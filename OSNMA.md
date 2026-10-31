@@ -122,5 +122,64 @@ scenarios and on a real receiver recording. The unit tests in
   attacks.
 - **Data must be complete.** A satellite is only authenticated once all the words covered by
   its tags have been received, so weak or intermittent signals can delay it.
-- **Devices that skip the CRC bits.** If a device doesn't fill in the I/NAV CRC bits, GPSTest
-  falls back to the device's own parity check and says so in the details.
+- **Devices that skip the CRC bits.** If the CRC fails on practically every page while the device
+  says they passed its parity check, GPSTest assumes the device doesn't fill in the CRC bits,
+  uses the device's check instead and says so in the details. Some devices mark every page as
+  passed, damaged or not, so this fallback is only used when no page at all passes the CRC.
+
+## Device quirks
+
+Real phones don't always deliver Galileo I/NAV pages the way the Android documentation
+describes. GPSTest detects and works around these differences. Each one is shown in the
+expanded card.
+
+### Bit layout of `TYPE_GAL_I` data
+
+The
+[`GnssNavigationMessage`](https://developer.android.com/reference/android/location/GnssNavigationMessage)
+documentation says that a Galileo I/NAV page (2 x 114 bits, sync and tail removed) is packed
+into 29 bytes, MSB first, with the 4 unused bits at the end ("skip B229-B232"):
+
+```
+documented:  [ 228 page bits ............................. ][ 4 unused ]
+seen:        [ 4 unused ][ 228 page bits ............................. ]
+```
+
+A Pixel 8 Pro (Android 17) puts the 4 unused bits at the start instead, so the whole page is
+shifted by 4 bits. Read the documented way, almost every field is garbage: the CRC fails, most
+pages look "not nominal", and the word type and time stamps decode to nonsense (for example a
+week number of 2904 instead of 1418). Read with the 4-bit offset, every page in a recorded log
+was nominal and passed the CRC.
+
+`InavLayoutDetector` checks each message with both layouts and uses the one under which the
+page passes the CRC. Once a few pages pass with one layout and none with the other, that layout
+is adopted. The **Data layout** row in the details shows the result ("As documented" or
+"Shifted by 4 bits").
+
+On that device, `getMessageId()` was mostly -1 and `getSubmessageId()` held the word type,
+which matches the documentation for `submessage_id` ("the word type").
+
+### Page halves paired the wrong way
+
+A nominal page is an even page part followed by an odd page part. If a device reports the odd
+part of one page together with the even part of the next, GPSTest rejoins the halves of two
+consecutive messages from the same satellite, and keeps the result only if the CRC passes. The
+**rejoined** count in the page counters shows how often this happened.
+
+### Missing pages
+
+Phones often deliver only part of the pages: the chip saves power (duty cycling) or tracks the
+E1 pilot signal, which carries no data. The Pixel 8 Pro log contained only 7 to 32 % of each
+Galileo satellite's pages. OSNMA needs all 15 pages of a 30 s subframe from a satellite, so at
+such rates authentication can't complete. The **Subframes** row shows how many subframes were
+complete, and the card shows a hint when fewer than half are. Turning on **Force full GNSS
+measurements**, both in GPSTest's settings and in Android's developer options, and keeping the
+screen on can help.
+
+### Time of each page
+
+Android doesn't say when a page was transmitted. GPSTest takes the Galileo time from the words
+that carry it (word types 0, 5 and 6) and places other pages in the slot their word type occupies
+in the fixed E1-B subframe sequence. This tolerates delivery delays of several seconds. Pages
+that fail the CRC are never used for timing. The **Page timing** and **Clock offset** rows show
+how this is going.
