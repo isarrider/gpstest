@@ -22,6 +22,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.android.gpstest.library.R
 import com.android.gpstest.library.osnma.InavPage
+import com.android.gpstest.library.osnma.InavLayoutDetector
 import com.android.gpstest.library.osnma.InavPageAssembler
 import com.android.gpstest.library.osnma.InavTimeTracker
 import com.android.gpstest.library.osnma.KeySource
@@ -76,7 +77,9 @@ data class OsnmaUiState(
     /** This device has delivered Galileo I/NAV pages before (in this or an earlier session) */
     val inavSeenBefore: Boolean = false,
     /** Pages restored from two messages whose halves were paired the wrong way round */
-    val pagesRepaired: Long = 0
+    val pagesRepaired: Long = 0,
+    /** Bit offset of the page in the platform's data (0 as documented, 4 on some devices) */
+    val layoutOffsetBits: Int? = null
 ) {
     /**
      * Pages arrive, but too many are missing to complete the OSNMA subframes, or they stopped.
@@ -119,6 +122,7 @@ class OsnmaRepository @Inject constructor(
     private var engine: OsnmaEngine? = null
     private val timeTracker = InavTimeTracker()
     private val assembler = InavPageAssembler()
+    private val layout = InavLayoutDetector()
     private var lastArrivalMillis = 0L
     private var lastPublishMillis = 0L
     private var inavPages = 0L
@@ -203,7 +207,7 @@ class OsnmaRepository @Inject constructor(
         subframeNumber: Int
     ) {
         if (!isEnabled()) return
-        val received = InavPage.fromAndroid(data)
+        val received = layout.read(data)
         if (received == null) {
             pagesWrongSize++
             Log.w(TAG, "Galileo I/NAV message with ${data.size} bytes instead of ${InavPage.SIZE_BYTES}")
@@ -339,7 +343,8 @@ class OsnmaRepository @Inject constructor(
             crcFailedButParityPassed = crcFailedButParityPassed,
             pagesCorrupted = pagesCorrupted,
             inavSeenBefore = inavSeen,
-            pagesRepaired = assembler.repaired
+            pagesRepaired = assembler.repaired,
+            layoutOffsetBits = layout.offsetBits
         )
     }
 

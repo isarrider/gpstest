@@ -247,6 +247,30 @@ class OsnmaEngineTest {
         assertTrue(engine.statistics.tagsOk > 1000)
     }
 
+    /**
+     * Some devices (a Pixel 8 Pro) put the 4 unused bits at the start of the 29 bytes instead of
+     * the end. The layout must be detected and the pages read correctly.
+     */
+    @Test
+    fun shiftedAndroidLayout_isDetected() {
+        val detector = InavLayoutDetector()
+        val engine = newEngine()
+        TestVectors.configuration1().forEach { p ->
+            val shifted = ByteArray(InavPage.SIZE_BYTES)
+            Bits.copy(p.page.toByteArray(), 0, shifted, 4, InavPage.PAGE_BITS)
+            val page = detector.read(shifted)!!
+            assertTrue(page.crcOk)
+            engine.feedPage(p.svn, p.gst, page)
+        }
+        assertEquals(4, detector.offsetBits)
+        assertEquals(1219, engine.statistics.tagsOk + engine.statistics.dummyTagsOk)
+
+        // The documented layout is detected too
+        val documented = InavLayoutDetector()
+        TestVectors.configuration1().take(50).forEach { documented.read(it.page.toByteArray()) }
+        assertEquals(0, documented.offsetBits)
+    }
+
     @Test
     fun corruptedPage_isRejectedByCrc() {
         val p = TestVectors.configuration1().first()

@@ -310,6 +310,12 @@ private fun Expanded(state: OsnmaUiState) {
                     state.pagesRepaired
                 )
             )
+            state.layoutOffsetBits?.let {
+                DetailRow(
+                    R.string.osnma_label_layout,
+                    stringResource(if (it == 0) R.string.osnma_layout_standard else R.string.osnma_layout_shifted)
+                )
+            }
             DetailRow(
                 R.string.osnma_label_device_parity,
                 stringResource(

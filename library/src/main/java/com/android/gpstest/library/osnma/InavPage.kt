@@ -90,8 +90,23 @@ class InavPage private constructor(private val bits: ByteArray) {
         private const val CRC_OFFSET = ODD_START + 82
 
         /** Wraps the 29-byte Android TYPE_GAL_I data. Returns null if the size is wrong. */
-        fun fromAndroid(data: ByteArray): InavPage? =
-            if (data.size >= SIZE_BYTES) InavPage(data.copyOf(SIZE_BYTES)) else null
+        fun fromAndroid(data: ByteArray): InavPage? = fromAndroid(data, 0)
+
+        /**
+         * Wraps Android TYPE_GAL_I data whose 228 page bits start [offsetBits] into the data.
+         * The documented layout has the 4 unused bits at the end (offset 0), but some devices
+         * (seen on a Pixel 8 Pro) put them at the start (offset 4). See [InavLayoutDetector].
+         */
+        fun fromAndroid(data: ByteArray, offsetBits: Int): InavPage? {
+            if (data.size < SIZE_BYTES || offsetBits < 0 || offsetBits > 4) return null
+            if (offsetBits == 0) return InavPage(data.copyOf(SIZE_BYTES))
+            val out = ByteArray(SIZE_BYTES)
+            Bits.copy(data, offsetBits, out, 0, PAGE_BITS)
+            return InavPage(out)
+        }
+
+        /** Number of page bits (2 x 114) */
+        const val PAGE_BITS = 228
 
         /**
          * Converts a full 240-bit nominal page (2 x 120 bits including tail bits, as used by the
