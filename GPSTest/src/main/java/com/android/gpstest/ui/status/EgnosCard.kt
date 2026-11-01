@@ -31,9 +31,9 @@ import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,10 +92,11 @@ fun EgnosCard(state: EgnosUiState, sbasStatuses: List<SatelliteStatus>) {
 
     var expanded by remember { mutableStateOf(egnosCardExpanded) }
     // Ticks every second so the age of the last message stays current
-    val now by produceState(SystemClock.elapsedRealtime()) {
+    var now by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(Unit) {
         while (true) {
             delay(1_000)
-            value = SystemClock.elapsedRealtime()
+            now = SystemClock.elapsedRealtime()
         }
     }
     val ageMillis = state.lastMessageElapsedMillis?.let { now - it }
