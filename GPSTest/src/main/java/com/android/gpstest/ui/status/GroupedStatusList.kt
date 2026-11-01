@@ -41,6 +41,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -93,6 +97,7 @@ private val collapsedGroups = mutableStateListOf<String>()
 @Composable
 private fun GroupCard(group: SatelliteGroup, osnmaMarks: Map<Int, OsnmaMark>) {
     val expanded = group.key !in collapsedGroups
+    val name = groupName(group)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -100,7 +105,7 @@ private fun GroupCard(group: SatelliteGroup, osnmaMarks: Map<Int, OsnmaMark>) {
         elevation = 2.dp
     ) {
         Column {
-            GroupHeader(group, expanded) {
+            GroupHeader(group, name, expanded) {
                 if (expanded) collapsedGroups.add(group.key) else collapsedGroups.remove(group.key)
             }
             if (expanded) {
@@ -112,7 +117,7 @@ private fun GroupCard(group: SatelliteGroup, osnmaMarks: Map<Int, OsnmaMark>) {
                         null
                     }
                     val showDetails = satellite.key in satellitesWithDetails
-                    SatelliteRow(satellite, mark) {
+                    SatelliteRow(satellite, mark, name, showDetails) {
                         if (showDetails) {
                             satellitesWithDetails.remove(satellite.key)
                         } else {
@@ -127,17 +132,36 @@ private fun GroupCard(group: SatelliteGroup, osnmaMarks: Map<Int, OsnmaMark>) {
 }
 
 @Composable
-private fun GroupHeader(group: SatelliteGroup, expanded: Boolean, onClick: () -> Unit) {
+private fun GroupHeader(
+    group: SatelliteGroup,
+    name: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    // Read as one item by screen readers, e.g. "Galileo, 7 of 9 satellites used in fix,
+    // average C/N0 34 dB-Hz", with "collapse" or "expand" as the action
+    val description = groupDescription(group, name)
+    val actionLabel = stringResource(
+        if (expanded) R.string.status_a11y_collapse else R.string.status_a11y_expand
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { onToggle() }
+            .clearAndSetSemantics {
+                contentDescription = description
+                heading()
+                onClick(label = actionLabel) {
+                    onToggle()
+                    true
+                }
+            }
             .padding(start = 9.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Flag(group.representative, Modifier.width(36.dp))
         Text(
-            text = groupName(group),
+            text = name,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
             modifier = Modifier.padding(start = 6.dp)
@@ -212,11 +236,29 @@ private fun satelliteId(satellite: GroupedSatellite): String {
 }
 
 @Composable
-private fun SatelliteRow(satellite: GroupedSatellite, osnmaMark: OsnmaMark?, onClick: () -> Unit) {
+private fun SatelliteRow(
+    satellite: GroupedSatellite,
+    osnmaMark: OsnmaMark?,
+    groupName: String,
+    showDetails: Boolean,
+    onToggle: () -> Unit
+) {
+    // Read as one item by screen readers instead of piece by piece (the C/N0 bars have no text)
+    val description = satelliteDescription(satellite, osnmaMark, groupName)
+    val actionLabel = stringResource(
+        if (showDetails) R.string.status_a11y_hide_details else R.string.status_a11y_show_details
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { onToggle() }
+            .clearAndSetSemantics {
+                contentDescription = description
+                onClick(label = actionLabel) {
+                    onToggle()
+                    true
+                }
+            }
             .alpha(if (satellite.usedInFix) 1f else 0.55f)
             .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -385,8 +427,11 @@ private fun SatelliteDetails(satellite: GroupedSatellite) {
             } else {
                 ""
             }
+            val used = stringResource(
+                if (status.usedInFix) R.string.status_details_used else R.string.status_details_not_used
+            )
             Text(
-                text = "$label: $frequency, $cn0$baseband",
+                text = "$label: $frequency, $cn0$baseband$used",
                 fontSize = 12.sp
             )
         }
@@ -405,4 +450,73 @@ private fun SatelliteDetails(satellite: GroupedSatellite) {
             )
         }
     }
+}
+
+/** Screen reader text for a group header */
+@Composable
+private fun groupDescription(group: SatelliteGroup, name: String): String {
+    val averageCn0 = group.averageCn0
+    return stringResource(
+        R.string.status_a11y_group,
+        name,
+        group.numUsed,
+        group.satellites.size
+    ) + if (averageCn0 != null) {
+        stringResource(R.string.status_a11y_group_cn0, averageCn0)
+    } else {
+        ""
+    }
+}
+
+/**
+ * Screen reader text for a satellite row, e.g. "Galileo 6, navigation data authenticated by
+ * Galileo OSNMA, E1 41.9 dB-Hz, E5a 28.6 dB-Hz, elevation 62 degrees, azimuth 214 degrees, used in
+ * fix"
+ */
+@Composable
+private fun satelliteDescription(
+    satellite: GroupedSatellite,
+    osnmaMark: OsnmaMark?,
+    groupName: String
+): String {
+    val parts = mutableListOf(
+        stringResource(R.string.status_a11y_satellite, groupName, satellite.svid)
+    )
+    if (osnmaMark != null) {
+        parts.add(
+            stringResource(
+                if (osnmaMark == OsnmaMark.AUTHENTICATED) {
+                    R.string.osnma_mark_authenticated
+                } else {
+                    R.string.osnma_mark_failed
+                }
+            )
+        )
+    }
+    satellite.signals.forEach { status ->
+        val label = carrierLabel(status)
+        if (status.cn0DbHz != SatelliteStatus.NO_DATA) {
+            parts.add(stringResource(R.string.status_a11y_signal, label, status.cn0DbHz).trim())
+        } else if (label.isNotEmpty()) {
+            parts.add(label)
+        }
+    }
+    val first = satellite.first
+    if (first.elevationDegrees != SatelliteStatus.NO_DATA ||
+        first.azimuthDegrees != SatelliteStatus.NO_DATA
+    ) {
+        parts.add(
+            stringResource(
+                R.string.status_a11y_position,
+                first.elevationDegrees,
+                first.azimuthDegrees
+            )
+        )
+    }
+    parts.add(
+        stringResource(
+            if (satellite.usedInFix) R.string.status_a11y_used else R.string.status_a11y_not_used
+        )
+    )
+    return parts.joinToString(", ")
 }

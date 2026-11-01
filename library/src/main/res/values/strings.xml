@@ -641,6 +641,20 @@
     <string name="status_details_cn0">C/N0 %1$.1f dB-Hz</string>
     <string name="status_details_no_cn0">no C/N0</string>
     <string name="status_details_baseband_cn0">, baseband %1$.1f dB-Hz</string>
+    <string name="status_details_used">, used in fix</string>
+    <string name="status_details_not_used">, not used in fix</string>
+    <!-- Screen reader texts for the grouped satellite list -->
+    <string name="status_a11y_group">%1$s, %2$d of %3$d satellites used in fix</string>
+    <string name="status_a11y_group_cn0">, average C/N0 %1$.0f dB-Hz</string>
+    <string name="status_a11y_satellite">%1$s %2$d</string>
+    <string name="status_a11y_signal">%1$s %2$.1f dB-Hz</string>
+    <string name="status_a11y_position">elevation %1$.0f degrees, azimuth %2$.0f degrees</string>
+    <string name="status_a11y_used">used in fix</string>
+    <string name="status_a11y_not_used">not used in fix</string>
+    <string name="status_a11y_show_details">show signal details</string>
+    <string name="status_a11y_hide_details">hide signal details</string>
+    <string name="status_a11y_expand">expand</string>
+    <string name="status_a11y_collapse">collapse</string>
     <string name="status_details_position">Elevation %1$.1f\u00B0, azimuth %2$.1f\u00B0</string>
     <string name="status_group_sbas_unknown">Other SBAS</string>
 </resources>
