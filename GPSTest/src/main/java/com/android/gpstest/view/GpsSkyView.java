@@ -69,7 +69,7 @@ public class GpsSkyView extends View {
 
     private List<SatelliteStatus> statuses = emptyList();
 
-    // Galileo OSNMA state by SVN, shown as a small lock next to the satellite
+    // Galileo OSNMA state by SVN, shown as a small seal next to the satellite
     private Map<Integer, OsnmaMark> mOsnmaMarks = Collections.emptyMap();
 
     private Drawable mOsnmaAuthenticatedIcon, mOsnmaFailedIcon;
@@ -378,8 +378,8 @@ public class GpsSkyView extends View {
     }
 
     /**
-     * Draws a small lock at the upper right of a Galileo satellite: closed if its navigation data
-     * is authenticated, open (red) if tags failed
+     * Draws a small seal at the upper right of a Galileo satellite: green with a check mark if its
+     * navigation data is authenticated, red with an exclamation mark if tags failed
      */
     private void drawOsnmaMark(Canvas c, float x, float y, OsnmaMark mark) {
         if (mark == null) {

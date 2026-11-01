@@ -39,15 +39,18 @@ that Android delivers to apps. The result is shown on the **Status** screen.
 The card is a single line by default: the status chip and, while authenticating, the number of
 authenticated satellites. Tap it to expand: the fields above, tag counts by type (CED, timing,
 slow MAC), page counters (received, used, without time, not nominal, CRC errors), device parity,
-subframe completeness, page timing, clock offset and the latest events.
+subframe completeness, page timing, clock offset and the latest events. All fields are shown
+from the start, with "Not known yet", "None yet" or the root key progress until they're filled
+in, so the layout doesn't jump while authentication progresses.
 
 ### Satellite list and sky view
 
 Galileo satellites are marked in the satellite list on the Status screen (next to the ID) and in
 the sky view (at the upper right of the triangle):
 
-- **Green closed lock**: the satellite's ephemeris, clock and health data is authenticated.
-- **Red open lock**: a tag of this satellite failed in the last 10 minutes.
+- **Green seal with a check mark**: the satellite's ephemeris, clock and health data is
+  authenticated.
+- **Red seal with an exclamation mark**: a tag of this satellite failed in the last 10 minutes.
 
 ### Warning notification
 

@@ -571,9 +571,12 @@
     <string name="osnma_chain_value">ID %1$d, %2$s, %3$d-bit tags, key at %4$s</string>
     <string name="osnma_chain_warm_start">(from the previous session)</string>
     <string name="osnma_chain_built_in">(built-in root key)</string>
-    <string name="osnma_label_kroot">TESLA root key</string>
-    <string name="osnma_kroot_progress">%1$d of %2$d blocks received</string>
-    <string name="osnma_kroot_progress_unknown">%1$d blocks received</string>
+    <string name="osnma_kroot_progress">Waiting for the root key: %1$d of %2$d blocks received</string>
+    <string name="osnma_kroot_progress_unknown">Waiting for the root key: %1$d blocks received</string>
+    <string name="osnma_kroot_waiting">Waiting for the root key</string>
+    <string name="osnma_value_unknown">Not known yet</string>
+    <string name="osnma_value_none_yet">None yet</string>
+    <string name="osnma_value_none">None</string>
     <string name="osnma_tags_value">%1$d (CED %2$d, timing %3$d, slow MAC %4$d), failed %5$d</string>
     <string name="osnma_pages_value">%1$d received, %2$d used (%3$d with OSNMA), %4$d without time, %5$d not nominal, %6$d CRC errors, %7$d rejoined</string>
     <string name="osnma_reception_stalled">Galileo navigation pages stopped arriving.</string>

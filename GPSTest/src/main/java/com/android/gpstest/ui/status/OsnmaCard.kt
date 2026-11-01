@@ -50,6 +50,7 @@ import com.android.gpstest.library.osnma.KeySource
 import com.android.gpstest.library.osnma.MacFunction
 import com.android.gpstest.library.osnma.NmaStatus
 import com.android.gpstest.library.osnma.OsnmaEvent
+import com.android.gpstest.library.osnma.OsnmaStatistics
 import com.android.gpstest.library.osnma.OsnmaStatus
 import com.android.gpstest.library.osnma.OsnmaStatus.Phase
 import kotlin.math.roundToInt
@@ -133,9 +134,7 @@ fun OsnmaCard(state: OsnmaUiState) {
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
-                if (status != null && status.statistics.osnmaPages > 0) {
-                    Details(status)
-                }
+                Details(status)
                 Expanded(state)
             }
         }
@@ -220,21 +219,29 @@ private fun phaseDescription(state: OsnmaUiState): String {
     }
 }
 
+/**
+ * The main fields. They're always shown, with a placeholder until they're known, so that the card
+ * keeps its layout while authentication progresses.
+ */
 @Composable
-private fun Details(status: OsnmaStatus) {
-    val header = status.nmaHeader
-    if (header != null) {
-        val nmas = when (header.nmaStatus) {
-            NmaStatus.OPERATIONAL -> stringResource(R.string.osnma_nmas_operational)
-            NmaStatus.TEST -> stringResource(R.string.osnma_nmas_test)
-            NmaStatus.DONT_USE -> stringResource(R.string.osnma_nmas_dont_use)
-            NmaStatus.RESERVED -> stringResource(R.string.osnma_nmas_reserved)
+private fun Details(status: OsnmaStatus?) {
+    val header = status?.nmaHeader
+    DetailRow(
+        R.string.osnma_label_status,
+        if (header != null) {
+            val nmas = when (header.nmaStatus) {
+                NmaStatus.OPERATIONAL -> stringResource(R.string.osnma_nmas_operational)
+                NmaStatus.TEST -> stringResource(R.string.osnma_nmas_test)
+                NmaStatus.DONT_USE -> stringResource(R.string.osnma_nmas_dont_use)
+                NmaStatus.RESERVED -> stringResource(R.string.osnma_nmas_reserved)
+            }
+            nmas + if (status.nmaHeaderAuthenticated) " ✓" else ""
+        } else {
+            stringResource(R.string.osnma_value_unknown)
         }
-        val verified = if (status.nmaHeaderAuthenticated) " ✓" else ""
-        DetailRow(R.string.osnma_label_status, nmas + verified)
-    }
+    )
 
-    val key = status.publicKey
+    val key = status?.publicKey
     DetailRow(
         R.string.osnma_label_public_key,
         if (key != null) {
@@ -250,151 +257,153 @@ private fun Details(status: OsnmaStatus) {
         }
     )
 
-    val tesla = status.teslaKey
-    if (tesla != null) {
-        val mac =
-            if (tesla.chain.macFunction == MacFunction.HMAC_SHA_256) "HMAC-SHA-256" else "CMAC-AES"
-        val chain = stringResource(
-            R.string.osnma_chain_value,
-            tesla.chain.chainId,
-            mac,
-            tesla.chain.tagSizeBits,
-            formatGst(tesla.gstSubframe)
-        )
-        DetailRow(
-            R.string.osnma_label_chain,
+    val tesla = status?.teslaKey
+    DetailRow(
+        R.string.osnma_label_chain,
+        if (tesla != null) {
+            val mac = if (tesla.chain.macFunction == MacFunction.HMAC_SHA_256) {
+                "HMAC-SHA-256"
+            } else {
+                "CMAC-AES"
+            }
+            val chain = stringResource(
+                R.string.osnma_chain_value,
+                tesla.chain.chainId,
+                mac,
+                tesla.chain.tagSizeBits,
+                formatGst(tesla.gstSubframe)
+            )
             when {
                 status.warmStartBuiltIn ->
                     chain + " " + stringResource(R.string.osnma_chain_built_in)
                 status.warmStart -> chain + " " + stringResource(R.string.osnma_chain_warm_start)
                 else -> chain
             }
-        )
-    } else {
-        status.krootProgress?.let { (have, needed) ->
-            DetailRow(
-                R.string.osnma_label_kroot,
-                if (needed > 0) stringResource(R.string.osnma_kroot_progress, have, needed)
-                else stringResource(R.string.osnma_kroot_progress_unknown, have)
-            )
+        } else {
+            val progress = status?.krootProgress
+            when {
+                progress == null -> stringResource(R.string.osnma_kroot_waiting)
+                progress.second > 0 ->
+                    stringResource(R.string.osnma_kroot_progress, progress.first, progress.second)
+                else -> stringResource(R.string.osnma_kroot_progress_unknown, progress.first)
+            }
         }
-    }
+    )
 
-    val authenticated = status.authenticatedSatellites
+    val authenticated = status?.authenticatedSatellites.orEmpty()
     if (authenticated.isNotEmpty()) {
         DetailRow(
             R.string.osnma_label_authenticated,
             authenticated.joinToString(" ") { "E%02d".format(it.svn) },
             color = greenText
         )
+    } else {
+        DetailRow(R.string.osnma_label_authenticated, stringResource(R.string.osnma_value_none_yet))
     }
-    val failed = status.recentFailures()
+    val failed = status?.recentFailures().orEmpty()
     if (failed.isNotEmpty()) {
         DetailRow(
             R.string.osnma_label_failed,
             failed.joinToString(" ") { "E%02d (%d)".format(it.svn, it.tagsFailed) },
             color = MaterialTheme.colors.error
         )
+    } else {
+        DetailRow(R.string.osnma_label_failed, stringResource(R.string.osnma_value_none))
     }
 }
 
 @Composable
 private fun Expanded(state: OsnmaUiState) {
     val status = state.status
+    val s = status?.statistics ?: OsnmaStatistics()
+    val unknown = stringResource(R.string.osnma_value_unknown)
     Column(modifier = Modifier.padding(top = 6.dp)) {
-        if (status != null) {
-            val s = status.statistics
-            DetailRow(
-                R.string.osnma_label_tags,
-                stringResource(
-                    R.string.osnma_tags_value,
-                    s.tagsOk + s.dummyTagsOk,
-                    s.tagsOkAdkd0,
-                    s.tagsOkAdkd4,
-                    s.tagsOkAdkd12,
-                    s.tagsFailed + s.dummyTagsFailed
-                )
+        DetailRow(
+            R.string.osnma_label_tags,
+            stringResource(
+                R.string.osnma_tags_value,
+                s.tagsOk + s.dummyTagsOk,
+                s.tagsOkAdkd0,
+                s.tagsOkAdkd4,
+                s.tagsOkAdkd12,
+                s.tagsFailed + s.dummyTagsFailed
             )
-            DetailRow(
-                R.string.osnma_label_pages,
-                stringResource(
-                    R.string.osnma_pages_value,
-                    state.inavPagesReceived,
-                    s.pages,
-                    s.osnmaPages,
-                    state.pagesWithoutTime,
-                    s.pagesRejected + state.pagesWrongSize,
-                    state.pagesCorrupted + s.crcErrors,
-                    state.pagesRepaired
-                )
+        )
+        DetailRow(
+            R.string.osnma_label_pages,
+            stringResource(
+                R.string.osnma_pages_value,
+                state.inavPagesReceived,
+                s.pages,
+                s.osnmaPages,
+                state.pagesWithoutTime,
+                s.pagesRejected + state.pagesWrongSize,
+                state.pagesCorrupted + s.crcErrors,
+                state.pagesRepaired
             )
-            state.layoutOffsetBits?.let {
-                DetailRow(
-                    R.string.osnma_label_layout,
-                    stringResource(
-                        if (it == 0) {
-                            R.string.osnma_layout_standard
-                        } else {
-                            R.string.osnma_layout_shifted
-                        }
-                    )
-                )
+        )
+        DetailRow(
+            R.string.osnma_label_layout,
+            when (state.layoutOffsetBits) {
+                null -> unknown
+                0 -> stringResource(R.string.osnma_layout_standard)
+                else -> stringResource(R.string.osnma_layout_shifted)
             }
-            DetailRow(
-                R.string.osnma_label_device_parity,
-                stringResource(
-                    R.string.osnma_device_parity_value,
-                    state.pagesParityPassed,
-                    state.inavPagesReceived,
-                    state.crcFailedButParityPassed
-                )
+        )
+        DetailRow(
+            R.string.osnma_label_device_parity,
+            stringResource(
+                R.string.osnma_device_parity_value,
+                state.pagesParityPassed,
+                state.inavPagesReceived,
+                state.crcFailedButParityPassed
             )
+        )
+        DetailRow(
+            R.string.osnma_label_subframes,
             s.subframeCompleteness?.let {
-                DetailRow(
-                    R.string.osnma_label_subframes,
-                    stringResource(
-                        R.string.osnma_subframes_value,
-                        s.subframesCompletedCounted,
-                        s.subframesStarted,
-                        (it * 100).roundToInt()
-                    )
-                )
-            }
-            status.gst?.let { DetailRow(R.string.osnma_label_gst, formatGst(it)) }
-            DetailRow(
-                R.string.osnma_label_timing,
                 stringResource(
-                    when {
-                        state.timingUsesReceiverClock -> R.string.osnma_timing_receiver_clock
-                        state.timingUsesSubframeNumbers -> R.string.osnma_timing_subframe_numbers
-                        else -> R.string.osnma_timing_word_types
-                    },
-                    state.timingCorrections
+                    R.string.osnma_subframes_value,
+                    s.subframesCompletedCounted,
+                    s.subframesStarted,
+                    (it * 100).roundToInt()
                 )
+            } ?: unknown
+        )
+        DetailRow(R.string.osnma_label_gst, status?.gst?.let { formatGst(it) } ?: unknown)
+        DetailRow(
+            R.string.osnma_label_timing,
+            stringResource(
+                when {
+                    state.timingUsesReceiverClock -> R.string.osnma_timing_receiver_clock
+                    state.timingUsesSubframeNumbers -> R.string.osnma_timing_subframe_numbers
+                    else -> R.string.osnma_timing_word_types
+                },
+                state.timingCorrections
             )
+        )
+        DetailRow(
+            R.string.osnma_label_clock_offset,
             state.clockOffsetSeconds?.let {
-                DetailRow(
-                    R.string.osnma_label_clock_offset,
-                    stringResource(R.string.osnma_clock_offset_value, it)
-                )
+                stringResource(R.string.osnma_clock_offset_value, it)
+            } ?: unknown
+        )
+        if (state.trustingPlatformParity) {
+            SmallText(stringResource(R.string.osnma_trusting_parity), FontStyle.Italic)
+        }
+        status?.events?.takeLast(MAX_EVENTS_SHOWN)?.reversed()?.forEach { e ->
+            val color = when (e.type) {
+                OsnmaEvent.Type.ERROR -> MaterialTheme.colors.error
+                OsnmaEvent.Type.WARNING -> amberText
+                OsnmaEvent.Type.SUCCESS -> greenText
+                OsnmaEvent.Type.INFO -> MaterialTheme.colors.onSurface
             }
-            if (state.trustingPlatformParity) {
-                SmallText(stringResource(R.string.osnma_trusting_parity), FontStyle.Italic)
-            }
-            status.events.takeLast(MAX_EVENTS_SHOWN).reversed().forEach { e ->
-                val color = when (e.type) {
-                    OsnmaEvent.Type.ERROR -> MaterialTheme.colors.error
-                    OsnmaEvent.Type.WARNING -> amberText
-                    OsnmaEvent.Type.SUCCESS -> greenText
-                    OsnmaEvent.Type.INFO -> MaterialTheme.colors.onSurface
-                }
-                Text(
-                    text = "${formatGst(e.gst)}  ${e.message}",
-                    fontSize = 11.sp,
-                    color = color,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
+            Text(
+                text = "${formatGst(e.gst)}  ${e.message}",
+                fontSize = 11.sp,
+                color = color,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
         SmallText(stringResource(R.string.osnma_explanation), FontStyle.Italic)
     }

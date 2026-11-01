@@ -248,7 +248,8 @@ fun Svid(satelliteStatus: SatelliteStatus, osnmaMark: OsnmaMark?, modifier: Modi
 }
 
 /**
- * Lock next to the ID of Galileo satellites: closed if authenticated, open and red if tags failed
+ * Seal next to the ID of Galileo satellites: green with a check mark if authenticated, red with an
+ * exclamation mark if tags failed
  */
 @Composable
 fun OsnmaMarkIcon(mark: OsnmaMark?) {
