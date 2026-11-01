@@ -148,6 +148,22 @@ object FormatUtils {
         }
     }
 
+    /**
+     * Formats a duration in the style of the TTFF, e.g. "45 sec", "13 min 45 sec" or
+     * "1 h 2 min 3 sec". Negative durations are shown as "0 sec".
+     */
+    fun formatDuration(millis: Long): String {
+        val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(millis.coerceAtLeast(0))
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return when {
+            hours > 0 -> "$hours h $minutes min $seconds sec"
+            minutes > 0 -> "$minutes min $seconds sec"
+            else -> "$seconds sec"
+        }
+    }
+
     fun formatAccuracy(context: Context, location: Location, prefs: SharedPreferences): String {
         if (location.isVerticalAccuracySupported()) {
             if (PreferenceUtil.distanceUnits(context, prefs)

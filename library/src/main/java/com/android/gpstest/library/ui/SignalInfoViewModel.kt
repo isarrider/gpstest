@@ -20,6 +20,7 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.location.Location
+import android.os.SystemClock
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
@@ -114,6 +115,13 @@ class SignalInfoViewModel @Inject constructor(
 
     private val _ttff = MutableLiveData("")
     val ttff: LiveData<String> = _ttff
+
+    /**
+     * SystemClock.elapsedRealtime() when the first fix was acquired, or null before the first fix,
+     * used to show the time since the first fix (TSFF)
+     */
+    private val _firstFixElapsedMillis = MutableLiveData<Long?>(null)
+    val firstFixElapsedMillis: LiveData<Long?> = _firstFixElapsedMillis
 
     private val _altitudeMsl = MutableLiveData<Double>()
     val altitudeMsl: LiveData<Double> = _altitudeMsl
@@ -373,6 +381,7 @@ class SignalInfoViewModel @Inject constructor(
 
     private fun onGnssFirstFix(ttffMillis: Int) {
         _ttff.value = formatTtff(ttffMillis)
+        _firstFixElapsedMillis.value = SystemClock.elapsedRealtime()
         setGotFirstFix(true)
     }
 
@@ -537,6 +546,7 @@ class SignalInfoViewModel @Inject constructor(
         _filteredSbasSatellites.value = emptyMap()
         _location.value = Location("reset")
         _ttff.value = ""
+        _firstFixElapsedMillis.value = null
         _altitudeMsl.value = Double.NaN
         _dop.value = DilutionOfPrecision(Double.NaN, Double.NaN, Double.NaN)
         _filteredSatelliteMetadata.value = SatelliteMetadata()

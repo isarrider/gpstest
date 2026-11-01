@@ -88,6 +88,7 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
     //
     val location: Location by viewModel.location.observeAsState(Location("default"))
     val ttff: String by viewModel.ttff.observeAsState("")
+    val firstFixElapsedMillis: Long? by viewModel.firstFixElapsedMillis.observeAsState(null)
     val altitudeMsl: Double by viewModel.altitudeMsl.observeAsState(Double.NaN)
     val dop: DilutionOfPrecision by viewModel.dop.observeAsState(DilutionOfPrecision(Double.NaN,Double.NaN,Double.NaN))
     val satelliteMetadata: SatelliteMetadata by viewModel.filteredSatelliteMetadata.observeAsState(
@@ -124,7 +125,8 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
                 altitudeMsl,
                 dop,
                 satelliteMetadata,
-                fixState)
+                fixState,
+                firstFixElapsedMillis)
         }
         item(key = "osnma") {
             OsnmaCard(osnma)

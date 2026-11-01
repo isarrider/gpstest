@@ -18,6 +18,7 @@ package com.android.gpstest.ui.status
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
+import android.os.SystemClock
 import android.os.Build
 import android.text.TextUtils
 import android.text.format.DateFormat
@@ -49,6 +50,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +86,7 @@ import com.android.gpstest.library.util.FormatUtils.formatAltitudeMsl
 import com.android.gpstest.library.util.FormatUtils.formatBearing
 import com.android.gpstest.library.util.FormatUtils.formatBearingAccuracy
 import com.android.gpstest.library.util.FormatUtils.formatDoP
+import com.android.gpstest.library.util.FormatUtils.formatDuration
 import com.android.gpstest.library.util.FormatUtils.formatHvDOP
 import com.android.gpstest.library.util.FormatUtils.formatLatOrLon
 import com.android.gpstest.library.util.FormatUtils.formatNumSats
@@ -98,6 +101,7 @@ import com.android.gpstest.library.util.PreferenceUtils.gnssFilter
 import com.android.gpstest.library.util.SatelliteUtil.isVerticalAccuracySupported
 import com.android.gpstest.ui.components.LinkifyText
 import java.text.SimpleDateFormat
+import kotlinx.coroutines.delay
 
 @Preview
 @Composable
@@ -144,6 +148,7 @@ fun LocationCard(
     dop: DilutionOfPrecision,
     satelliteMetadata: SatelliteMetadata,
     fixState: FixState,
+    firstFixElapsedMillis: Long? = null,
 ) {
     val context = LocalContext.current
     Card(
@@ -163,7 +168,7 @@ fun LocationCard(
                 LabelColumn1()
                 ValueColumn1(context, location, altitudeMsl, dop)
                 LabelColumn2(location)
-                ValueColumn2(location, ttff, dop, satelliteMetadata)
+                ValueColumn2(location, ttff, dop, satelliteMetadata, firstFixElapsedMillis)
             }
             LockIcon(fixState)
         }
@@ -236,6 +241,7 @@ fun ValueColumn2(
     ttff: String,
     dop: DilutionOfPrecision,
     satelliteMetadata: SatelliteMetadata,
+    firstFixElapsedMillis: Long? = null,
 ) {
     Column(
         modifier = Modifier
@@ -246,7 +252,7 @@ fun ValueColumn2(
         horizontalAlignment = Alignment.Start
     ) {
         Time(location)
-        TTFF(ttff)
+        TTFF(ttff, firstFixElapsedMillis)
         Accuracy(location)
         NumSats(satelliteMetadata)
         Bearing(location)
@@ -306,9 +312,24 @@ private fun String.trimZeros(): String {
         .replace(",000", "")
 }
 
+/**
+ * Time to first fix and time since first fix (TSFF), e.g. "12 sec / 13 min 45 sec". The TSFF
+ * counts up every second.
+ */
 @Composable
-fun TTFF(ttff: String) {
-    LocationValue(ttff)
+fun TTFF(ttff: String, firstFixElapsedMillis: Long? = null) {
+    if (ttff.isEmpty() || firstFixElapsedMillis == null) {
+        LocationValue(ttff)
+        return
+    }
+    var now by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(firstFixElapsedMillis) {
+        while (true) {
+            now = SystemClock.elapsedRealtime()
+            delay(1_000)
+        }
+    }
+    LocationValue("$ttff / " + formatDuration(now - firstFixElapsedMillis))
 }
 
 /**
@@ -380,7 +401,7 @@ fun LabelColumn2(location: Location) {
         horizontalAlignment = Alignment.End
     ) {
         LocationLabel(R.string.fix_time_label)
-        LocationLabel(R.string.ttff_label)
+        LocationLabel(R.string.ttff_tsff_label)
         LocationLabel(if (location.isVerticalAccuracySupported()) R.string.hor_and_vert_accuracy_label else R.string.accuracy_label)
         LocationLabel(R.string.num_sats_label)
         LocationLabel(R.string.bearing_label)

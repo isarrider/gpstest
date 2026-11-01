@@ -81,6 +81,7 @@
     <string name="longitude_label">Long:</string>
     <string name="fix_time_label">Time:</string>
     <string name="ttff_label">TTFF:</string>
+    <string name="ttff_tsff_label">TTFF / TSFF:</string>
     <string name="altitude_label">Alt:</string>
     <string name="altitude_msl_label">Alt (MSL):</string>
     <string name="accuracy_label">E H Acc:</string>
