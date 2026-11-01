@@ -50,6 +50,10 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.Layout
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -160,17 +164,51 @@ fun LocationCard(
             },
         elevation = 2.dp
     ) {
-        Box {
-            Row(
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
+        BoxWithConstraints {
+            val cardWidthPx = constraints.maxWidth
+            TwoColumnBlocks(
+                cardWidthPx = cardWidthPx,
+                modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
-                LabelColumn1()
-                ValueColumn1(context, location, altitudeMsl, dop)
-                LabelColumn2(location)
-                ValueColumn2(location, ttff, dop, satelliteMetadata, firstFixElapsedMillis)
+                Row {
+                    LabelColumn1()
+                    ValueColumn1(context, location, altitudeMsl, dop)
+                }
+                Row {
+                    LabelColumn2(location)
+                    ValueColumn2(location, ttff, dop, satelliteMetadata, firstFixElapsedMillis)
+                }
             }
             LockIcon(fixState)
+        }
+    }
+}
+
+/**
+ * Lays out the fix card's two blocks of labels and values: the first at the left, the second as
+ * far right as the card allows, so free space ends up between them instead of to the right of the
+ * second block. If both don't fit, the second follows the first and the card scrolls horizontally.
+ *
+ * The second block's position only uses the widest width it had so far, so it doesn't move a little
+ * every second while the time, TTFF/TSFF and accuracy values change length.
+ */
+@Composable
+private fun TwoColumnBlocks(
+    cardWidthPx: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val widestSecond = remember { IntArray(1) }
+    val endPaddingPx = with(LocalDensity.current) { 8.dp.roundToPx() }
+    Layout(content = content, modifier = modifier) { measurables, _ ->
+        val first = measurables[0].measure(Constraints())
+        val second = measurables[1].measure(Constraints())
+        widestSecond[0] = maxOf(widestSecond[0], second.width)
+        val secondX = maxOf(first.width, cardWidthPx - widestSecond[0] - endPaddingPx)
+        val width = maxOf(cardWidthPx, secondX + second.width)
+        layout(width, maxOf(first.height, second.height)) {
+            first.place(0, 0)
+            second.place(secondX, 0)
         }
     }
 }
