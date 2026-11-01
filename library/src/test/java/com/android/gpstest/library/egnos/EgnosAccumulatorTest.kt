@@ -152,4 +152,14 @@ class EgnosAccumulatorTest {
         assertNull(EmsParser.parseLine("# comment"))
         assertNull(EmsParser.parseLine("136 26 11 01 14 00 05 1 XYZ"))
     }
+
+    @Test
+    fun emsDates() {
+        assertEquals(0L, EmsParser.daysFromCivil(1970, 1, 1))
+        assertEquals(3657L, EmsParser.daysFromCivil(1980, 1, 6))
+        // Leap day and the day after
+        assertEquals(19782L, EmsParser.daysFromCivil(2024, 2, 29))
+        assertEquals(19783L, EmsParser.daysFromCivil(2024, 3, 1))
+        assertEquals(20393L, EmsParser.daysFromCivil(2025, 11, 1))
+    }
 }
