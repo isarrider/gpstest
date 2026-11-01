@@ -102,7 +102,10 @@ object PreferenceUtil {
     }
 
     fun isCsvLoggingEnabled(context: Context, prefs: SharedPreferences): Boolean {
-        return writeNmeaToFile(context, prefs) || writeMeasurementsToFile(context, prefs) || writeNavMessageToFile(context, prefs) || writeLocationToFile(context, prefs) || writeAntennaInfoToFileCsv(context, prefs) || writeStatusToFile(context, prefs) || writeOrientationToFile(context, prefs) || writeOsnmaToFile(context, prefs)
+        return writeNmeaToFile(context, prefs) || writeMeasurementsToFile(context, prefs) ||
+                writeNavMessageToFile(context, prefs) || writeLocationToFile(context, prefs) ||
+                writeAntennaInfoToFileCsv(context, prefs) || writeStatusToFile(context, prefs) ||
+                writeOrientationToFile(context, prefs) || writeOsnmaToFile(context, prefs)
     }
 
     fun isJsonLoggingEnabled(context: Context, prefs: SharedPreferences): Boolean {

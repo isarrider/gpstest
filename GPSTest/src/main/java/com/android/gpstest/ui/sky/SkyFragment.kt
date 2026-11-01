@@ -177,7 +177,8 @@ class SkyFragment : Fragment() {
         osnmaRepository.state
             .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
             .onEach { state ->
-                binding?.skyView?.setOsnmaMarks(state.status?.takeIf { state.enabled }?.marks() ?: emptyMap())
+                val marks = state.status?.takeIf { state.enabled }?.marks() ?: emptyMap()
+                binding?.skyView?.setOsnmaMarks(marks)
             }
             .launchIn(viewLifecycleOwner.lifecycleScope)
     }

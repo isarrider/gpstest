@@ -70,7 +70,9 @@ class InavTimeTracker(
     }
 
     private fun receiverOffset(arrivalMillis: Long): Long? =
-        receiverOffsetMillis?.takeIf { abs(arrivalMillis - receiverOffsetAt) <= MAX_RECEIVER_CLOCK_AGE_MILLIS }
+        receiverOffsetMillis?.takeIf {
+            abs(arrivalMillis - receiverOffsetAt) <= MAX_RECEIVER_CLOCK_AGE_MILLIS
+        }
 
     // Consistency of the platform's subframe numbers with the time stamps in the data
     private var subframeNumberAgree = 0
@@ -110,7 +112,9 @@ class InavTimeTracker(
         arrivalMillis: Long,
         subframeNumber: Int = -1
     ): Gst? {
-        val wn = weekNumber ?: receiverOffset(arrivalMillis)?.let { ((arrivalMillis - it) / 1000 / Gst.SECS_IN_WEEK).toInt() }
+        val wn = weekNumber ?: receiverOffset(arrivalMillis)?.let {
+            ((arrivalMillis - it) / 1000 / Gst.SECS_IN_WEEK).toInt()
+        }
         val exact = page.gstFromWord(wn)
         if (exact != null) {
             if (page.wordType != 6) weekNumber = exact.wn
@@ -140,7 +144,11 @@ class InavTimeTracker(
 
     private fun checkSubframeNumber(exact: Gst, subframeNumber: Int) {
         if (subframeNumber in 1..SUBFRAMES_PER_FRAME) {
-            if (subframeOf(exact.totalSeconds) == subframeNumber - 1) subframeNumberAgree++ else subframeNumberDisagree++
+            if (subframeOf(exact.totalSeconds) == subframeNumber - 1) {
+                subframeNumberAgree++
+            } else {
+                subframeNumberDisagree++
+            }
         }
     }
 
@@ -148,13 +156,19 @@ class InavTimeTracker(
         subframeNumberAgree >= 3 && subframeNumberDisagree * 10 <= subframeNumberAgree
 
     private fun estimate(svn: Int, page: InavPage, arrivalMillis: Long, subframeNumber: Int): Gst? {
-        while (samples.isNotEmpty() && arrivalMillis - samples.first().arrivalMillis > maxSampleAgeMillis) {
+        while (samples.isNotEmpty() &&
+            arrivalMillis - samples.first().arrivalMillis > maxSampleAgeMillis
+        ) {
             samples.removeFirst()
         }
         val receiver = receiverOffset(arrivalMillis)
         val roughMillis = if (receiver != null) {
             // Page start = delivery time in GST - delivery delay - 2 s page duration
-            val delay = if (delaySamples.isEmpty()) DEFAULT_DELAY_MILLIS else delaySamples.sorted()[delaySamples.size / 2]
+            val delay = if (delaySamples.isEmpty()) {
+                DEFAULT_DELAY_MILLIS
+            } else {
+                delaySamples.sorted()[delaySamples.size / 2]
+            }
             arrivalMillis - receiver - delay - 2000
         } else {
             if (samples.isEmpty()) return null
@@ -169,17 +183,24 @@ class InavTimeTracker(
         val candidates = when {
             slots == null -> emptyList()
             useSubframe -> slots.flatMap {
-                nearestCandidates(rough, (subframeNumber - 1) * PAGES_PER_SUBFRAME + it, FRAME_SECONDS)
+                val position = (subframeNumber - 1) * PAGES_PER_SUBFRAME + it
+                nearestCandidates(rough, position, FRAME_SECONDS)
             }
             else -> slots.flatMap { nearestCandidates(rough, it, SUBFRAME_SECONDS) }
         }.distinct().sortedBy { abs(it - rough) }
         // A satellite sends a page every 2 s: if its previous page's time is known and a candidate
         // follows it directly, that's the one (resolves word types in adjacent slots)
-        val follower = lastCertain[svn]?.plus(2)?.takeIf { it in candidates && abs(it - rough) <= MAX_FOLLOW_SECONDS }
+        val follower = lastCertain[svn]?.plus(2)
+            ?.takeIf { it in candidates && abs(it - rough) <= MAX_FOLLOW_SECONDS }
         val snappedSeconds = follower ?: candidates.firstOrNull() ?: rough
         // Certain if the next possible slot is clearly further away than the chosen one
-        lastTimeCertain = follower != null || (candidates.isNotEmpty() &&
-                (candidates.size == 1 || abs(candidates[1] - rough) - abs(candidates[0] - rough) >= MIN_MARGIN_SECONDS))
+        val margin = if (candidates.size >= 2) {
+            abs(candidates[1] - rough) - abs(candidates[0] - rough)
+        } else {
+            Long.MAX_VALUE
+        }
+        lastTimeCertain = follower != null ||
+                (candidates.isNotEmpty() && margin >= MIN_MARGIN_SECONDS)
         if (snappedSeconds != rough) snapped++
         if (snappedSeconds < 0) return null
         return Gst.fromTotalSeconds(snappedSeconds)
@@ -205,7 +226,8 @@ class InavTimeTracker(
         fun slotOf(gstSeconds: Long): Int = ((gstSeconds / 2) % PAGES_PER_SUBFRAME).toInt()
 
         /** Subframe (0-23) of [gstSeconds] within its 720 s frame */
-        fun subframeOf(gstSeconds: Long): Int = ((gstSeconds % FRAME_SECONDS) / SUBFRAME_SECONDS).toInt()
+        fun subframeOf(gstSeconds: Long): Int =
+            ((gstSeconds % FRAME_SECONDS) / SUBFRAME_SECONDS).toInt()
 
         /** Receiver clock readings older than this aren't used */
         private const val MAX_RECEIVER_CLOCK_AGE_MILLIS = 120_000L

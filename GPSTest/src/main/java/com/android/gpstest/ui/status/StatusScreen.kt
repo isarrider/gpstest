@@ -27,12 +27,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -65,10 +65,10 @@ import com.android.gpstest.library.data.FixState
 import com.android.gpstest.library.data.OsnmaUiState
 import com.android.gpstest.library.model.DilutionOfPrecision
 import com.android.gpstest.library.model.GnssType
-import com.android.gpstest.library.osnma.OsnmaMark
 import com.android.gpstest.library.model.SatelliteMetadata
 import com.android.gpstest.library.model.SatelliteStatus
 import com.android.gpstest.library.model.SbasType
+import com.android.gpstest.library.osnma.OsnmaMark
 import com.android.gpstest.library.ui.SignalInfoViewModel
 import com.android.gpstest.library.util.CarrierFreqUtils
 import com.android.gpstest.library.util.MathUtils
@@ -111,7 +111,10 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
             if (gnssFilter(app, prefs).isNotEmpty()) {
                 Filter(allStatuses.size, satelliteMetadata) { PreferenceUtils.clearGnssFilter(app, prefs) }
             }
-            GnssStatusCard(gnssStatuses, osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap())
+            GnssStatusCard(
+                gnssStatuses,
+                osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
+            )
             SbasStatusCard(sbasStatuses)
         }
     }
@@ -161,7 +164,10 @@ fun Filter(totalNumSignals: Int, satelliteMetadata: SatelliteMetadata, onClick: 
 }
 
 @Composable
-fun GnssStatusCard(satStatuses: List<SatelliteStatus>, osnmaMarks: Map<Int, OsnmaMark> = emptyMap()) {
+fun GnssStatusCard(
+    satStatuses: List<SatelliteStatus>,
+    osnmaMarks: Map<Int, OsnmaMark> = emptyMap()
+) {
     StatusCard(satStatuses, true, osnmaMarks)
 }
 
@@ -193,7 +199,8 @@ fun StatusCard(
             Column {
                 StatusRowHeader(isGnss)
                 satStatuses.forEach {
-                    StatusRow(it, if (it.gnssType == GnssType.GALILEO) osnmaMarks[it.svid] else null)
+                    val osnmaMark = if (it.gnssType == GnssType.GALILEO) osnmaMarks[it.svid] else null
+                    StatusRow(it, osnmaMark)
                 }
                 StatusRowFooter()
             }
@@ -239,16 +246,26 @@ fun Svid(satelliteStatus: SatelliteStatus, osnmaMark: OsnmaMark?, modifier: Modi
     }
 }
 
-/** Lock next to the ID of Galileo satellites: closed if authenticated, open and red if tags failed */
+/**
+ * Lock next to the ID of Galileo satellites: closed if authenticated, open and red if tags failed
+ */
 @Composable
 fun OsnmaMarkIcon(mark: OsnmaMark?) {
     if (mark == null) return
     Image(
         painter = painterResource(
-            if (mark == OsnmaMark.AUTHENTICATED) R.drawable.ic_osnma_authenticated else R.drawable.ic_osnma_failed
+            if (mark == OsnmaMark.AUTHENTICATED) {
+                R.drawable.ic_osnma_authenticated
+            } else {
+                R.drawable.ic_osnma_failed
+            }
         ),
         contentDescription = stringResource(
-            if (mark == OsnmaMark.AUTHENTICATED) R.string.osnma_mark_authenticated else R.string.osnma_mark_failed
+            if (mark == OsnmaMark.AUTHENTICATED) {
+                R.string.osnma_mark_authenticated
+            } else {
+                R.string.osnma_mark_failed
+            }
         ),
         modifier = Modifier.size(12.dp)
     )

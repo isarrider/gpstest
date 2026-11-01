@@ -202,7 +202,11 @@ class StoredTeslaKey(val chain: TeslaChain, val key: ByteArray, val gstSubframe:
             )
             val gst = Gst(f[7].toInt(), f[8].toInt())
             val key = Bits.fromHex(f[9])
-            if (key.size == chain.keySizeBytes && gst.isSubframe) StoredTeslaKey(chain, key, gst) else null
+            if (key.size == chain.keySizeBytes && gst.isSubframe) {
+                StoredTeslaKey(chain, key, gst)
+            } else {
+                null
+            }
         } catch (e: Exception) {
             null
         }

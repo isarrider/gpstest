@@ -34,7 +34,8 @@ class InavPage private constructor(private val bits: ByteArray) {
     /** 0 = nominal page, 1 = alert page */
     val pageType: Int get() = Bits.get(bits, 1)
 
-    val isNominal: Boolean get() = isEvenFirst && pageType == 0 && Bits.get(bits, ODD_START + 1) == 0
+    val isNominal: Boolean
+        get() = isEvenFirst && pageType == 0 && Bits.get(bits, ODD_START + 1) == 0
 
     /** The CRC-24Q covers the even part and the odd part up to (excluding) the CRC */
     val crcOk: Boolean
@@ -144,7 +145,8 @@ internal object Crc24q {
         Bits.copy(data, offsetBits, buf, pad, lengthBits)
         var crc = 0
         for (b in buf) {
-            crc = ((crc shl 8) xor table[((crc ushr 16) xor (b.toInt() and 0xFF)) and 0xFF]) and 0xFFFFFF
+            val index = ((crc ushr 16) xor (b.toInt() and 0xFF)) and 0xFF
+            crc = ((crc shl 8) xor table[index]) and 0xFFFFFF
         }
         return crc
     }

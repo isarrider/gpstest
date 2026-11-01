@@ -58,7 +58,11 @@ class OsnmaPublicKey internal constructor(
             return OsnmaPublicKey(pkid, curve, OsnmaCrypto.compress(curve, key), source, key)
         }
 
-        internal fun fromPlatformKey(pkid: Int, key: ECPublicKey, source: KeySource): OsnmaPublicKey? {
+        internal fun fromPlatformKey(
+            pkid: Int,
+            key: ECPublicKey,
+            source: KeySource
+        ): OsnmaPublicKey? {
             val curve = OsnmaCrypto.curveOf(key) ?: return null
             return fromSec1(pkid, OsnmaCrypto.compress(curve, key), source)
         }
@@ -134,7 +138,11 @@ object OsnmaKeyFiles {
 
     class ImportException(message: String) : Exception(message)
 
-    fun parse(content: ByteArray, fileName: String?, defaultPkid: Int? = null): ImportedKeyMaterial {
+    fun parse(
+        content: ByteArray,
+        fileName: String?,
+        defaultPkid: Int? = null
+    ): ImportedKeyMaterial {
         val text = String(content, Charsets.UTF_8)
         return when {
             text.contains("<MerkleTree>") -> parseMerkleXml(text)
@@ -154,7 +162,10 @@ object OsnmaKeyFiles {
         Regex("<$name>\\s*([^<]*?)\\s*</$name>").find(xml)?.groupValues?.get(1)
 
     private fun blocks(xml: String, name: String): List<String> =
-        Regex("<$name>(.*?)</$name>", RegexOption.DOT_MATCHES_ALL).findAll(xml).map { it.groupValues[1] }.toList()
+        Regex("<$name>(.*?)</$name>", RegexOption.DOT_MATCHES_ALL)
+            .findAll(xml)
+            .map { it.groupValues[1] }
+            .toList()
 
     private fun parseMerkleXml(xml: String): ImportedKeyMaterial {
         val nodes = blocks(xml, "TreeNode").mapNotNull { n ->
@@ -202,7 +213,11 @@ object OsnmaKeyFiles {
         return ImportedKeyMaterial(null, keys)
     }
 
-    private fun parseCertificateOrPem(content: ByteArray, text: String, pkid: Int?): ImportedKeyMaterial {
+    private fun parseCertificateOrPem(
+        content: ByteArray,
+        text: String,
+        pkid: Int?
+    ): ImportedKeyMaterial {
         val ecKey: ECPublicKey = when {
             text.contains("BEGIN PUBLIC KEY") -> {
                 val der = pemBody(text, "PUBLIC KEY")
@@ -214,15 +229,21 @@ object OsnmaKeyFiles {
             } catch (e: Exception) {
                 null
             }
-        } ?: throw ImportException("Unsupported file: expected a GSC OSNMA Merkle tree, public key or certificate")
-        val id = pkid ?: throw ImportException("Couldn't determine the public key ID (PKID) from the file name")
+        } ?: throw ImportException(
+            "Unsupported file: expected a GSC OSNMA Merkle tree, public key or certificate"
+        )
+        val id = pkid ?: throw ImportException(
+            "Couldn't determine the public key ID (PKID) from the file name"
+        )
         val key = OsnmaPublicKey.fromPlatformKey(id, ecKey, KeySource.IMPORTED)
             ?: throw ImportException("Unsupported elliptic curve")
         return ImportedKeyMaterial(null, listOf(key))
     }
 
     private fun pemBody(text: String, label: String): ByteArray {
-        val body = text.substringAfter("-----BEGIN $label-----").substringBefore("-----END $label-----")
+        val body = text
+            .substringAfter("-----BEGIN $label-----")
+            .substringBefore("-----END $label-----")
             .replace(Regex("\\s"), "")
         return base64Decode(body)
     }

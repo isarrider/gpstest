@@ -45,14 +45,18 @@ object OsnmaKeyStore {
     fun merkleRoot(context: Context, prefs: SharedPreferences): ByteArray? {
         val imported = prefs.getString(context.getString(R.string.pref_key_osnma_merkle_root), null)
         val root = imported ?: GALILEO_MERKLE_ROOT
-        val revoked = prefs.getString(context.getString(R.string.pref_key_osnma_revoked_merkle_root), null)
+        val revoked = prefs.getString(
+            context.getString(R.string.pref_key_osnma_revoked_merkle_root),
+            null
+        )
         return if (root == revoked) null else hexToBytes(root)
     }
 
     /** True after an OSNMA Alert Message, until new key material is imported */
     fun isRevoked(context: Context, prefs: SharedPreferences): Boolean =
         merkleRoot(context, prefs) == null &&
-                prefs.getStringSet(context.getString(R.string.pref_key_osnma_public_keys), null).isNullOrEmpty()
+                prefs.getStringSet(context.getString(R.string.pref_key_osnma_public_keys), null)
+                        .isNullOrEmpty()
 
     /**
      * Public keys to use: the ones stored (received from the signal or imported), plus the
@@ -66,13 +70,17 @@ object OsnmaKeyStore {
     }
 
     private fun storedPublicKeys(context: Context, prefs: SharedPreferences): List<OsnmaPublicKey> {
-        val stored = prefs.getStringSet(context.getString(R.string.pref_key_osnma_public_keys), emptySet())
+        val stored = prefs.getStringSet(
+            context.getString(R.string.pref_key_osnma_public_keys),
+            emptySet()
+        )
             ?: emptySet()
         return stored.mapNotNull { entry ->
             val parts = entry.split('|')
             if (parts.size != 3) return@mapNotNull null
             val pkid = parts[0].toIntOrNull() ?: return@mapNotNull null
-            val source = runCatching { KeySource.valueOf(parts[1]) }.getOrNull() ?: return@mapNotNull null
+            val source = runCatching { KeySource.valueOf(parts[1]) }.getOrNull()
+                ?: return@mapNotNull null
             OsnmaPublicKey.fromSec1(pkid, hexToBytes(parts[2]), source)
         }.sortedBy { it.pkid }
     }
@@ -83,7 +91,10 @@ object OsnmaKeyStore {
         // One key per PKID, and only keep the two most recent PKIDs (current and next)
         existing.removeAll { it.substringBefore('|') == key.pkid.toString() }
         existing.add("${key.pkid}|${key.source.name}|${bytesToHex(key.sec1)}")
-        val trimmed = existing.sortedBy { it.substringBefore('|').toIntOrNull() ?: 0 }.takeLast(2).toSet()
+        val trimmed = existing
+            .sortedBy { it.substringBefore('|').toIntOrNull() ?: 0 }
+            .takeLast(2)
+            .toSet()
         prefs.edit().putStringSet(prefKey, trimmed).apply()
     }
 
@@ -91,7 +102,12 @@ object OsnmaKeyStore {
      * Imports a file downloaded from the GSC (Merkle tree XML, public key XML, certificate or
      * PEM). Throws [OsnmaKeyFiles.ImportException] if nothing usable is found.
      */
-    fun import(context: Context, prefs: SharedPreferences, content: ByteArray, fileName: String?): ImportedKeyMaterial {
+    fun import(
+        context: Context,
+        prefs: SharedPreferences,
+        content: ByteArray,
+        fileName: String?
+    ): ImportedKeyMaterial {
         val material = OsnmaKeyFiles.parse(content, fileName)
         if (material.merkleRoot == null && material.publicKeys.isEmpty()) {
             throw OsnmaKeyFiles.ImportException("No OSNMA key material found")
@@ -128,10 +144,13 @@ object OsnmaKeyStore {
 
     /** The last verified TESLA key, for a warm start, or null */
     fun teslaKey(context: Context, prefs: SharedPreferences): StoredTeslaKey? =
-        prefs.getString(context.getString(R.string.pref_key_osnma_tesla_key), null)?.let { StoredTeslaKey.decode(it) }
+        prefs.getString(context.getString(R.string.pref_key_osnma_tesla_key), null)
+            ?.let { StoredTeslaKey.decode(it) }
 
     fun saveTeslaKey(context: Context, prefs: SharedPreferences, key: StoredTeslaKey) {
-        prefs.edit().putString(context.getString(R.string.pref_key_osnma_tesla_key), key.encode()).apply()
+        prefs.edit()
+            .putString(context.getString(R.string.pref_key_osnma_tesla_key), key.encode())
+            .apply()
     }
 
     fun clearTeslaKey(context: Context, prefs: SharedPreferences) {
@@ -143,15 +162,27 @@ object OsnmaKeyStore {
      * if none were saved in the last [MAX_DSM_AGE_MILLIS]. Wrong bytes can't do harm: the
      * messages are only used after their signature or Merkle tree check passes.
      */
-    fun dsm(context: Context, prefs: SharedPreferences, nowUtcMillis: Long = System.currentTimeMillis()): String? {
-        val saved = prefs.getString(context.getString(R.string.pref_key_osnma_dsm), null) ?: return null
+    fun dsm(
+        context: Context,
+        prefs: SharedPreferences,
+        nowUtcMillis: Long = System.currentTimeMillis()
+    ): String? {
+        val saved = prefs.getString(context.getString(R.string.pref_key_osnma_dsm), null)
+            ?: return null
         val savedAt = saved.substringBefore('|').toLongOrNull() ?: return null
         if (nowUtcMillis - savedAt !in 0..MAX_DSM_AGE_MILLIS) return null
         return saved.substringAfter('|').takeIf { it.isNotEmpty() }
     }
 
-    fun saveDsm(context: Context, prefs: SharedPreferences, dsm: String, nowUtcMillis: Long = System.currentTimeMillis()) {
-        prefs.edit().putString(context.getString(R.string.pref_key_osnma_dsm), "$nowUtcMillis|$dsm").apply()
+    fun saveDsm(
+        context: Context,
+        prefs: SharedPreferences,
+        dsm: String,
+        nowUtcMillis: Long = System.currentTimeMillis()
+    ) {
+        prefs.edit()
+            .putString(context.getString(R.string.pref_key_osnma_dsm), "$nowUtcMillis|$dsm")
+            .apply()
     }
 
     /** The TESLA root key is renewed rarely, but old pieces are of little use after a few days */

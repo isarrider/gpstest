@@ -52,7 +52,6 @@ import com.android.gpstest.library.osnma.NmaStatus
 import com.android.gpstest.library.osnma.OsnmaEvent
 import com.android.gpstest.library.osnma.OsnmaStatus
 import com.android.gpstest.library.osnma.OsnmaStatus.Phase
-import com.android.gpstest.library.osnma.SatelliteAuthStatus
 import kotlin.math.roundToInt
 
 // Chip backgrounds (white text on top)
@@ -77,7 +76,8 @@ private val Gray = Color(0xFF757575)
 @Composable
 fun OsnmaCard(state: OsnmaUiState) {
     // Only show the card on devices that provide (or have provided) Galileo I/NAV messages
-    val known = state.inavSeenBefore || state.inavPagesReceived > 0 || state.status != null || state.keysRevoked
+    val known = state.inavSeenBefore || state.inavPagesReceived > 0 || state.status != null ||
+            state.keysRevoked
     if (!state.enabled || !known) return
     var expanded by remember { mutableStateOf(osnmaCardExpanded) }
     val status = state.status
@@ -116,7 +116,10 @@ fun OsnmaCard(state: OsnmaUiState) {
                 )
                 if (state.clockOffsetTooLarge) {
                     Text(
-                        text = stringResource(R.string.osnma_clock_offset_warning, state.clockOffsetSeconds ?: 0L),
+                        text = stringResource(
+                            R.string.osnma_clock_offset_warning,
+                            state.clockOffsetSeconds ?: 0L
+                        ),
                         fontSize = 13.sp,
                         color = MaterialTheme.colors.error,
                         modifier = Modifier.padding(bottom = 2.dp)
@@ -249,7 +252,8 @@ private fun Details(status: OsnmaStatus) {
 
     val tesla = status.teslaKey
     if (tesla != null) {
-        val mac = if (tesla.chain.macFunction == MacFunction.HMAC_SHA_256) "HMAC-SHA-256" else "CMAC-AES"
+        val mac =
+            if (tesla.chain.macFunction == MacFunction.HMAC_SHA_256) "HMAC-SHA-256" else "CMAC-AES"
         val chain = stringResource(
             R.string.osnma_chain_value,
             tesla.chain.chainId,
@@ -259,7 +263,11 @@ private fun Details(status: OsnmaStatus) {
         )
         DetailRow(
             R.string.osnma_label_chain,
-            if (status.warmStart) chain + " " + stringResource(R.string.osnma_chain_warm_start) else chain
+            if (status.warmStart) {
+                chain + " " + stringResource(R.string.osnma_chain_warm_start)
+            } else {
+                chain
+            }
         )
     } else {
         status.krootProgress?.let { (have, needed) ->
@@ -322,7 +330,13 @@ private fun Expanded(state: OsnmaUiState) {
             state.layoutOffsetBits?.let {
                 DetailRow(
                     R.string.osnma_label_layout,
-                    stringResource(if (it == 0) R.string.osnma_layout_standard else R.string.osnma_layout_shifted)
+                    stringResource(
+                        if (it == 0) {
+                            R.string.osnma_layout_standard
+                        } else {
+                            R.string.osnma_layout_shifted
+                        }
+                    )
                 )
             }
             DetailRow(
@@ -358,7 +372,10 @@ private fun Expanded(state: OsnmaUiState) {
                 )
             )
             state.clockOffsetSeconds?.let {
-                DetailRow(R.string.osnma_label_clock_offset, stringResource(R.string.osnma_clock_offset_value, it))
+                DetailRow(
+                    R.string.osnma_label_clock_offset,
+                    stringResource(R.string.osnma_clock_offset_value, it)
+                )
             }
             if (state.trustingPlatformParity) {
                 SmallText(stringResource(R.string.osnma_trusting_parity), FontStyle.Italic)

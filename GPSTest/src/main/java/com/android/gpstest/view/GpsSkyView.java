@@ -70,9 +70,9 @@ public class GpsSkyView extends View {
     private List<SatelliteStatus> statuses = emptyList();
 
     // Galileo OSNMA state by SVN, shown as a small lock next to the satellite
-    private Map<Integer, OsnmaMark> osnmaMarks = Collections.emptyMap();
+    private Map<Integer, OsnmaMark> mOsnmaMarks = Collections.emptyMap();
 
-    private Drawable osnmaAuthenticatedIcon, osnmaFailedIcon;
+    private Drawable mOsnmaAuthenticatedIcon, mOsnmaFailedIcon;
 
     public GpsSkyView(Context context) {
         super(context);
@@ -88,8 +88,9 @@ public class GpsSkyView extends View {
         mContext = context;
         mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
         SAT_RADIUS = LibUIUtils.dpToPixels(context, 5);
-        osnmaAuthenticatedIcon = ContextCompat.getDrawable(context, R.drawable.ic_osnma_authenticated);
-        osnmaFailedIcon = ContextCompat.getDrawable(context, R.drawable.ic_osnma_failed);
+        mOsnmaAuthenticatedIcon = ContextCompat.getDrawable(context,
+                R.drawable.ic_osnma_authenticated);
+        mOsnmaFailedIcon = ContextCompat.getDrawable(context, R.drawable.ic_osnma_failed);
 
         int textColor;
         int backgroundColor;
@@ -201,8 +202,8 @@ public class GpsSkyView extends View {
      * Sets the Galileo OSNMA state of each satellite (by SVN)
      */
     public synchronized void setOsnmaMarks(Map<Integer, OsnmaMark> marks) {
-        if (!marks.equals(osnmaMarks)) {
-            osnmaMarks = marks;
+        if (!marks.equals(mOsnmaMarks)) {
+            mOsnmaMarks = marks;
             invalidate();
         }
     }
@@ -372,7 +373,7 @@ public class GpsSkyView extends View {
                 y + (int) (SAT_RADIUS * PRN_Y_SCALE), mPrnIdPaint);
 
         if (gnssType == GnssType.GALILEO) {
-            drawOsnmaMark(c, x, y, osnmaMarks.get(prn));
+            drawOsnmaMark(c, x, y, mOsnmaMarks.get(prn));
         }
     }
 
@@ -384,7 +385,9 @@ public class GpsSkyView extends View {
         if (mark == null) {
             return;
         }
-        Drawable icon = mark == OsnmaMark.AUTHENTICATED ? osnmaAuthenticatedIcon : osnmaFailedIcon;
+        Drawable icon = mark == OsnmaMark.AUTHENTICATED
+                ? mOsnmaAuthenticatedIcon
+                : mOsnmaFailedIcon;
         if (icon == null) {
             return;
         }

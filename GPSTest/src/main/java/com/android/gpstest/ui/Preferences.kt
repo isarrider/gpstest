@@ -230,7 +230,11 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
                 try {
                     startActivityForResult(intent, OSNMA_IMPORT_REQUEST)
                 } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(this, getString(R.string.osnma_import_failed, e.message), Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.osnma_import_failed, e.message),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
                 true
             }
@@ -252,15 +256,20 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
 
     private fun importOsnmaFile(uri: Uri) {
         val message = try {
-            val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            val name = contentResolver
+                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                 ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
             val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: throw IOException("Can't read $uri")
             if (bytes.size > OSNMA_MAX_FILE_BYTES) throw IOException("File too large")
             val material = OsnmaKeyStore.import(this, prefs, bytes, name)
             val imported = mutableListOf<String>()
-            if (material.merkleRoot != null) imported.add(getString(R.string.osnma_import_merkle_root))
-            material.publicKeys.forEach { imported.add(getString(R.string.osnma_import_public_key, it.pkid)) }
+            if (material.merkleRoot != null) {
+                imported.add(getString(R.string.osnma_import_merkle_root))
+            }
+            material.publicKeys.forEach {
+                imported.add(getString(R.string.osnma_import_public_key, it.pkid))
+            }
             getString(R.string.osnma_import_success, imported.joinToString(", "))
         } catch (e: Exception) {
             getString(R.string.osnma_import_failed, e.message ?: e.javaClass.simpleName)

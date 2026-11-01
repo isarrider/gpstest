@@ -493,17 +493,18 @@ class ForegroundOnlyLocationService : LifecycleService() {
             0,
             false
         )
-        val notification = NotificationCompat.Builder(applicationContext, OSNMA_NOTIFICATION_CHANNEL)
-            .setContentTitle(getString(R.string.osnma_failure_notification_title))
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setSmallIcon(R.drawable.ic_sat_notification)
-            .setColor(ContextCompat.getColor(this, R.color.colorPrimary))
-            .setPriority(NotificationCompat.PRIORITY_HIGH) // For < API 26
-            .setCategory(NotificationCompat.CATEGORY_ERROR)
-            .setAutoCancel(true)
-            .setContentIntent(openIntent)
-            .build()
+        val notification =
+            NotificationCompat.Builder(applicationContext, OSNMA_NOTIFICATION_CHANNEL)
+                .setContentTitle(getString(R.string.osnma_failure_notification_title))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setSmallIcon(R.drawable.ic_sat_notification)
+                .setColor(ContextCompat.getColor(this, R.color.colorPrimary))
+                .setPriority(NotificationCompat.PRIORITY_HIGH) // For < API 26
+                .setCategory(NotificationCompat.CATEGORY_ERROR)
+                .setAutoCancel(true)
+                .setContentIntent(openIntent)
+                .build()
         try {
             notificationManager.notify(OSNMA_NOTIFICATION_ID, notification)
         } catch (e: SecurityException) {

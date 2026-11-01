@@ -124,12 +124,18 @@ object OsnmaCrypto {
             "SHA256withECDSA"
         ),
         P521(
-            "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-            "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC",
-            "0051953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00",
-            "00C6858E06B70404E9CD9E3ECB662395B4429C648139053FB521F828AF606B4D3DBAA14B5E77EFE75928FE1DC127A2FFA8DE3348B3C1856A429BF97E7E31C2E5BD66",
-            "011839296A789A3BC0045C8A5FB42C7D1BD998F54449579B446817AFBD17273E662C97EE72995EF42640C550B9013FAD0761353C7086A272C24088BE94769FD16650",
-            "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA51868783BF2F966B7FCC0148F709A5D03BB5C9B8899C47AEBB6FB71E91386409",
+            "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" +
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" +
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC",
+            "0051953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109" +
+                "E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00",
+            "00C6858E06B70404E9CD9E3ECB662395B4429C648139053FB521F828AF606B4D3D" +
+                "BAA14B5E77EFE75928FE1DC127A2FFA8DE3348B3C1856A429BF97E7E31C2E5BD66",
+            "011839296A789A3BC0045C8A5FB42C7D1BD998F54449579B446817AFBD17273E66" +
+                "2C97EE72995EF42640C550B9013FAD0761353C7086A272C24088BE94769FD16650",
+            "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" +
+                "FA51868783BF2F966B7FCC0148F709A5D03BB5C9B8899C47AEBB6FB71E91386409",
             66,
             "SHA512withECDSA"
         );
@@ -160,7 +166,8 @@ object OsnmaCrypto {
             val x: BigInteger
             val y: BigInteger
             when {
-                sec1.size == curve.coordBytes + 1 && (sec1[0].toInt() == 2 || sec1[0].toInt() == 3) -> {
+                sec1.size == curve.coordBytes + 1 &&
+                    (sec1[0].toInt() == 2 || sec1[0].toInt() == 3) -> {
                     x = BigInteger(1, sec1.copyOfRange(1, sec1.size))
                     if (x >= curve.p) return null
                     val rhs = x.modPow(BigInteger.valueOf(3), curve.p)
@@ -195,7 +202,11 @@ object OsnmaCrypto {
         out[0] = if (key.w.affineY.testBit(0)) 3 else 2
         val x = key.w.affineX.toByteArray().let { raw ->
             // Strip a sign byte or left-pad to the coordinate size
-            if (raw.size > curve.coordBytes) raw.copyOfRange(raw.size - curve.coordBytes, raw.size) else raw
+            if (raw.size > curve.coordBytes) {
+                raw.copyOfRange(raw.size - curve.coordBytes, raw.size)
+            } else {
+                raw
+            }
         }
         System.arraycopy(x, 0, out, out.size - x.size, x.size)
         return out
@@ -212,7 +223,12 @@ object OsnmaCrypto {
      * Verifies an ECDSA signature given in the raw r || s form used by OSNMA (each half is the
      * size of the curve coordinates).
      */
-    internal fun verifyEcdsa(curve: Curve, key: ECPublicKey, message: ByteArray, rawSignature: ByteArray): Boolean {
+    internal fun verifyEcdsa(
+        curve: Curve,
+        key: ECPublicKey,
+        message: ByteArray,
+        rawSignature: ByteArray
+    ): Boolean {
         if (rawSignature.size != 2 * curve.coordBytes) return false
         return try {
             val r = BigInteger(1, rawSignature.copyOfRange(0, curve.coordBytes))
@@ -277,14 +293,17 @@ internal object Keccak {
         val d = LongArray(5)
         for (round in 0 until 24) {
             for (x in 0 until 5) c[x] = a[x] xor a[x + 5] xor a[x + 10] xor a[x + 15] xor a[x + 20]
-            for (x in 0 until 5) d[x] = c[(x + 4) % 5] xor java.lang.Long.rotateLeft(c[(x + 1) % 5], 1)
+            for (x in 0 until 5) {
+                d[x] = c[(x + 4) % 5] xor java.lang.Long.rotateLeft(c[(x + 1) % 5], 1)
+            }
             for (i in 0 until 25) a[i] = a[i] xor d[i % 5]
             for (x in 0 until 5) for (y in 0 until 5) {
                 val idx = x + 5 * y
                 b[y + 5 * ((2 * x + 3 * y) % 5)] = java.lang.Long.rotateLeft(a[idx], ROT[idx])
             }
             for (x in 0 until 5) for (y in 0 until 5) {
-                a[x + 5 * y] = b[x + 5 * y] xor (b[(x + 1) % 5 + 5 * y].inv() and b[(x + 2) % 5 + 5 * y])
+                a[x + 5 * y] = b[x + 5 * y] xor
+                    (b[(x + 1) % 5 + 5 * y].inv() and b[(x + 2) % 5 + 5 * y])
             }
             a[0] = a[0] xor RC[round]
         }
@@ -301,7 +320,8 @@ internal object Keccak {
             for (i in 0 until rate / 8) {
                 var lane = 0L
                 for (k in 0 until 8) {
-                    lane = lane or ((padded[block * rate + i * 8 + k].toLong() and 0xFF) shl (8 * k))
+                    val byte = padded[block * rate + i * 8 + k].toLong() and 0xFF
+                    lane = lane or (byte shl (8 * k))
                 }
                 state[i] = state[i] xor lane
             }

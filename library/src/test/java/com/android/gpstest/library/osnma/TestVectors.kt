@@ -42,7 +42,8 @@ object TestVectors {
     fun configuration1(): List<Page> {
         val start = Gst(1251, 277201)
         val text = GZIPInputStream(
-            TestVectors::class.java.getResourceAsStream("/osnma/16_AUG_2023_GST_05_00_01_8min.csv.gz")!!
+            TestVectors::class.java
+                .getResourceAsStream("/osnma/16_AUG_2023_GST_05_00_01_8min.csv.gz")!!
         ).bufferedReader().use { it.readText() }
         val perSatellite = text.lines().drop(1).filter { it.isNotBlank() }.map { line ->
             val fields = line.split(',')
@@ -54,7 +55,9 @@ object TestVectors {
         val pages = ArrayList<Page>()
         for (i in 0 until numPages) {
             for ((svn, list) in perSatellite) {
-                if (i < list.size) pages.add(Page(svn, start.addSeconds(2 * i), InavPage.fromFullPage(list[i])))
+                if (i < list.size) {
+                    pages.add(Page(svn, start.addSeconds(2 * i), InavPage.fromFullPage(list[i])))
+                }
             }
         }
         return pages

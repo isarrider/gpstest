@@ -29,11 +29,13 @@ class PixelLogTest {
     private class Message(val svid: Int, val messageId: Int, val data: ByteArray)
 
     private fun messages(): List<Message> {
-        val text = GZIPInputStream(PixelLogTest::class.java.getResourceAsStream("/osnma/pixel8pro_gal_inav.csv.gz")!!)
-            .use { String(it.readBytes()) }
+        val stream =
+            PixelLogTest::class.java.getResourceAsStream("/osnma/pixel8pro_gal_inav.csv.gz")!!
+        val text = GZIPInputStream(stream).use { String(it.readBytes()) }
         return text.lines().filter { it.isNotBlank() }.map { line ->
             val f = line.split(',')
-            Message(f[0].toInt(), f[1].toInt(), ByteArray(f.size - 3) { f[3 + it].toInt().toByte() })
+            val data = ByteArray(f.size - 3) { f[3 + it].toInt().toByte() }
+            Message(f[0].toInt(), f[1].toInt(), data)
         }
     }
 
@@ -89,7 +91,8 @@ class PixelLogTest {
             val page = layout.read(m.data) ?: return@forEachIndexed
             val assembled = assembler.assemble(m.svid, page, arrival[i]) ?: return@forEachIndexed
             if (!assembled.page.crcOk) return@forEachIndexed
-            val gst = tracker.gstFor(m.svid, assembled.page, assembled.arrivalMillis, m.messageId) ?: return@forEachIndexed
+            val gst = tracker.gstFor(m.svid, assembled.page, assembled.arrivalMillis, m.messageId)
+                ?: return@forEachIndexed
             if (tracker.lastWasExact) stamped++
             engine.feedPage(m.svid, gst, assembled.page, timeCertain = tracker.lastTimeCertain)
             used++
@@ -98,7 +101,10 @@ class PixelLogTest {
         val stats = engine.statistics
         assertTrue("used $used of ${messages.size}", used > messages.size * 9 / 10)
         // Time stamps that disagreed with the estimate from the other pages
-        assertTrue("corrections ${tracker.corrections} of $stamped", tracker.corrections * 20 < stamped)
+        assertTrue(
+            "corrections ${tracker.corrections} of $stamped",
+            tracker.corrections * 20 < stamped
+        )
         assertEquals(0, assembler.repaired)
         assertEquals(0L, stats.crcErrors)
         // Operational OSNMA with the built-in key, TESLA root key still being collected

@@ -53,9 +53,18 @@ class OsnmaCryptoTest {
             "6BC1BEE22E409F96E93D7E117393172AAE2D8A571E03AC9C9EB76FAC45AF8E51" +
                     "30C81C46A35CE411E5FBC1191A0A52EFF69F2445DF4F9B17AD2B417BE66C3710"
         )
-        assertEquals("BB1D6929E95937287FA37D129B756746", Bits.toHex(OsnmaCrypto.cmacAes(key, ByteArray(0))))
-        assertEquals("070A16B46B4D4144F79BDD9DD04A287C", Bits.toHex(OsnmaCrypto.cmacAes(key, msg.copyOf(16))))
-        assertEquals("DFA66747DE9AE63030CA32611497C827", Bits.toHex(OsnmaCrypto.cmacAes(key, msg.copyOf(40))))
+        assertEquals(
+            "BB1D6929E95937287FA37D129B756746",
+            Bits.toHex(OsnmaCrypto.cmacAes(key, ByteArray(0)))
+        )
+        assertEquals(
+            "070A16B46B4D4144F79BDD9DD04A287C",
+            Bits.toHex(OsnmaCrypto.cmacAes(key, msg.copyOf(16)))
+        )
+        assertEquals(
+            "DFA66747DE9AE63030CA32611497C827",
+            Bits.toHex(OsnmaCrypto.cmacAes(key, msg.copyOf(40)))
+        )
         assertEquals("51F0BEBF7E3B9D92FC49741779363CFE", Bits.toHex(OsnmaCrypto.cmacAes(key, msg)))
     }
 
@@ -68,8 +77,8 @@ class OsnmaCryptoTest {
         val p521 = OsnmaPublicKey.fromSec1(
             9,
             hex(
-                "03004BE2D894FCA1C3585DB7FC4D29EB695E41E366B1039CC4637E6814216D34EAE874FF6652C49BE0" +
-                        "54EF2E9D229BDD03048039B40D230FFC7671E766B7420AF22EEE"
+                "03004BE2D894FCA1C3585DB7FC4D29EB695E41E366B1039CC4637E6814216D34" +
+                        "EAE874FF6652C49BE054EF2E9D229BDD03048039B40D230FFC7671E766B7420AF22EEE"
             ),
             KeySource.IMPORTED
         )
@@ -120,7 +129,8 @@ class OsnmaCryptoTest {
             8GLT+Lsu6Y8PbbCBqF1dQK+JP+3Ss8YUnBSSGfDcEp9YCpRYO8lZE3fSqQ==
             -----END PUBLIC KEY-----
         """.trimIndent()
-        val material = OsnmaKeyFiles.parse(pem.toByteArray(), "OSNMA_PublicKey_20230803105952_newPKID_1.pem")
+        val material =
+            OsnmaKeyFiles.parse(pem.toByteArray(), "OSNMA_PublicKey_20230803105952_newPKID_1.pem")
         val key = material.publicKeys.single()
         assertEquals(1, key.pkid)
         assertArrayEquals(hex(TestVectors.PUBLIC_KEY_1), key.sec1)

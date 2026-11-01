@@ -23,7 +23,8 @@ class OsnmaReportingTest {
 
     /** Runs the test vector and returns the final status */
     private fun authenticatedStatus(): OsnmaStatus {
-        val engine = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()))
+        val engine =
+            OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()))
         TestVectors.configuration1().forEach { engine.feedPage(it.svn, it.gst, it.page) }
         return engine.status()
     }
@@ -63,20 +64,22 @@ class OsnmaReportingTest {
     fun failureMonitor_rateLimited() {
         val status = authenticatedStatus()
         val svn = status.satellites.first().svn
-        fun withFailures(svnFailures: Map<Int, Int>) = status.copy(satellites = status.satellites.map {
-            it.copy(tagsFailed = svnFailures[it.svn] ?: 0)
-        })
+        fun withFailures(svnFailures: Map<Int, Int>) =
+            status.copy(satellites = status.satellites.map {
+                it.copy(tagsFailed = svnFailures[it.svn] ?: 0)
+            })
         val monitor = OsnmaFailureMonitor(intervalMillis = 600_000)
         assertEquals(emptyList<Int>(), monitor.check(withFailures(emptyMap()), 0))
         assertEquals(listOf(svn), monitor.check(withFailures(mapOf(svn to 1)), 1000))
         // More failures within the interval: held back
         val other = status.satellites[1].svn
-        assertEquals(emptyList<Int>(), monitor.check(withFailures(mapOf(svn to 2, other to 1)), 60_000))
-        assertEquals(emptyList<Int>(), monitor.check(withFailures(mapOf(svn to 2, other to 1)), 120_000))
+        val both = withFailures(mapOf(svn to 2, other to 1))
+        assertEquals(emptyList<Int>(), monitor.check(both, 60_000))
+        assertEquals(emptyList<Int>(), monitor.check(both, 120_000))
         // After the interval, the held back ones are reported
-        assertEquals(listOf(svn, other).sorted(), monitor.check(withFailures(mapOf(svn to 2, other to 1)), 601_001))
+        assertEquals(listOf(svn, other).sorted(), monitor.check(both, 601_001))
         // No new failures: nothing
-        assertEquals(emptyList<Int>(), monitor.check(withFailures(mapOf(svn to 2, other to 1)), 1_300_000))
+        assertEquals(emptyList<Int>(), monitor.check(both, 1_300_000))
         // Engine restarted (counts back to 0): no warning
         assertEquals(emptyList<Int>(), monitor.check(withFailures(emptyMap()), 1_400_000))
     }

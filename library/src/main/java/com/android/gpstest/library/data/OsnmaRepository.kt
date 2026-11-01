@@ -23,8 +23,8 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import com.android.gpstest.library.R
-import com.android.gpstest.library.osnma.InavPage
 import com.android.gpstest.library.osnma.InavLayoutDetector
+import com.android.gpstest.library.osnma.InavPage
 import com.android.gpstest.library.osnma.InavPageAssembler
 import com.android.gpstest.library.osnma.InavTimeTracker
 import com.android.gpstest.library.osnma.KeySource
@@ -92,13 +92,17 @@ data class OsnmaUiState(
      */
     val poorReception: Boolean
         get() = pagesStalled ||
-                (status?.statistics?.subframeCompleteness?.let { it < MIN_SUBFRAME_COMPLETENESS } == true)
+                (status?.statistics?.subframeCompleteness
+                        ?.let { it < MIN_SUBFRAME_COMPLETENESS } == true)
 
     val clockOffsetTooLarge: Boolean
-        get() = clockOffsetSeconds != null && kotlin.math.abs(clockOffsetSeconds) > MAX_CLOCK_OFFSET_SECONDS
+        get() = clockOffsetSeconds != null &&
+                kotlin.math.abs(clockOffsetSeconds) > MAX_CLOCK_OFFSET_SECONDS
 
     companion object {
-        /** TESLA keys are disclosed 30 s after their tags, so time must be known better than that */
+        /**
+         * TESLA keys are disclosed 30 s after their tags, so time must be known better than that
+         */
         const val MAX_CLOCK_OFFSET_SECONDS = 30L
 
         /** Below this share of complete subframes, authentication becomes slow or impossible */
@@ -118,9 +122,11 @@ class OsnmaRepository @Inject constructor(
     private val executor = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "OSNMA") }
 
     // Remembered so that the card can be shown right away on devices known to deliver I/NAV
-    private var inavSeen = prefs.getBoolean(context.getString(R.string.pref_key_osnma_inav_seen), false)
+    private var inavSeen =
+        prefs.getBoolean(context.getString(R.string.pref_key_osnma_inav_seen), false)
 
-    private val _state = MutableStateFlow(OsnmaUiState(enabled = isEnabled(), inavSeenBefore = inavSeen))
+    private val _state =
+        MutableStateFlow(OsnmaUiState(enabled = isEnabled(), inavSeenBefore = inavSeen))
     val state: StateFlow<OsnmaUiState> = _state
 
     // Only accessed from the executor thread
@@ -230,7 +236,10 @@ class OsnmaRepository @Inject constructor(
         val received = layout.read(data)
         if (received == null) {
             pagesWrongSize++
-            Log.w(TAG, "Galileo I/NAV message with ${data.size} bytes instead of ${InavPage.SIZE_BYTES}")
+            Log.w(
+                TAG,
+                "Galileo I/NAV message with ${data.size} bytes instead of ${InavPage.SIZE_BYTES}"
+            )
             publish(force = false)
             return
         }
@@ -244,7 +253,9 @@ class OsnmaRepository @Inject constructor(
         inavPages++
         if (!inavSeen) {
             inavSeen = true
-            prefs.edit().putBoolean(context.getString(R.string.pref_key_osnma_inav_seen), true).apply()
+            prefs.edit()
+                .putBoolean(context.getString(R.string.pref_key_osnma_inav_seen), true)
+                .apply()
         }
         if (parityPassed) pagesParityPassed++
 
@@ -291,7 +302,13 @@ class OsnmaRepository @Inject constructor(
                 clockOffsetSeconds = deviceGstSeconds(pageWallClock) - 2 - gst.totalSeconds
             }
             val e = engine ?: newEngine().also { engine = it }
-            e.feedPage(svid, gst, page, checkCrc = !trustPlatformParity, timeCertain = timeTracker.lastTimeCertain)
+            e.feedPage(
+                svid,
+                gst,
+                page,
+                checkCrc = !trustPlatformParity,
+                timeCertain = timeTracker.lastTimeCertain
+            )
             saveDsm(e, force = false)
         } else {
             pagesWithoutTime++

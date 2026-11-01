@@ -42,7 +42,9 @@ class OsnmaCsvLog {
             status.publicKey?.pkid?.toString() ?: ""
         )
         val satellites = status.satellites.filter { it.transmitsOsnma }
-        if (satellites.isEmpty()) return listOf((common + List(SATELLITE_FIELDS) { "" }).joinToString(","))
+        if (satellites.isEmpty()) {
+            return listOf((common + List(SATELLITE_FIELDS) { "" }).joinToString(","))
+        }
         return satellites.sortedBy { it.svn }.map { s ->
             (common + listOf(
                 s.svn.toString(),
@@ -65,7 +67,9 @@ class OsnmaCsvLog {
 
         /** Format line for the CSV file header */
         const val FORMAT =
-            "OSNMA,UnixTimeMillis,GstWeek,GstTimeOfWeekSeconds,Phase,NmaStatus,ChainId,PublicKeyId,Svid,CedAuthenticated,CedAuthBits,TimingAuthenticated,TimingAuthBits,TagsOk,TagsFailed"
+            "OSNMA,UnixTimeMillis,GstWeek,GstTimeOfWeekSeconds,Phase,NmaStatus,ChainId," +
+                "PublicKeyId,Svid,CedAuthenticated,CedAuthBits,TimingAuthenticated," +
+                "TimingAuthBits,TagsOk,TagsFailed"
     }
 }
 

@@ -101,13 +101,18 @@ internal class PageStore(private val depthSubframes: Int = 13) {
 
     fun get(svn: Int, gstSubframe: Gst): SubframePages? = bySubframe[gstSubframe]?.get(svn)
 
-    fun subframe(gstSubframe: Gst): Collection<SubframePages> = bySubframe[gstSubframe]?.values ?: emptyList()
+    fun subframe(gstSubframe: Gst): Collection<SubframePages> =
+        bySubframe[gstSubframe]?.values ?: emptyList()
 
     fun header(gstSubframe: Gst): NmaHeader? = headers[gstSubframe]?.let { NmaHeader(it) }
 
     /** Distinct NMA headers seen recently, newest first */
     fun recentHeaders(): List<NmaHeader> =
-        headers.entries.sortedByDescending { it.key }.map { it.value }.distinct().map { NmaHeader(it) }
+        headers.entries
+            .sortedByDescending { it.key }
+            .map { it.value }
+            .distinct()
+            .map { NmaHeader(it) }
 
     fun clear() {
         bySubframe.clear()
@@ -148,7 +153,8 @@ internal class DsmAssembler {
     /** Writes byte [index] (0-12) of block [blockId] of DSM [dsmId] */
     fun write(dsmId: Int, blockId: Int, index: Int, value: Byte): Completed? {
         val entry = entries.getOrPut(dsmId) { Entry() }
-        val block = entry.blocks[blockId] ?: ByteArray(BLOCK_BYTES).also { entry.blocks[blockId] = it }
+        val block = entry.blocks[blockId]
+            ?: ByteArray(BLOCK_BYTES).also { entry.blocks[blockId] = it }
         block[index] = value
         entry.masks[blockId] = entry.masks[blockId] or (1 shl index)
         entry.restoredMasks[blockId] = entry.restoredMasks[blockId] and (1 shl index).inv()
@@ -166,7 +172,9 @@ internal class DsmAssembler {
         }
         for (b in 0 until n) if (entry.masks[b] != FULL_BLOCK) return null
         val data = ByteArray(n * BLOCK_BYTES)
-        for (b in 0 until n) System.arraycopy(entry.blocks[b]!!, 0, data, b * BLOCK_BYTES, BLOCK_BYTES)
+        for (b in 0 until n) {
+            System.arraycopy(entry.blocks[b]!!, 0, data, b * BLOCK_BYTES, BLOCK_BYTES)
+        }
         if (entry.lastProcessed?.contentEquals(data) == true) return null
         entry.lastProcessed = data
         return Completed(dsmId, isPkr, data)
@@ -176,7 +184,9 @@ internal class DsmAssembler {
     fun progress(dsmId: Int): Pair<Int, Int>? {
         val entry = entries[dsmId] ?: return null
         val full = entry.masks.count { it == FULL_BLOCK }
-        val nb = entry.blocks[0]?.takeIf { entry.masks[0] and 1 != 0 }?.let { (it[0].toInt() ushr 4) and 0xF }
+        val nb = entry.blocks[0]
+            ?.takeIf { entry.masks[0] and 1 != 0 }
+            ?.let { (it[0].toInt() ushr 4) and 0xF }
         val n = when {
             nb == null -> null
             dsmId >= 12 -> nb + 6
@@ -293,10 +303,12 @@ internal class NavDataStore(private val depthSubframes: Int = 30) {
     private class Part(val type: Int, val from: Int, val to: Int, val length: Int)
 
     /** ADKD 0 / 12: ephemeris, clock and status from word types 1 to 5 (549 bits) */
-    fun cedAndStatus(svn: Int, subframe: Gst): NavData? = assemble(svn, subframe, CED_PARTS, CED_BITS)
+    fun cedAndStatus(svn: Int, subframe: Gst): NavData? =
+        assemble(svn, subframe, CED_PARTS, CED_BITS)
 
     /** ADKD 4: timing parameters from word types 6 and 10 (141 bits) */
-    fun timing(svn: Int, subframe: Gst): NavData? = assemble(svn, subframe, TIMING_PARTS, TIMING_BITS)
+    fun timing(svn: Int, subframe: Gst): NavData? =
+        assemble(svn, subframe, TIMING_PARTS, TIMING_BITS)
 
     fun clear() = words.clear()
 

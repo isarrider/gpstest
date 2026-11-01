@@ -139,12 +139,19 @@ class OsnmaEngine(
     /**
      * Processes one I/NAV page from satellite [svn] (1-36), where [gst] is the GST at the start
      * of the page (page TOWs are odd). Pages from all satellites must be fed in time order.
-     * Pass timeCertain = false if [gst] might be off by a page (see InavTimeTracker.lastTimeCertain):
+     * Pass timeCertain = false if [gst] might be off by a page (see
+     * InavTimeTracker.lastTimeCertain):
      * the page is then not used for OSNMA data.
      *
      * @return false if the page was discarded (not a nominal page or bad CRC)
      */
-    fun feedPage(svn: Int, gst: Gst, page: InavPage, checkCrc: Boolean = true, timeCertain: Boolean = true): Boolean {
+    fun feedPage(
+        svn: Int,
+        gst: Gst,
+        page: InavPage,
+        checkCrc: Boolean = true,
+        timeCertain: Boolean = true
+    ): Boolean {
         if (svn !in 1..36) return false
         if (!page.isNominal) {
             stats.pagesRejected++
@@ -198,7 +205,9 @@ class OsnmaEngine(
 
         // DSM bytes: usable once the DSM header (page 1) of this satellite's subframe is known
         when {
-            stored.page == 1 -> for (i in 2 until SubframeLayout.PAGES) if (pages.has(i)) writeDsmByte(pages, i)
+            stored.page == 1 -> for (i in 2 until SubframeLayout.PAGES) {
+                if (pages.has(i)) writeDsmByte(pages, i)
+            }
             stored.page >= 2 && pages.has(1) -> writeDsmByte(pages, stored.page)
         }
         tryTeslaKey(subframe, stored.page)
@@ -262,7 +271,11 @@ class OsnmaEngine(
         val pubKey = applicablePubKey(pkid)
         if (pubKey == null) {
             pendingKroot = Triple(dsm, headers, gst)
-            event(gst, OsnmaEvent.Type.INFO, "DSM-KROOT received, waiting for public key PKID $pkid")
+            event(
+                gst,
+                OsnmaEvent.Type.INFO,
+                "DSM-KROOT received, waiting for public key PKID $pkid"
+            )
             return
         }
         pendingKroot = null
@@ -276,7 +289,12 @@ class OsnmaEngine(
                 curve == null -> "unknown DSM-KROOT signature length"
                 curve != pubKey.curve -> "public key type doesn't match DSM-KROOT"
                 !dsm.paddingOk(candidate) -> "wrong DSM-KROOT padding"
-                !OsnmaCrypto.verifyEcdsa(curve, pubKey.key, dsm.signedMessage(candidate), dsm.signature!!) ->
+                !OsnmaCrypto.verifyEcdsa(
+                    curve,
+                    pubKey.key,
+                    dsm.signedMessage(candidate),
+                    dsm.signature!!
+                ) ->
                     "invalid DSM-KROOT signature"
                 else -> null
             }
@@ -298,7 +316,11 @@ class OsnmaEngine(
         val krootStart = Gst(dsm.krootWn, dsm.krootTowh * 3600)
         val kroot = TeslaKey(dsm.kroot!!, chain!!, krootStart.addSeconds(-30))
         if (krootGst == null) {
-            event(gst, OsnmaEvent.Type.SUCCESS, "KROOT of chain ${chain.chainId} verified with public key PKID $pkid")
+            event(
+                gst,
+                OsnmaEvent.Type.SUCCESS,
+                "KROOT of chain ${chain.chainId} verified with public key PKID $pkid"
+            )
         }
         krootGst = gst
         lastHeader = header
@@ -352,7 +374,11 @@ class OsnmaEngine(
 
     private fun alertMessageReceived(gst: Gst) {
         if (!alertReceived) {
-            event(gst, OsnmaEvent.Type.ERROR, "OSNMA Alert Message: all cryptographic material erased")
+            event(
+                gst,
+                OsnmaEvent.Type.ERROR,
+                "OSNMA Alert Message: all cryptographic material erased"
+            )
         }
         alertReceived = true
         merkleTree = null
@@ -378,12 +404,22 @@ class OsnmaEngine(
                 if (key == null) {
                     stats.pkrFailed++
                     pkrDsmIdInProcess?.let { dsmAssembler.dropRestored(it) }
-                    event(gst, OsnmaEvent.Type.ERROR, "Could not verify public key PKID ${pkr.newPublicKeyId} against the Merkle tree")
+                    event(
+                        gst,
+                        OsnmaEvent.Type.ERROR,
+                        "Could not verify public key PKID ${pkr.newPublicKeyId} " +
+                            "against the Merkle tree"
+                    )
                 } else {
                     stats.pkrVerified++
                     val isNew = storePublicKey(key, notify = true)
                     if (isNew) {
-                        event(gst, OsnmaEvent.Type.SUCCESS, "Public key PKID ${key.pkid} received and verified against the Merkle tree")
+                        event(
+                            gst,
+                            OsnmaEvent.Type.SUCCESS,
+                            "Public key PKID ${key.pkid} received and verified " +
+                                "against the Merkle tree"
+                        )
                     }
                     retryPendingKroot()
                 }
@@ -392,7 +428,8 @@ class OsnmaEngine(
                 if (tree.verifies(pkr)) alertMessageReceived(gst)
                 else event(gst, OsnmaEvent.Type.ERROR, "Could not verify OSNMA Alert Message")
             }
-            NewPublicKeyType.RESERVED -> event(gst, OsnmaEvent.Type.ERROR, "Reserved NPKT in DSM-PKR")
+            NewPublicKeyType.RESERVED ->
+                event(gst, OsnmaEvent.Type.ERROR, "Reserved NPKT in DSM-PKR")
         }
     }
 
@@ -528,11 +565,13 @@ class OsnmaEngine(
         }
         keyAttempts[subframe] = attempts + 1
         keyAttempts.keys.removeAll { it < subframe.addSubframes(-PageStoreDepth) }
-        validateKey(TeslaKey(Bits.slice(buffer, offset, chain.keySizeBits), chain, subframe), current)
+        val key = TeslaKey(Bits.slice(buffer, offset, chain.keySizeBits), chain, subframe)
+        validateKey(key, current)
     }
 
     private fun validateKey(newKey: TeslaKey, current: TeslaKey) {
-        val maxDerivations = if (warmStart) TeslaKey.MAX_DERIVATIONS_STORED else TeslaKey.MAX_DERIVATIONS
+        val maxDerivations =
+            if (warmStart) TeslaKey.MAX_DERIVATIONS_STORED else TeslaKey.MAX_DERIVATIONS
         if (current.authenticates(newKey, maxDerivations)) {
             stats.teslaKeysVerified++
             warmStartFailures = 0
@@ -547,7 +586,11 @@ class OsnmaEngine(
             processTags(newKey)
         } else {
             stats.teslaKeysFailed++
-            event(newKey.gstSubframe, OsnmaEvent.Type.ERROR, "TESLA key at ${newKey.gstSubframe} could not be verified")
+            event(
+                newKey.gstSubframe,
+                OsnmaEvent.Type.ERROR,
+                "TESLA key at ${newKey.gstSubframe} could not be verified"
+            )
             if (warmStart && ++warmStartFailures >= MAX_WARM_START_FAILURES) {
                 discardStoredKey(newKey.gstSubframe, "new keys don't follow from it")
             }
@@ -569,11 +612,13 @@ class OsnmaEngine(
         }
         for (svn in 1..36) {
             if (!onlySlowMac) {
-                pageStore.get(svn, gstMack)?.let { processMack(it, key, key, gstMack, slowMac = false) }
+                pageStore.get(svn, gstMack)
+                    ?.let { processMack(it, key, key, gstMack, slowMac = false) }
             }
             if (slowMacKey != null) {
                 // slowMacKey authenticates the MACK; the current key authenticates its tags
-                pageStore.get(svn, gstSlowMac)?.let { processMack(it, slowMacKey, key, gstSlowMac, slowMac = true) }
+                pageStore.get(svn, gstSlowMac)
+                    ?.let { processMack(it, slowMacKey, key, gstSlowMac, slowMac = true) }
             }
         }
     }
@@ -608,7 +653,8 @@ class OsnmaEngine(
         val msg = (gstMack.tow / 30) % 2
         val flex = MacLookupTable.flexIndices(chain.macLookupTable, msg)!!
         val headerReceived = pages.hasMackBits(0, step)
-        val macseqVerified = if (headerReceived && flex.all { pages.hasMackBits(it * step + chain.tagSizeBits, 16) }) {
+        val macseqReceived = flex.all { pages.hasMackBits(it * step + chain.tagSizeBits, 16) }
+        val macseqVerified = if (headerReceived && macseqReceived) {
             if (!macseqKey.verifyMacseq(mack, prna, gstMack)) {
                 stats.mackFailed++
                 event(gstMack, OsnmaEvent.Type.ERROR, "Wrong MACSEQ from E%02d".format(prna))
@@ -624,7 +670,11 @@ class OsnmaEngine(
             if (!chain.adkdValid(j, mack.tag(j), prna, gstMack)) {
                 if (macseqVerified && pages.complete) {
                     stats.mackFailed++
-                    event(gstMack, OsnmaEvent.Type.ERROR, "Tag $j from E%02d doesn't match the MAC look-up table".format(prna))
+                    event(
+                        gstMack,
+                        OsnmaEvent.Type.ERROR,
+                        "Tag $j from E%02d doesn't match the MAC look-up table".format(prna)
+                    )
                     return
                 }
                 continue
@@ -636,12 +686,18 @@ class OsnmaEngine(
         if (!slowMac) {
             // Tag0: self-authentication of the CED and status of the transmitting satellite
             if (headerReceived) {
-                verifyTagFor(tagKey, mack, 0, mack.cop, Adkd.INAV_CED, prna, prna, gstMack, gstNav, nmaStatus)
+                verifyTagFor(
+                    tagKey, mack, 0, mack.cop, Adkd.INAV_CED, prna, prna, gstMack, gstNav, nmaStatus
+                )
             }
             for (j in usable) {
                 val tag = mack.tag(j)
-                if ((tag.adkd == Adkd.INAV_CED || tag.adkd == Adkd.INAV_TIMING) && tag.prnd in 1..36) {
-                    verifyTagFor(tagKey, mack, j, tag.cop, tag.adkd, tag.prnd, prna, gstMack, gstNav, nmaStatus)
+                val navAdkd = tag.adkd == Adkd.INAV_CED || tag.adkd == Adkd.INAV_TIMING
+                if (navAdkd && tag.prnd in 1..36) {
+                    verifyTagFor(
+                        tagKey, mack, j, tag.cop, tag.adkd, tag.prnd, prna, gstMack, gstNav,
+                        nmaStatus
+                    )
                 }
                 // Slow MAC tags need a key with an extra delay
             }
@@ -649,7 +705,10 @@ class OsnmaEngine(
             for (j in usable) {
                 val tag = mack.tag(j)
                 if (tag.adkd == Adkd.SLOW_MAC && tag.prnd in 1..36) {
-                    verifyTagFor(tagKey, mack, j, tag.cop, Adkd.SLOW_MAC, tag.prnd, prna, gstMack, gstNav, nmaStatus)
+                    verifyTagFor(
+                        tagKey, mack, j, tag.cop, Adkd.SLOW_MAC, tag.prnd, prna, gstMack, gstNav,
+                        nmaStatus
+                    )
                 }
             }
         }
@@ -675,14 +734,20 @@ class OsnmaEngine(
         val ctr = index + 1
         if (cop == 0) {
             // Dummy tag: the navigation data field is all zeros
-            val ok = key.verifyTag(mack.data, tagOffset, tagLength, gstTag, tagPrnd, prna, ctr, nmaStatus, null, navBits)
+            val ok = key.verifyTag(
+                mack.data, tagOffset, tagLength, gstTag, tagPrnd, prna, ctr, nmaStatus, null,
+                navBits
+            )
             if (ok) stats.dummyTagsOk++ else stats.dummyTagsFailed++
             return
         }
         val nav = if (isTiming) navData.timing(prnd, gstNav) else navData.cedAndStatus(prnd, gstNav)
         // The cut-off point (COP) limits how old the authenticated data can be
         if (nav == null || nav.maxAge + 1 > cop) return
-        val ok = key.verifyTag(mack.data, tagOffset, tagLength, gstTag, tagPrnd, prna, ctr, nmaStatus, nav.bits, navBits)
+        val ok = key.verifyTag(
+            mack.data, tagOffset, tagLength, gstTag, tagPrnd, prna, ctr, nmaStatus, nav.bits,
+            navBits
+        )
         val sat = satellites.getOrPut(prnd) { SatTracking() }
         if (ok) {
             stats.tagsOk++
@@ -708,7 +773,12 @@ class OsnmaEngine(
             stats.tagsFailed++
             sat.tagsFailed++
             sat.lastFailureGst = gstTag
-            event(gstTag, OsnmaEvent.Type.ERROR, "Tag for E%02d (%s) sent by E%02d failed verification".format(prnd, adkd.label(), prna))
+            event(
+                gstTag,
+                OsnmaEvent.Type.ERROR,
+                "Tag for E%02d (%s) sent by E%02d failed verification"
+                    .format(prnd, adkd.label(), prna)
+            )
         }
     }
 
@@ -748,7 +818,8 @@ class OsnmaEngine(
                 transmitsOsnma = s.transmitsOsnma && s.lastOsnmaGst.recent(now, 120),
                 cedAuthBits = s.ced?.bits ?: 0,
                 cedAuthGst = s.ced?.lastGst,
-                cedCurrent = s.ced != null && latestCed != null && s.ced!!.data.contentEquals(latestCed.bits),
+                cedCurrent = s.ced != null && latestCed != null &&
+                    s.ced!!.data.contentEquals(latestCed.bits),
                 timingAuthBits = s.timing?.bits ?: 0,
                 timingAuthGst = s.timing?.lastGst,
                 tagsOk = s.tagsOk,

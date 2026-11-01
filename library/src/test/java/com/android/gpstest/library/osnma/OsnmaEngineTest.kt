@@ -177,7 +177,8 @@ class OsnmaEngineTest {
             val arrival = (p.gst.totalSeconds - 756_000_000L) * 1000 + 2000 + 80 +
                     random.nextInt(-jitterMillis, jitterMillis + 1)
             val android = InavPage.fromAndroid(p.page.toByteArray())!!
-            val subframeNumber = if (useSubframeNumbers) InavTimeTracker.subframeOf(p.gst.totalSeconds) + 1 else -1
+            val subframeNumber =
+                if (useSubframeNumbers) InavTimeTracker.subframeOf(p.gst.totalSeconds) + 1 else -1
             repeat(if (duplicates) 2 else 1) {
                 val gst = tracker.gstFor(p.svn, android, arrival, subframeNumber) ?: return@repeat
                 // Dummy pages (word type 63) carry nothing and are ignored by the engine
@@ -191,7 +192,8 @@ class OsnmaEngineTest {
     /** Delivery jitter of several seconds is absorbed by snapping to the word type's page slot */
     @Test
     fun timeTracker_largeJitter_wordTypeSlots() {
-        val (stats, wrong) = runWithTimeTracker(jitterMillis = 6000, useSubframeNumbers = false, duplicates = false)
+        val (stats, wrong) =
+            runWithTimeTracker(jitterMillis = 6000, useSubframeNumbers = false, duplicates = false)
         // Word type 16 occupies two slots 14 s apart, so a few can be off at this jitter
         assertTrue("wrong $wrong", wrong < TestVectors.configuration1().size / 100)
         assertEquals(0, stats.tagsFailed)
@@ -201,7 +203,8 @@ class OsnmaEngineTest {
     /** With the platform's subframe numbers and pages delivered twice, timing stays right */
     @Test
     fun timeTracker_subframeNumbersAndDuplicates() {
-        val (stats, wrong) = runWithTimeTracker(jitterMillis = 3000, useSubframeNumbers = true, duplicates = true)
+        val (stats, wrong) =
+            runWithTimeTracker(jitterMillis = 3000, useSubframeNumbers = true, duplicates = true)
         assertTrue("wrong $wrong", wrong < TestVectors.configuration1().size / 100)
         assertEquals(0, stats.tagsFailed)
         assertTrue(stats.tagsOk > 1100)
@@ -231,13 +234,16 @@ class OsnmaEngineTest {
                 Bits.copy(original, 0, swapped, 114, 114)
                 swapped
             } else original
-            val arrival = (p.gst.totalSeconds - 756_000_000L) * 1000 + 2080 - (if (swappedSat) 1000 else 0)
-            val assembled = assembler.assemble(p.svn, InavPage.fromAndroid(message)!!, arrival) ?: return@forEach
+            val arrival =
+                (p.gst.totalSeconds - 756_000_000L) * 1000 + 2080 - (if (swappedSat) 1000 else 0)
+            val assembled = assembler.assemble(p.svn, InavPage.fromAndroid(message)!!, arrival)
+                ?: return@forEach
             assertTrue(assembled.page.isNominal)
             assertTrue(assembled.page.crcOk)
             // A rejoined page is the one before the message's even part
             val expectedGst = if (swappedSat) p.gst.addSeconds(-2) else p.gst
-            val gst = tracker.gstFor(p.svn, assembled.page, assembled.arrivalMillis) ?: return@forEach
+            val gst = tracker.gstFor(p.svn, assembled.page, assembled.arrivalMillis)
+                ?: return@forEach
             if (gst != expectedGst && assembled.page.wordType != 63) wrongTime++
             engine.feedPage(p.svn, gst, assembled.page, timeCertain = tracker.lastTimeCertain)
         }
@@ -302,12 +308,15 @@ class OsnmaEngineTest {
         val pages = TestVectors.configuration1()
         val half = pages.indexOfFirst { it.gst.tow >= 277201 + 240 }
         var stored: StoredTeslaKey? = null
-        val first = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()),
+        val first = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
             object : OsnmaEngine.Listener {
                 override fun onTeslaKeyVerified(key: StoredTeslaKey) {
                     stored = key
                 }
-            })
+            }
+        )
         pages.subList(0, half).forEach { first.feedPage(it.svn, it.gst, it.page) }
         val key = StoredTeslaKey.decode(stored!!.encode())!!
         assertTrue(key.key.contentEquals(stored!!.key))
@@ -335,16 +344,20 @@ class OsnmaEngineTest {
     @Test
     fun warmStart_otherChainDiscarded() {
         var stored: StoredTeslaKey? = null
-        val first = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()),
+        val first = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
             object : OsnmaEngine.Listener {
                 override fun onTeslaKeyVerified(key: StoredTeslaKey) {
                     stored = key
                 }
-            })
+            }
+        )
         val pages = TestVectors.configuration1()
         pages.take(pages.size / 2).forEach { first.feedPage(it.svn, it.gst, it.page) }
         val s = stored!!
-        val otherChain = StoredTeslaKey(s.chain.copy(chainId = (s.chain.chainId + 1) % 4), s.key, s.gstSubframe)
+        val otherChain =
+            StoredTeslaKey(s.chain.copy(chainId = (s.chain.chainId + 1) % 4), s.key, s.gstSubframe)
         var discarded = false
         val second = OsnmaEngine(null, emptyList(), object : OsnmaEngine.Listener {
             override fun onStoredKeyDiscarded() {
@@ -371,7 +384,8 @@ class OsnmaEngineTest {
         val pages = TestVectors.configuration1()
         pages.forEach { p ->
             val elapsedBase = p.gst.totalSeconds * 1000 - 756_000_000_000L
-            // The receiver clock is known from the start; delivery 300 ms after the page, +-3 s jitter
+            // The receiver clock is known from the start; delivery 300 ms after the page, +-3 s
+            // jitter
             tracker.updateReceiverClock(elapsedBase, p.gst.totalSeconds * 1000)
             val arrival = elapsedBase + 2300 + random.nextInt(-3000, 3001)
             val android = InavPage.fromAndroid(p.page.toByteArray())!!
@@ -401,7 +415,11 @@ class OsnmaEngineTest {
         assertTrue(saved.isNotEmpty())
 
         // Second session continues with the saved bytes
-        val withSaved = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()), storedDsm = saved)
+        val withSaved = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            storedDsm = saved
+        )
         val withoutSaved = newEngine()
         var krootWith: Gst? = null
         var krootWithout: Gst? = null
@@ -411,7 +429,9 @@ class OsnmaEngineTest {
             withSaved.feedPage(it.svn, it.gst, it.page)
             withoutSaved.feedPage(it.svn, it.gst, it.page)
             if (krootWith == null && withSaved.statistics.krootVerified > 0) krootWith = it.gst
-            if (krootWithout == null && withoutSaved.statistics.krootVerified > 0) krootWithout = it.gst
+            if (krootWithout == null && withoutSaved.statistics.krootVerified > 0) {
+                krootWithout = it.gst
+            }
         }
         assertNotNull(krootWith)
         assertTrue(krootWithout == null || krootWith!! < krootWithout!!)
@@ -442,7 +462,8 @@ class OsnmaEngineTest {
         var correct = 0
         TestVectors.configuration1().forEach { p ->
             // Pages arrive after their 2 s transmission, with latency and +-400 ms jitter
-            val arrival = (p.gst.totalSeconds - 756_000_000L) * 1000 + 2000 + 80 + random.nextInt(-400, 401)
+            val arrival =
+                (p.gst.totalSeconds - 756_000_000L) * 1000 + 2000 + 80 + random.nextInt(-400, 401)
             val android = InavPage.fromAndroid(p.page.toByteArray())!!
             val gst = tracker.gstFor(p.svn, android, arrival) ?: return@forEach
             known++

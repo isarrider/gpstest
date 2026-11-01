@@ -74,7 +74,8 @@ internal object Bits {
         return true
     }
 
-    fun toHex(data: ByteArray): String = data.joinToString("") { "%02X".format(it.toInt() and 0xFF) }
+    fun toHex(data: ByteArray): String =
+        data.joinToString("") { "%02X".format(it.toInt() and 0xFF) }
 
     fun fromHex(hex: String): ByteArray {
         val clean = hex.trim().replace(" ", "")

@@ -190,7 +190,9 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
             writer.write(COMMENT_START);
             writer.newLine();
             writer.write(COMMENT_START);
-            writer.write("Galileo OSNMA format (https://github.com/barbeau/gpstest/blob/master/OSNMA.md), one record per satellite every 30 s:");
+            writer.write("Galileo OSNMA format"
+                    + " (https://github.com/barbeau/gpstest/blob/master/OSNMA.md),"
+                    + " one record per satellite every 30 s:");
             writer.newLine();
             writer.write(COMMENT_START);
             writer.write("  " + OsnmaCsvLog.FORMAT);

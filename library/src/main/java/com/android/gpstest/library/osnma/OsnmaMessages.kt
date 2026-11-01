@@ -41,7 +41,8 @@ enum class MacFunction { HMAC_SHA_256, CMAC_AES }
 
 /** DSM-KROOT message, ICD Figure 7 */
 internal class DsmKroot(val data: ByteArray) {
-    val numberOfBlocks: Int? get() = Bits.readInt(data, 0, 4).let { if (it in 1..8) it + 6 else null }
+    val numberOfBlocks: Int?
+        get() = Bits.readInt(data, 0, 4).let { if (it in 1..8) it + 6 else null }
     val publicKeyId: Int get() = Bits.readInt(data, 4, 4)
     val chainId: Int get() = Bits.readInt(data, 8, 2)
     val hashFunction: HashFunction?
@@ -108,7 +109,9 @@ internal class DsmKroot(val data: ByteArray) {
             return data.copyOfRange(start, data.size)
         }
 
-    /** Message signed by the ECDSA signature: NMA header || DSM-KROOT fields after NB_DK and PKID */
+    /**
+     * Message signed by the ECDSA signature: NMA header || DSM-KROOT fields after NB_DK and PKID
+     */
     fun signedMessage(nmaHeader: NmaHeader): ByteArray {
         val end = 13 + keySizeBits!! / 8
         val m = ByteArray(end)
@@ -130,7 +133,8 @@ enum class NewPublicKeyType { P256, P521, ALERT_MESSAGE, RESERVED }
 
 /** DSM-PKR message, ICD Figure 6 */
 internal class DsmPkr(val data: ByteArray) {
-    val numberOfBlocks: Int? get() = Bits.readInt(data, 0, 4).let { if (it in 7..10) it + 6 else null }
+    val numberOfBlocks: Int?
+        get() = Bits.readInt(data, 0, 4).let { if (it in 7..10) it + 6 else null }
     val messageId: Int get() = Bits.readInt(data, 4, 4)
     fun intermediateTreeNode(n: Int): ByteArray = data.copyOfRange(1 + 32 * n, 1 + 32 * (n + 1))
     val newPublicKeyType: NewPublicKeyType
@@ -160,7 +164,11 @@ internal class DsmPkr(val data: ByteArray) {
 enum class Adkd { INAV_CED, INAV_TIMING, SLOW_MAC, RESERVED }
 
 /** A Tag-Info entry of a MACK message (tag + PRND + ADKD + COP), ICD Figure 11 */
-internal class TagAndInfo(private val mack: ByteArray, private val offset: Int, private val tagSizeBits: Int) {
+internal class TagAndInfo(
+    private val mack: ByteArray,
+    private val offset: Int,
+    private val tagSizeBits: Int
+) {
     val tagOffset: Int get() = offset
     val tagLength: Int get() = tagSizeBits
     val tagInfoOffset: Int get() = offset + tagSizeBits
