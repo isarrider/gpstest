@@ -10,3 +10,12 @@ receiver developers to validate their OSNMA implementations:
 - `OSNMA_MerkleTree_test_vectors_1.xml` and `OSNMA_PublicKey_test_vectors_PKID_1.xml`: the
   Merkle tree and public key of that scenario. They are test material only and unrelated to the
   operational Galileo keys.
+
+The other file is a real recording:
+
+- `pixel8pro_gal_inav.csv.gz`: the Galileo E1-B I/NAV messages (`GnssNavigationMessage`
+  `TYPE_GAL_I`) a Pixel 8 Pro (Android 17) delivered over 18 minutes in October 2026, in the
+  order received. One line per message: `svid,messageId,submessageId,data bytes`. It shows
+  the device quirks described in OSNMA.md: the page shifted by 4 bits in the data, most pages
+  missing, and no subframe numbers. It contains only the navigation data broadcast by the
+  satellites; arrival times, measurements, locations and device details were removed.

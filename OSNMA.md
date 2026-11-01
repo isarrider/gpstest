@@ -120,7 +120,8 @@ without Android or third-party dependencies, and is modelled on the
 same results as galileo-osnma, tag for tag, on all
 [GSC OSNMA test vector](https://www.gsc-europa.eu/support-to-developers/osnma-test-vectors)
 scenarios and on a real receiver recording. The unit tests in
-`library/src/test/java/com/android/gpstest/library/osnma` run on a trimmed test vector:
+`library/src/test/java/com/android/gpstest/library/osnma` run on a trimmed test vector and on
+18 minutes of Galileo messages recorded on a Pixel 8 Pro (see *Device quirks*):
 
 ```
 ./gradlew :library:testDebugUnitTest --tests "com.android.gpstest.library.osnma.*"
