@@ -29,6 +29,15 @@
         <item>Constellation, Used in Fix</item>
     </string-array>
 
+    <!-- Order of the satellites within each constellation in the Status screen's grouped list.
+         Must match GroupedSortOrder. -->
+    <string-array name="sort_sats_grouped">
+        <item>Satellite ID</item>
+        <item>Signal Strength</item>
+        <item>Elevation</item>
+        <item>Used in Fix</item>
+    </string-array>
+
     <!-- Let the user choose between map views -->
     <string-array name="map_type_entries">
         <item>Map View</item>

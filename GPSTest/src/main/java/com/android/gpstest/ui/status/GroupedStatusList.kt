@@ -63,6 +63,7 @@ fun GroupedStatusCards(
     satStatuses: List<SatelliteStatus>,
     isGnss: Boolean,
     osnmaMarks: Map<Int, OsnmaMark> = emptyMap(),
+    sortOrder: GroupedSortOrder = GroupedSortOrder.ID,
 ) {
     if (satStatuses.isEmpty()) {
         if (isGnss) {
@@ -78,85 +79,8 @@ fun GroupedStatusCards(
         // Like the classic table, nothing is shown for SBAS if there are no SBAS satellites
         return
     }
-    satelliteGroups(satStatuses, isGnss).forEach { group ->
+    groupSatellites(satStatuses, isGnss, sortOrder).forEach { group ->
         GroupCard(group, osnmaMarks)
-    }
-}
-
-/** A satellite with all of its signals */
-private class GroupedSatellite(
-    val svid: Int,
-    val gnssType: GnssType,
-    val signals: List<SatelliteStatus>,
-) {
-    /** The first signal, used for elevation, azimuth and the flag */
-    val first: SatelliteStatus get() = signals.first()
-    val usedInFix: Boolean get() = signals.any { it.usedInFix }
-    val hasAlmanac: Boolean get() = signals.any { it.hasAlmanac }
-    val hasEphemeris: Boolean get() = signals.any { it.hasEphemeris }
-}
-
-/** A constellation (GNSS) or SBAS system with its satellites */
-private class SatelliteGroup(
-    val key: String,
-    val gnssType: GnssType,
-    val sbasType: SbasType,
-    val satellites: List<GroupedSatellite>,
-) {
-    val numUsed: Int get() = satellites.count { it.usedInFix }
-    val representative: SatelliteStatus get() = satellites.first().first
-}
-
-private val gnssOrder = listOf(
-    GnssType.NAVSTAR,
-    GnssType.GALILEO,
-    GnssType.GLONASS,
-    GnssType.BEIDOU,
-    GnssType.QZSS,
-    GnssType.IRNSS,
-    GnssType.SBAS,
-    GnssType.UNKNOWN,
-)
-
-/**
- * Groups the signals by constellation (or SBAS system) and by satellite. The order of the satellites
- * within a group and of the signals' first appearance follows the list, so the user's sort order is
- * kept. Signals of a satellite are ordered from the highest to the lowest carrier frequency
- * (e.g. L1 before L5).
- */
-private fun satelliteGroups(
-    satStatuses: List<SatelliteStatus>,
-    isGnss: Boolean
-): List<SatelliteGroup> {
-    val byGroup = LinkedHashMap<String, MutableList<SatelliteStatus>>()
-    satStatuses.forEach { status ->
-        val key = if (isGnss) status.gnssType.name else "SBAS_" + status.sbasType.name
-        byGroup.getOrPut(key) { mutableListOf() }.add(status)
-    }
-    val groups = byGroup.map { (key, statuses) ->
-        val bySatellite = LinkedHashMap<Pair<GnssType, Int>, MutableList<SatelliteStatus>>()
-        statuses.forEach {
-            bySatellite.getOrPut(it.gnssType to it.svid) { mutableListOf() }.add(it)
-        }
-        SatelliteGroup(
-            key = key,
-            gnssType = statuses.first().gnssType,
-            sbasType = statuses.first().sbasType,
-            satellites = bySatellite.map { (id, signals) ->
-                GroupedSatellite(
-                    svid = id.second,
-                    gnssType = id.first,
-                    signals = signals.sortedByDescending {
-                        if (it.hasCarrierFrequency) it.carrierFrequencyHz else 0.0
-                    }
-                )
-            }
-        )
-    }
-    return if (isGnss) {
-        groups.sortedBy { gnssOrder.indexOf(it.gnssType) }
-    } else {
-        groups.sortedBy { it.sbasType.ordinal }
     }
 }
 
@@ -299,7 +223,7 @@ private fun SatelliteRow(satellite: GroupedSatellite, osnmaMark: OsnmaMark?) {
                 maxLines = 1
             )
             Text(
-                text = aeu(satellite),
+                text = satellite.aeu,
                 fontSize = 12.sp,
                 textAlign = TextAlign.End
             )
@@ -402,10 +326,4 @@ private fun elevationAzimuth(status: SatelliteStatus): String {
         "–"
     }
     return "$elevation · $azimuth"
-}
-
-private fun aeu(satellite: GroupedSatellite): String {
-    return (if (satellite.hasAlmanac) "A" else "") +
-            (if (satellite.hasEphemeris) "E" else "") +
-            (if (satellite.usedInFix) "U" else "")
 }

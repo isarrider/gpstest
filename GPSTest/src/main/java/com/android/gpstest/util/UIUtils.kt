@@ -267,4 +267,30 @@ internal object UIUtils {
         dialog.setOwnerActivity(activity)
         dialog.show()
     }
+
+    /**
+     * Sort dialog for the Status screen's grouped satellite list, which sorts the satellites within
+     * each constellation (the constellations themselves are always in the same order)
+     */
+    fun showGroupedSortByDialog(activity: FragmentActivity) {
+        val key = app.getString(R.string.pref_key_grouped_sat_sort)
+        val builder = AlertDialog.Builder(
+            activity
+        )
+        builder.setTitle(R.string.menu_option_sort_by)
+        builder.setSingleChoiceItems(
+            R.array.sort_sats_grouped, prefs.getInt(key, 0)
+        ) { dialog: DialogInterface, index: Int ->
+            prefs.edit().putInt(key, index).apply()
+            dialog.dismiss()
+        }
+        val dialog = builder.create()
+        dialog.setOwnerActivity(activity)
+        dialog.show()
+    }
+
+    /** True if the user chose the classic one-row-per-signal table on the Status screen */
+    fun isClassicStatusList(): Boolean {
+        return prefs.getBoolean(app.getString(R.string.pref_key_classic_status_list), false)
+    }
 }

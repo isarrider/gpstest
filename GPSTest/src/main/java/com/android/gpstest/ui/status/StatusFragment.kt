@@ -34,6 +34,8 @@ import com.android.gpstest.library.data.OsnmaRepository
 import com.android.gpstest.library.ui.SignalInfoViewModel
 import com.android.gpstest.library.util.PreferenceUtil.darkTheme
 import com.android.gpstest.ui.theme.AppTheme
+import com.android.gpstest.util.UIUtils.isClassicStatusList
+import com.android.gpstest.util.UIUtils.showGroupedSortByDialog
 import com.android.gpstest.util.UIUtils.showSortByDialog
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -70,7 +72,11 @@ class StatusFragment : Fragment() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         val id = item.itemId
         if (id == R.id.sort_sats) {
-            showSortByDialog(requireActivity())
+            if (isClassicStatusList()) {
+                showSortByDialog(requireActivity())
+            } else {
+                showGroupedSortByDialog(requireActivity())
+            }
         }
         return false
     }

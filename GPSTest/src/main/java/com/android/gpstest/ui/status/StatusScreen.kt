@@ -98,7 +98,12 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
     val sbasStatuses: List<SatelliteStatus> by viewModel.filteredSbasStatuses.observeAsState(emptyList())
     val allStatuses: List<SatelliteStatus> by viewModel.allStatuses.observeAsState(emptyList())
     val osnma: OsnmaUiState by osnmaState.collectAsState()
-    val classicList: Boolean by classicStatusListState()
+    val classicList: Boolean by preferenceState(R.string.pref_key_classic_status_list) { p, key ->
+        p.getBoolean(key, false)
+    }
+    val groupedSortIndex: Int by preferenceState(R.string.pref_key_grouped_sat_sort) { p, key ->
+        p.getInt(key, 0)
+    }
 
     Box(
         modifier = Modifier
@@ -122,21 +127,25 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
                 GnssStatusCard(gnssStatuses, osnmaMarks)
                 SbasStatusCard(sbasStatuses)
             } else {
-                GroupedStatusCards(gnssStatuses, true, osnmaMarks)
-                GroupedStatusCards(sbasStatuses, false)
+                val sortOrder = GroupedSortOrder.fromIndex(groupedSortIndex)
+                GroupedStatusCards(gnssStatuses, true, osnmaMarks, sortOrder)
+                GroupedStatusCards(sbasStatuses, false, sortOrder = sortOrder)
             }
         }
     }
 }
 
-/** Whether the user chose the classic one-row-per-signal table in Settings, updated when it changes */
+/** The value of a preference, updated when it changes (e.g. in Settings or the sort dialog) */
 @Composable
-private fun classicStatusListState(): State<Boolean> {
-    val key = stringResource(R.string.pref_key_classic_status_list)
-    val state = remember { mutableStateOf(prefs.getBoolean(key, false)) }
+private fun <T> preferenceState(
+    @StringRes keyId: Int,
+    read: (SharedPreferences, String) -> T
+): State<T> {
+    val key = stringResource(keyId)
+    val state = remember { mutableStateOf(read(prefs, key)) }
     DisposableEffect(key) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, changedKey ->
-            if (changedKey == key) state.value = p.getBoolean(key, false)
+            if (changedKey == key) state.value = read(p, key)
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
