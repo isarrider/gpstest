@@ -317,7 +317,7 @@ private fun SatelliteRow(
             // Two signals per line, so phones with three frequencies (e.g. L1, L2, L5) still fit
             satellite.signals.chunked(2).forEach { line ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    line.forEach { SignalCn0(it) }
+                    line.forEach { SignalCn0(it, satellite.usedInFix) }
                 }
             }
         }
@@ -339,10 +339,13 @@ private fun SatelliteRow(
 
 /** Carrier label, a C/N0 bar coloured like the sky view, and the C/N0 value */
 @Composable
-private fun SignalCn0(status: SatelliteStatus) {
+private fun SignalCn0(status: SatelliteStatus, satelliteUsed: Boolean) {
+    // If the satellite is used in the fix but this signal isn't (e.g. L1 used, L5 not), dim just
+    // this signal. Satellites not used at all are already dimmed as a whole.
     Row(
         modifier = Modifier
             .width(98.dp)
+            .alpha(if (satelliteUsed && !status.usedInFix) 0.45f else 1f)
             .padding(vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

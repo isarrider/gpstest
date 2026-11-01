@@ -61,7 +61,11 @@ class Cn0History(
     }
 
     companion object {
-        const val DEFAULT_WINDOW_MILLIS = 120_000L
+        /**
+         * 15 minutes. At one sample per second that's 900 samples per signal, roughly 3 MB for
+         * 80 signals in view.
+         */
+        const val DEFAULT_WINDOW_MILLIS = 15 * 60_000L
 
         /**
          * Identifies a signal: constellation, SBAS system, satellite ID and carrier frequency,

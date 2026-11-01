@@ -75,7 +75,7 @@ class SignalInfoViewModel @Inject constructor(
     //
 
     // All statuses BEFORE filtering
-    /** C/N0 of each signal over the last two minutes, for the Status screen's signal details */
+    /** C/N0 of each signal over the last 15 minutes, for the Status screen's signal details */
     val cn0History = Cn0History()
 
     private val _allStatuses = MutableLiveData<List<SatelliteStatus>>()
