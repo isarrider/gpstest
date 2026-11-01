@@ -329,6 +329,8 @@
     <string name="pref_display_category_title">Display</string>
     <string name="pref_keep_screen_on_title">Keep Screen On</string>
     <string name="pref_keep_screen_on_summary">Prevents the screen from turning off</string>
+    <string name="pref_classic_status_list_title">Classic satellite table</string>
+    <string name="pref_classic_status_list_summary">Show one row per signal on the Status screen instead of grouping the signals by satellite and constellation</string>
     <string name="pref_true_north_title">Point Compass to True North</string>
     <string name="pref_true_north_summary">Compass will face true north instead of magnetic north
     </string>
@@ -630,4 +632,8 @@
     <string name="osnma_import_public_key">public key PKID %1$d</string>
     <string name="osnma_import_failed">Couldn\'t import OSNMA file: %1$s</string>
     <string name="osnma_keys_cleared">OSNMA keys deleted</string>
+    <!-- Status screen satellites grouped by constellation -->
+    <string name="status_group_summary">%1$d used \u00B7 %2$d in view</string>
+    <string name="status_group_unknown">Other</string>
+    <string name="status_group_sbas_unknown">Other SBAS</string>
 </resources>

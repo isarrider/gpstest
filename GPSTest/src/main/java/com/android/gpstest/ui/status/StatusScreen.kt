@@ -15,6 +15,7 @@
  */
 package com.android.gpstest.ui.status
 
+import android.content.SharedPreferences
 import android.location.Location
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -40,9 +41,13 @@ import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -93,6 +98,7 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
     val sbasStatuses: List<SatelliteStatus> by viewModel.filteredSbasStatuses.observeAsState(emptyList())
     val allStatuses: List<SatelliteStatus> by viewModel.allStatuses.observeAsState(emptyList())
     val osnma: OsnmaUiState by osnmaState.collectAsState()
+    val classicList: Boolean by classicStatusListState()
 
     Box(
         modifier = Modifier
@@ -111,13 +117,31 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
             if (gnssFilter(app, prefs).isNotEmpty()) {
                 Filter(allStatuses.size, satelliteMetadata) { PreferenceUtils.clearGnssFilter(app, prefs) }
             }
-            GnssStatusCard(
-                gnssStatuses,
-                osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
-            )
-            SbasStatusCard(sbasStatuses)
+            val osnmaMarks = osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
+            if (classicList) {
+                GnssStatusCard(gnssStatuses, osnmaMarks)
+                SbasStatusCard(sbasStatuses)
+            } else {
+                GroupedStatusCards(gnssStatuses, true, osnmaMarks)
+                GroupedStatusCards(sbasStatuses, false)
+            }
         }
     }
+}
+
+/** Whether the user chose the classic one-row-per-signal table in Settings, updated when it changes */
+@Composable
+private fun classicStatusListState(): State<Boolean> {
+    val key = stringResource(R.string.pref_key_classic_status_list)
+    val state = remember { mutableStateOf(prefs.getBoolean(key, false)) }
+    DisposableEffect(key) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, changedKey ->
+            if (changedKey == key) state.value = p.getBoolean(key, false)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return state
 }
 
 @Composable

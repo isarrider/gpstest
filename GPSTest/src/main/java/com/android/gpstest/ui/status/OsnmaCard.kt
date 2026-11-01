@@ -149,7 +149,7 @@ fun OsnmaCard(state: OsnmaUiState) {
 }
 
 /** Remembers whether the card is expanded while the app runs (e.g. when switching screens) */
-private var osnmaCardExpanded = false
+private var osnmaCardExpanded = true
 
 /** Short status for the collapsed card, e.g. "12 sats" */
 @Composable
