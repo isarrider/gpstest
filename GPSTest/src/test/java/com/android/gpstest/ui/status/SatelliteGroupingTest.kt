@@ -206,10 +206,10 @@ class SatelliteGroupingTest {
     }
 
     @Test
-    fun averageCn0IgnoresSignalsWithoutCn0() {
+    fun averageCn0UsesStrongestSignalPerSatellite() {
         val group = groupSatellites(mixed, true)[0]
-        // 25.8, 41.9, 28.6, 34.7 and 42.0; the satellite without C/N0 doesn't count
-        assertEquals(34.6f, group.averageCn0!!, 0.001f)
+        // E21 25.8, E06 41.9 (not its E5a 28.6), E34 34.7, E23 42.0; E02 without C/N0 doesn't count
+        assertEquals(36.1f, group.averageCn0!!, 0.001f)
     }
 
     @Test

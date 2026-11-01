@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -313,26 +314,47 @@ private fun SatelliteRow(
             Spacer(modifier = Modifier.width(2.dp))
             OsnmaMarkIcon(osnmaMark)
         }
+        // On wide screens three signals fit on a line and elevation, azimuth and flags fit on one
+        // line, so each satellite needs only one line. Same threshold as the fix card's date.
+        val wide = LocalConfiguration.current.screenWidthDp > 450
         Column(modifier = Modifier.weight(1f)) {
-            // Two signals per line, so phones with three frequencies (e.g. L1, L2, L5) still fit
-            satellite.signals.chunked(2).forEach { line ->
+            // Two signals per line on phones, so three frequencies (e.g. L1, L2, L5) still fit
+            satellite.signals.chunked(if (wide) 3 else 2).forEach { line ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     line.forEach { SignalCn0(it, satellite.usedInFix) }
                 }
             }
         }
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(76.dp)) {
-            Text(
-                text = elevationAzimuth(satellite.first),
-                fontSize = 12.sp,
-                textAlign = TextAlign.End,
-                maxLines = 1
-            )
-            Text(
-                text = satellite.aeu,
-                fontSize = 12.sp,
-                textAlign = TextAlign.End
-            )
+        if (wide) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = elevationAzimuth(satellite.first),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    modifier = Modifier.width(90.dp)
+                )
+                Text(
+                    text = satellite.aeu,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(36.dp)
+                )
+            }
+        } else {
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(76.dp)) {
+                Text(
+                    text = elevationAzimuth(satellite.first),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 1
+                )
+                Text(
+                    text = satellite.aeu,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.End
+                )
+            }
         }
     }
 }
