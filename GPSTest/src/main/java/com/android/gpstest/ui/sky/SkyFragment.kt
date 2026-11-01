@@ -332,7 +332,9 @@ class SkyFragment : Fragment() {
             legend.skyLegendShapeLine16a,
             legend.skyLegendShapeLine16b,
             legend.skyLegendShapeLine17a,
-            legend.skyLegendShapeLine17b
+            legend.skyLegendShapeLine17b,
+            legend.skyLegendShapeLineOsnmaAuthenticated,
+            legend.skyLegendShapeLineOsnmaFailed
         )
 
         // Shape Legend shapes

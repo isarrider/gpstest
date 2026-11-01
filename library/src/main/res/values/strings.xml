@@ -602,6 +602,8 @@
     <string name="osnma_receiver_clock_no_elapsed">the chip doesn\'t report when it measured</string>
     <string name="osnma_receiver_clock_invalid">implausible clock values</string>
     <string name="osnma_timing_receiver_clock">From the receiver clock and word types, %1$d corrections</string>
+    <string name="sky_legend_osnma_authenticated">Galileo navigation data authenticated (OSNMA)</string>
+    <string name="sky_legend_osnma_failed">Galileo OSNMA tag failed in the last 10 minutes</string>
     <string name="osnma_mark_authenticated">Navigation data authenticated by Galileo OSNMA</string>
     <string name="osnma_mark_failed">Galileo OSNMA authentication failed</string>
     <string name="osnma_failure_channel_name">Galileo OSNMA warnings</string>

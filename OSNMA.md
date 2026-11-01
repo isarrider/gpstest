@@ -56,6 +56,8 @@ the sky view (at the upper right of the triangle):
   authenticated.
 - **Red seal with an exclamation mark**: a tag of this satellite failed in the last 10 minutes.
 
+Both are also explained in the sky view's legend.
+
 ### Warning notification
 
 When a tag fails, GPSTest posts a notification ("Galileo authentication failed") naming the
