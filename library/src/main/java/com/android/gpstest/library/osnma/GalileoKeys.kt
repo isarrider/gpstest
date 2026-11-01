@@ -52,6 +52,26 @@ object GalileoKeys {
         )
     )
 
+    /**
+     * Signed DSM-KROOT messages of the TESLA chain in force, with the NMA header they were
+     * broadcast with, so that the first session can verify TESLA keys without receiving the
+     * DSM-KROOT. The engine checks the ECDSA signature with an authenticated public key before
+     * using one, and drops it when the signal shows another chain in force or a revocation.
+     *
+     * Chain 1, PKID 2, KROOT at WN 1385 TOWH 40 (March 2026), recorded from the signal with a
+     * u-blox receiver. Keys can be traced back to it for up to a year
+     * ([TeslaKey.MAX_DERIVATIONS_STORED]); a newer one is logged by GPSTest whenever it verifies
+     * a DSM-KROOT (see OSNMA.md).
+     */
+    private val KROOTS = listOf(
+        "9222504922056928C5EFE33668F2BE563D9CD1F2AB9D929C499AA7FD8BAAD704829AF98D3D270AA9A3" +
+            "6C2C20223B8524D94ECD8427969F9A814F7E4E2A384289C5DB9FD136B58AF8333602ED44E4C475F912" +
+            "69D2AC438E94F74B7B4CA3F89A53ED9AC7D59CBF675483"
+    )
+
+    /** The built-in DSM-KROOT messages (still unverified: the engine checks them) */
+    fun builtInKroots(): List<BuiltInKroot> = KROOTS.mapNotNull { BuiltInKroot.decode(it) }
+
     /** The built-in public keys that are authenticated by the Merkle tree [root] */
     fun builtInKeys(root: ByteArray): List<OsnmaPublicKey> = KEYS.mapNotNull { k ->
         val key = OsnmaPublicKey.fromSec1(k.pkid, Bits.fromHex(k.point), KeySource.BUILT_IN)

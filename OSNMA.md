@@ -159,9 +159,20 @@ OSNMA messages page by page instead of waiting for complete 30 s subframes:
   flexible tags are skipped. Fixed tags are checked against the MAC look-up table as usual.
 - **Warm start.** The last verified TESLA key is saved. On the next start, new keys are verified
   by hashing back to it, so authentication can start within about a minute, without waiting for
-  the root key. The saved key is dropped as soon as the signal shows a different chain in force,
-  a revoked chain or key, an alert message, or a "don't use" status, and when keys are forgotten
-  in the settings. The details then show the TESLA chain as "(from the previous session)".
+  the root key. This works for up to a year after the saved key, as long as the same chain is in
+  force (hashing back that far takes a few seconds, so it's tried at most every 2.5 minutes).
+  The saved key is dropped as soon as the signal shows a different chain in force, a revoked
+  chain or key, an alert message, or a "don't use" status, and when keys are forgotten in the
+  settings. The details then show the TESLA chain as "(from the previous session)". If the
+  root key from the signal arrives, it takes over.
+- **Built-in TESLA root key.** GPSTest also ships with a signed root key message (DSM-KROOT) of
+  the chain in force, so even the very first session can start without receiving it. It's
+  checked like one from the signal: its ECDSA signature must verify with the built-in public
+  key, and the same rules as for the warm start drop it. The details then show "(built-in root
+  key)". When the chain changes, the app simply falls back to the signal until the built-in
+  message is updated. Each root key GPSTest verifies is written to Logcat ("Verified
+  DSM-KROOT") and, with OSNMA file logging on, to the CSV file, so it can be built into a
+  later version (`GalileoKeys.kt`).
 - **Root key parts kept between sessions.** The parts of the TESLA root key (DSM-KROOT) and of
   public key messages received so far are saved every minute and when tracking stops. The next
   session continues collecting where the last one stopped, which matters on phones that miss
@@ -246,6 +257,12 @@ sends OSNMA data:
 
 ```
 OSNMA,UnixTimeMillis,GstWeek,GstTimeOfWeekSeconds,Phase,NmaStatus,ChainId,PublicKeyId,Svid,CedAuthenticated,CedAuthBits,TimingAuthenticated,TimingAuthBits,TagsOk,TagsFailed
+```
+
+A record is also written each time a root key is verified:
+
+```
+OSNMA_KROOT,UnixTimeMillis,NmaHeaderAndDsmKrootHex
 ```
 
 `Phase` is the overall state (for example `WAITING_FOR_KROOT` or `AUTHENTICATING`). Before any

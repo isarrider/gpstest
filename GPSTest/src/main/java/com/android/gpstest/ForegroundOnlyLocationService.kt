@@ -463,7 +463,9 @@ class ForegroundOnlyLocationService : LifecycleService() {
                 if (status == null) {
                     osnmaCsvLog.reset()
                 } else if (writeOsnmaToFile(app, prefs)) {
-                    val records = osnmaCsvLog.records(status, System.currentTimeMillis())
+                    val now = System.currentTimeMillis()
+                    val records = osnmaCsvLog.records(status, now) +
+                        listOfNotNull(osnmaCsvLog.krootRecord(state.lastVerifiedKroot, now))
                     if (records.isNotEmpty()) {
                         GlobalScope.launch(Dispatchers.IO) {
                             initLogging()

@@ -263,10 +263,11 @@ private fun Details(status: OsnmaStatus) {
         )
         DetailRow(
             R.string.osnma_label_chain,
-            if (status.warmStart) {
-                chain + " " + stringResource(R.string.osnma_chain_warm_start)
-            } else {
-                chain
+            when {
+                status.warmStartBuiltIn ->
+                    chain + " " + stringResource(R.string.osnma_chain_built_in)
+                status.warmStart -> chain + " " + stringResource(R.string.osnma_chain_warm_start)
+                else -> chain
             }
         )
     } else {

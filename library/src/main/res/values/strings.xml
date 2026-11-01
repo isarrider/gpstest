@@ -570,6 +570,7 @@
     <string name="osnma_public_key_none">Not available yet</string>
     <string name="osnma_chain_value">ID %1$d, %2$s, %3$d-bit tags, key at %4$s</string>
     <string name="osnma_chain_warm_start">(from the previous session)</string>
+    <string name="osnma_chain_built_in">(built-in root key)</string>
     <string name="osnma_label_kroot">TESLA root key</string>
     <string name="osnma_kroot_progress">%1$d of %2$d blocks received</string>
     <string name="osnma_kroot_progress_unknown">%1$d blocks received</string>

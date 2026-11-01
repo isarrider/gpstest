@@ -199,7 +199,8 @@ fun StatusCard(
             Column {
                 StatusRowHeader(isGnss)
                 satStatuses.forEach {
-                    val osnmaMark = if (it.gnssType == GnssType.GALILEO) osnmaMarks[it.svid] else null
+                    val osnmaMark =
+                        if (it.gnssType == GnssType.GALILEO) osnmaMarks[it.svid] else null
                     StatusRow(it, osnmaMark)
                 }
                 StatusRowFooter()

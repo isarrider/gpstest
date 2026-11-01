@@ -402,6 +402,133 @@ class OsnmaEngineTest {
         assertTrue(engine.statistics.tagsOk > 1000)
     }
 
+    /** The fast derivation loop gives the same keys as stepping back one key at a time */
+    @Test
+    fun teslaKey_deriveMatchesPrevious() {
+        for (hash in HashFunction.values()) {
+            val chain = TeslaChain(1, hash, MacFunction.HMAC_SHA_256, 16, 40, 34, 0x25D3964DA3A2L)
+            val key = TeslaKey(ByteArray(16) { (it * 7).toByte() }, chain, Gst(1419, 30 * 1000))
+            var stepwise = key
+            repeat(50) { stepwise = stepwise.previous() }
+            val fast = key.derive(50)
+            assertEquals(stepwise.gstSubframe, fast.gstSubframe)
+            assertEquals(Bits.toHex(stepwise.data), Bits.toHex(fast.data))
+        }
+    }
+
+    /**
+     * A built-in DSM-KROOT lets the engine verify TESLA keys and tags before the DSM-KROOT is
+     * received; a tampered one isn't used
+     */
+    @Test
+    fun builtInKroot_usedBeforeSignalKroot() {
+        val pages = TestVectors.configuration1()
+        var captured: BuiltInKroot? = null
+        val first = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            object : OsnmaEngine.Listener {
+                override fun onKrootVerified(kroot: BuiltInKroot) {
+                    captured = kroot
+                }
+            }
+        )
+        pages.forEach { first.feedPage(it.svn, it.gst, it.page) }
+        val kroot = BuiltInKroot.decode(captured!!.encode())!!
+
+        val engine = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            builtInKroots = listOf(kroot)
+        )
+        assertTrue(engine.status().warmStartBuiltIn)
+        val withoutBuiltIn = newEngine()
+        var firstTag: Gst? = null
+        var firstTagWithout: Gst? = null
+        // With 60 % of the pages lost, as on some phones, the DSM-KROOT takes minutes
+        val random = Random(8)
+        pages.forEach {
+            if (random.nextInt(100) < 60) return@forEach
+            engine.feedPage(it.svn, it.gst, it.page)
+            withoutBuiltIn.feedPage(it.svn, it.gst, it.page)
+            if (firstTag == null && engine.statistics.tagsOk > 0) firstTag = it.gst
+            if (firstTagWithout == null && withoutBuiltIn.statistics.tagsOk > 0) {
+                firstTagWithout = it.gst
+            }
+        }
+        assertTrue(firstTag!! < firstTagWithout!!)
+        assertEquals(0, engine.statistics.tagsFailed)
+        assertEquals(0, engine.statistics.teslaKeysFailed)
+
+        // One bit changed in the TESLA root key: the signature fails and it isn't used
+        val tampered = kroot.dsmKroot.copyOf()
+        tampered[20] = (tampered[20].toInt() xor 1).toByte()
+        val withTampered = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            builtInKroots = listOf(BuiltInKroot(kroot.nmaHeader, tampered))
+        )
+        assertNull(withTampered.status().teslaKey)
+        assertFalse(withTampered.status().warmStartBuiltIn)
+    }
+
+    /**
+     * A built-in or stored key from an earlier chain with the same chain ID doesn't block
+     * authentication: the signed DSM-KROOT from the signal replaces it
+     */
+    @Test
+    fun warmStart_staleKeyWithSameChainIdReplaced() {
+        var stored: StoredTeslaKey? = null
+        val first = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            object : OsnmaEngine.Listener {
+                override fun onTeslaKeyVerified(key: StoredTeslaKey) {
+                    stored = key
+                }
+            }
+        )
+        val pages = TestVectors.configuration1()
+        pages.take(pages.size / 4).forEach { first.feedPage(it.svn, it.gst, it.page) }
+        val s = stored!!
+        val stale = StoredTeslaKey(s.chain, ByteArray(s.key.size) { 0x55 }, s.gstSubframe)
+        val engine = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            storedKey = stale
+        )
+        pages.drop(pages.size / 4).forEach { engine.feedPage(it.svn, it.gst, it.page) }
+        assertTrue(engine.statistics.krootVerified > 0)
+        assertTrue(engine.statistics.tagsOk > 300)
+        assertEquals(0, engine.statistics.tagsFailed)
+    }
+
+    /** The KROOT built into the app verifies with the built-in public key */
+    @Test
+    fun galileoBuiltInKroot_verifies() {
+        val root = Bits.fromHex(GalileoKeys.MERKLE_ROOT)
+        val engine = OsnmaEngine(
+            root,
+            GalileoKeys.builtInKeys(root),
+            builtInKroots = GalileoKeys.builtInKroots()
+        )
+        val status = engine.status()
+        assertTrue(status.warmStartBuiltIn)
+        assertEquals(1, status.chainInForce)
+        assertEquals(1385, status.teslaKey!!.gstSubframe.wn)
+    }
+
+    /** Verifying a key half a year after the built-in KROOT is fast enough for a phone */
+    @Test
+    fun teslaKey_longDerivationSpeed() {
+        val chain = TeslaChain(1, HashFunction.SHA_256, MacFunction.HMAC_SHA_256, 16, 40, 34, 1L)
+        val key = TeslaKey(ByteArray(16), chain, Gst(1419, 0))
+        val start = System.nanoTime()
+        key.derive(183 * 24 * 120)
+        val millis = (System.nanoTime() - start) / 1_000_000
+        assertTrue("took $millis ms", millis < 5000)
+    }
+
     /** DSM bytes collected in one session are completed in the next one */
     @Test
     fun dsmBytes_carriedOverToNextSession() {

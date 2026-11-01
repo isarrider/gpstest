@@ -15,6 +15,8 @@
  */
 package com.android.gpstest.library.osnma
 
+import java.security.MessageDigest
+
 /** Parameters of a TESLA chain, taken from an authenticated DSM-KROOT */
 data class TeslaChain(
     val chainId: Int,
@@ -89,9 +91,30 @@ class TeslaKey internal constructor(
     }
 
     fun derive(steps: Int): TeslaKey {
-        var k = this
-        repeat(steps) { k = k.previous() }
-        return k
+        if (steps <= 0) return this
+        // Same as calling previous() [steps] times, without creating objects for each step: a
+        // year of keys is about a million hashes
+        val size = chain.keySizeBytes
+        val input = ByteArray(size + 10)
+        for (i in 0 until 6) {
+            input[size + 4 + i] = (chain.alpha ushr (8 * (5 - i))).toByte()
+        }
+        val sha256 = if (chain.hashFunction == HashFunction.SHA_256) {
+            MessageDigest.getInstance("SHA-256")
+        } else {
+            null
+        }
+        var key = data
+        var gst = gstSubframe
+        repeat(steps) {
+            gst = gst.addSeconds(-30)
+            System.arraycopy(key, 0, input, 0, size)
+            val time = (gst.wn.toLong() shl 20) or gst.tow.toLong()
+            for (i in 0 until 4) input[size + i] = (time ushr (8 * (3 - i))).toByte()
+            val h = sha256?.digest(input) ?: OsnmaCrypto.sha3_256(input)
+            key = h.copyOf(size)
+        }
+        return TeslaKey(key, chain, gst)
     }
 
     /**
@@ -165,10 +188,11 @@ class TeslaKey internal constructor(
         const val MAX_DERIVATIONS = 3000
 
         /**
-         * Limit when starting from a key stored in an earlier session: 30 days. Deriving that
-         * many keys takes well under a second.
+         * Limit when starting from a key stored in an earlier session or a built-in TESLA root
+         * key: one year. Deriving that many keys takes a few seconds on a phone, so the engine
+         * limits how often it does that (see OsnmaEngine).
          */
-        const val MAX_DERIVATIONS_STORED = 30 * 24 * 120
+        const val MAX_DERIVATIONS_STORED = 366 * 24 * 120
     }
 }
 
@@ -204,6 +228,31 @@ class StoredTeslaKey(val chain: TeslaChain, val key: ByteArray, val gstSubframe:
             val key = Bits.fromHex(f[9])
             if (key.size == chain.keySizeBytes && gst.isSubframe) {
                 StoredTeslaKey(chain, key, gst)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
+/**
+ * A DSM-KROOT message with the NMA header it was broadcast with, as built into the app (see
+ * GalileoKeys). It's verified like a received one: its ECDSA signature must check out with an
+ * authenticated public key. It lets the first session start without receiving the DSM-KROOT,
+ * as long as its chain is still in force.
+ */
+class BuiltInKroot(val nmaHeader: Int, val dsmKroot: ByteArray) {
+
+    /** Hex text form: NMA header byte followed by the DSM-KROOT */
+    fun encode(): String = "%02X".format(nmaHeader) + Bits.toHex(dsmKroot)
+
+    companion object {
+        fun decode(hex: String): BuiltInKroot? = try {
+            val bytes = Bits.fromHex(hex)
+            if (bytes.size > 1) {
+                BuiltInKroot(bytes[0].toInt() and 0xFF, bytes.copyOfRange(1, bytes.size))
             } else {
                 null
             }

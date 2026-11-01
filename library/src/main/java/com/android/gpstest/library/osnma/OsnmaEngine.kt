@@ -32,6 +32,8 @@ package com.android.gpstest.library.osnma
  * satellites, the TESLA key of a subframe from the pages of any satellite, and each tag as soon as
  * its own pages are there. A TESLA key verified in an earlier session can be passed in as
  * [storedKey] ("warm start"), so that new keys can be verified without waiting for the DSM-KROOT.
+ * Signed DSM-KROOT messages built into the app ([builtInKroots]) serve the same purpose for the
+ * first session, after their signature has been verified.
  *
  * This class is not thread safe: call it from a single thread.
  */
@@ -44,7 +46,9 @@ class OsnmaEngine(
     /** A TESLA key verified in an earlier session, to start without the DSM-KROOT */
     storedKey: StoredTeslaKey? = null,
     /** DSM bytes collected in an earlier session (see [exportDsm]) */
-    storedDsm: String? = null
+    storedDsm: String? = null,
+    /** Signed DSM-KROOT messages known in advance, verified before use (see [BuiltInKroot]) */
+    builtInKroots: List<BuiltInKroot> = emptyList()
 ) {
 
     interface Listener {
@@ -61,6 +65,9 @@ class OsnmaEngine(
 
         /** The key passed as storedKey can't be used (chain changed or revoked); forget it */
         fun onStoredKeyDiscarded() {}
+
+        /** A DSM-KROOT was verified; it can be built into apps as a [BuiltInKroot] */
+        fun onKrootVerified(kroot: BuiltInKroot) {}
     }
 
     private var merkleTree: MerkleTree? = merkleRoot?.let { MerkleTree(it) }
@@ -75,7 +82,11 @@ class OsnmaEngine(
     // Warm start: the chain in force comes from a key stored in an earlier session, and no
     // DSM-KROOT has been verified yet in this one
     private var warmStart = false
+    private var warmStartBuiltIn = false
     private var warmStartFailures = 0
+
+    // Verifying a key against an old one takes up to a million hashes: not more often than this
+    private var lastLongDerivation: Gst? = null
     private var lastKrootDsmId: Int? = null
     private var krootDsmIdInProcess: Int? = null
     private var pkrDsmIdInProcess: Int? = null
@@ -117,12 +128,50 @@ class OsnmaEngine(
 
     init {
         initialKeys.sortedBy { it.pkid }.forEach { storePublicKey(it, notify = false) }
-        storedKey?.let {
-            keySlots[0] = TeslaKey(it.key, it.chain, it.gstSubframe)
+        var startKey = storedKey?.let { TeslaKey(it.key, it.chain, it.gstSubframe) }
+        for (builtIn in builtInKroots) {
+            val key = verifyBuiltInKroot(builtIn) ?: continue
+            if (startKey == null || key.gstSubframe > startKey.gstSubframe) {
+                startKey = key
+                warmStartBuiltIn = true
+            }
+        }
+        startKey?.let {
+            keySlots[0] = it
             chainInForce = it.chain.chainId
             warmStart = true
         }
         storedDsm?.let { dsmAssembler.import(it) }
+    }
+
+    /**
+     * Checks a built-in DSM-KROOT like a received one and returns its TESLA root key, or null if
+     * it can't be used (unknown public key, wrong signature, or a header that rules it out)
+     */
+    private fun verifyBuiltInKroot(builtIn: BuiltInKroot): TeslaKey? {
+        val header = NmaHeader(builtIn.nmaHeader)
+        if (header.nmaStatus == NmaStatus.DONT_USE || header.cpks == Cpks.CHAIN_REVOKED ||
+            header.cpks == Cpks.PUBLIC_KEY_REVOKED || header.cpks == Cpks.ALERT_MESSAGE
+        ) {
+            return null
+        }
+        val dsm = DsmKroot(builtIn.dsmKroot)
+        val pubKey = applicablePubKey(dsm.publicKeyId) ?: return null
+        val chain = TeslaChain.fromDsmKroot(dsm) ?: return null
+        val curve = dsm.curve ?: return null
+        val signature = dsm.signature ?: return null
+        val kroot = dsm.kroot ?: return null
+        if (curve != pubKey.curve || !dsm.paddingOk(header)) return null
+        if (!OsnmaCrypto.verifyEcdsa(curve, pubKey.key, dsm.signedMessage(header), signature)) {
+            return null
+        }
+        val krootStart = Gst(dsm.krootWn, dsm.krootTowh * 3600)
+        event(
+            krootStart,
+            OsnmaEvent.Type.INFO,
+            "Built-in TESLA root key of chain ${chain.chainId} verified with PKID ${pubKey.pkid}"
+        )
+        return TeslaKey(kroot, chain, krootStart.addSeconds(-30))
     }
 
     /**
@@ -235,7 +284,10 @@ class OsnmaEngine(
         chainInForce = null
         chainStart = null
         warmStart = false
-        event(gst, OsnmaEvent.Type.WARNING, "TESLA key from the previous session not used: $reason")
+        val source = if (warmStartBuiltIn) "Built-in TESLA root key" else
+            "TESLA key from the previous session"
+        warmStartBuiltIn = false
+        event(gst, OsnmaEvent.Type.WARNING, "$source not used: $reason")
         listener?.onStoredKeyDiscarded()
     }
 
@@ -327,8 +379,15 @@ class OsnmaEngine(
         lastHeaderAuthenticated = true
         if (warmStart) {
             warmStart = false
+            warmStartBuiltIn = false
+            // Continue from the signed KROOT: a stored or built-in key with the same chain ID
+            // might belong to an earlier chain
+            for (i in keySlots.indices) {
+                if (keySlots[i]?.chain?.chainId == chain.chainId) keySlots[i] = null
+            }
             event(gst, OsnmaEvent.Type.INFO, "TESLA chain confirmed by the DSM-KROOT")
         }
+        listener?.onKrootVerified(BuiltInKroot(header.raw, dsm.data.copyOf()))
         storeKroot(kroot, header, gst)
         processNmaHeader(header, pkid, gst)
         // Keys of recent subframes may have been received before this KROOT: try them now
@@ -572,6 +631,14 @@ class OsnmaEngine(
     private fun validateKey(newKey: TeslaKey, current: TeslaKey) {
         val maxDerivations =
             if (warmStart) TeslaKey.MAX_DERIVATIONS_STORED else TeslaKey.MAX_DERIVATIONS
+        val steps = newKey.gstSubframe.subframesSince(current.gstSubframe)
+        if (warmStart && steps > TeslaKey.MAX_DERIVATIONS) {
+            // Hashing back to an old key is costly: try that once every few minutes at most
+            val last = lastLongDerivation
+            val sinceLast = last?.let { newKey.gstSubframe.subframesSince(it) }
+            if (sinceLast != null && sinceLast < LONG_DERIVATION_SUBFRAMES) return
+            lastLongDerivation = newKey.gstSubframe
+        }
         if (current.authenticates(newKey, maxDerivations)) {
             stats.teslaKeysVerified++
             warmStartFailures = 0
@@ -840,6 +907,7 @@ class OsnmaEngine(
             teslaKey = current?.let { TeslaKeyInfo(it.chain, it.gstSubframe) },
             alertMessage = alertReceived,
             warmStart = warmStart && current != null,
+            warmStartBuiltIn = warmStart && warmStartBuiltIn && current != null,
             krootProgress = lastKrootDsmId?.let { dsmAssembler.progress(it) },
             satellites = sats,
             events = events.toList(),
@@ -855,6 +923,7 @@ class OsnmaEngine(
         private const val DUMMY_WORD_TYPE = 63
         private const val MAX_KEY_ATTEMPTS = 3
         private const val MAX_WARM_START_FAILURES = 3
+        private const val LONG_DERIVATION_SUBFRAMES = 5
         private const val PageStoreDepth = 13
     }
 }
@@ -948,8 +1017,10 @@ data class OsnmaStatus(
     val chainInForce: Int?,
     val teslaKey: TeslaKeyInfo?,
     val alertMessage: Boolean,
-    /** The chain in force comes from a TESLA key stored in an earlier session */
+    /** The chain in force comes from a TESLA key stored in an earlier session or built in */
     val warmStart: Boolean,
+    /** The chain in force comes from a built-in TESLA root key (see [BuiltInKroot]) */
+    val warmStartBuiltIn: Boolean = false,
     /** Blocks of the DSM-KROOT received so far and the number needed (0 until known) */
     val krootProgress: Pair<Int, Int>?,
     val satellites: List<SatelliteAuthStatus>,

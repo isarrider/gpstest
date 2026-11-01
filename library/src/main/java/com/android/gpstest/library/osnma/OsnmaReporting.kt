@@ -21,6 +21,7 @@ package com.android.gpstest.library.osnma
  */
 class OsnmaCsvLog {
     private var lastSubframe: Long? = null
+    private var lastKroot: String? = null
 
     /**
      * @return the records to log for [status], or an empty list if this subframe was already
@@ -58,12 +59,28 @@ class OsnmaCsvLog {
         }
     }
 
+    /**
+     * @return a record with a newly verified DSM-KROOT ([kroot], hex), or null if it was logged
+     * already
+     */
+    fun krootRecord(kroot: String?, utcMillis: Long): String? {
+        if (kroot == null || kroot == lastKroot) return null
+        lastKroot = kroot
+        return "OSNMA_KROOT,$utcMillis,$kroot"
+    }
+
     fun reset() {
         lastSubframe = null
     }
 
     companion object {
         private const val SATELLITE_FIELDS = 7
+
+        /**
+         * Format line of the record written when a DSM-KROOT is verified: the NMA header and the
+         * DSM-KROOT in hex
+         */
+        const val KROOT_FORMAT = "OSNMA_KROOT,UnixTimeMillis,NmaHeaderAndDsmKrootHex"
 
         /** Format line for the CSV file header */
         const val FORMAT =

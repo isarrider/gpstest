@@ -197,6 +197,9 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
             writer.write(COMMENT_START);
             writer.write("  " + OsnmaCsvLog.FORMAT);
             writer.newLine();
+            writer.write(COMMENT_START);
+            writer.write("  " + OsnmaCsvLog.KROOT_FORMAT);
+            writer.newLine();
         } catch (IOException e) {
             logException(Application.Companion.getApp().getString(R.string.could_not_initialize_file, filePath), e);
             return;

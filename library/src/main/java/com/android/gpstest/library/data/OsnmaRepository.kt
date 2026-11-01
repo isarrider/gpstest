@@ -23,6 +23,8 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import com.android.gpstest.library.R
+import com.android.gpstest.library.osnma.BuiltInKroot
+import com.android.gpstest.library.osnma.GalileoKeys
 import com.android.gpstest.library.osnma.InavLayoutDetector
 import com.android.gpstest.library.osnma.InavPage
 import com.android.gpstest.library.osnma.InavPageAssembler
@@ -84,7 +86,9 @@ data class OsnmaUiState(
     /** Bit offset of the page in the platform's data (0 as documented, 4 on some devices) */
     val layoutOffsetBits: Int? = null,
     /** Page times are estimated with the receiver's GNSS clock (GnssClock) */
-    val timingUsesReceiverClock: Boolean = false
+    val timingUsesReceiverClock: Boolean = false,
+    /** The last DSM-KROOT verified from the signal (hex, see BuiltInKroot), for logging */
+    val lastVerifiedKroot: String? = null
 ) {
     /**
      * Pages arrive, but too many are missing to complete the OSNMA subframes, or they stopped.
@@ -144,6 +148,7 @@ class OsnmaRepository @Inject constructor(
     private var engineKeys: Set<String> = emptySet()
     private var lastKeySaveMillis = 0L
     private var lastDsmSaveMillis = 0L
+    private var lastVerifiedKroot: String? = null
     private var pagesWithoutTime = 0L
     private var pagesWrongSize = 0L
     private var pagesParityPassed = 0L
@@ -175,6 +180,15 @@ class OsnmaRepository @Inject constructor(
 
         override fun onStoredKeyDiscarded() {
             OsnmaKeyStore.clearTeslaKey(context, prefs)
+        }
+
+        override fun onKrootVerified(kroot: BuiltInKroot) {
+            val hex = kroot.encode()
+            if (hex != lastVerifiedKroot) {
+                // Can be built into the app (GalileoKeys) to speed up the first session
+                Log.i(TAG, "Verified DSM-KROOT: $hex")
+                lastVerifiedKroot = hex
+            }
         }
     }
 
@@ -359,7 +373,8 @@ class OsnmaRepository @Inject constructor(
             initialKeys = keys,
             listener = listener,
             storedKey = OsnmaKeyStore.teslaKey(context, prefs),
-            storedDsm = OsnmaKeyStore.dsm(context, prefs)
+            storedDsm = OsnmaKeyStore.dsm(context, prefs),
+            builtInKroots = GalileoKeys.builtInKroots()
         )
     }
 
@@ -421,7 +436,8 @@ class OsnmaRepository @Inject constructor(
             inavSeenBefore = inavSeen,
             pagesRepaired = assembler.repaired,
             layoutOffsetBits = layout.offsetBits,
-            timingUsesReceiverClock = timeTracker.usingReceiverClock
+            timingUsesReceiverClock = timeTracker.usingReceiverClock,
+            lastVerifiedKroot = lastVerifiedKroot
         )
     }
 
