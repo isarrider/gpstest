@@ -634,6 +634,13 @@
     <string name="osnma_keys_cleared">OSNMA keys deleted</string>
     <!-- Status screen satellites grouped by constellation -->
     <string name="status_group_summary">%1$d used \u00B7 %2$d in view</string>
+    <string name="status_group_summary_cn0">%1$d used \u00B7 %2$d in view \u00B7 \u2300 %3$.0f dB-Hz</string>
     <string name="status_group_unknown">Other</string>
+    <string name="status_details_frequency">%1$.3f MHz</string>
+    <string name="status_details_no_frequency">frequency unknown</string>
+    <string name="status_details_cn0">C/N0 %1$.1f dB-Hz</string>
+    <string name="status_details_no_cn0">no C/N0</string>
+    <string name="status_details_baseband_cn0">, baseband %1$.1f dB-Hz</string>
+    <string name="status_details_position">Elevation %1$.1f\u00B0, azimuth %2$.1f\u00B0</string>
     <string name="status_group_sbas_unknown">Other SBAS</string>
 </resources>

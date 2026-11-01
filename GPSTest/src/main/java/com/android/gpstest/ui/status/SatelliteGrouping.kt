@@ -47,6 +47,9 @@ class GroupedSatellite(
     val gnssType: GnssType,
     val signals: List<SatelliteStatus>,
 ) {
+    /** Identifies the satellite across updates, e.g. to remember which one shows its details */
+    val key: String get() = gnssType.name + "_" + svid
+
     /** The first signal, used for elevation, azimuth and the flag */
     val first: SatelliteStatus get() = signals.first()
     val usedInFix: Boolean get() = signals.any { it.usedInFix }
@@ -74,6 +77,18 @@ class SatelliteGroup(
     val satellites: List<GroupedSatellite>,
 ) {
     val numUsed: Int get() = satellites.count { it.usedInFix }
+
+    /**
+     * Average C/N0 of all signals of the group that have one (in view, not only used in fix), or
+     * null if no signal has a C/N0
+     */
+    val averageCn0: Float?
+        get() = satellites.flatMap { it.signals }
+            .map { it.cn0DbHz }
+            .filter { it != SatelliteStatus.NO_DATA }
+            .takeIf { it.isNotEmpty() }
+            ?.average()
+            ?.toFloat()
     val representative: SatelliteStatus get() = satellites.first().first
 }
 

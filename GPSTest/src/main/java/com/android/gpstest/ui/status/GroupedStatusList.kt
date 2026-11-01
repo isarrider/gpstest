@@ -84,6 +84,9 @@ fun GroupedStatusCards(
     }
 }
 
+/** Keys of the satellites whose signal details the user opened by tapping them */
+private val satellitesWithDetails = mutableStateListOf<String>()
+
 /** Keys of the groups the user collapsed, kept while the app runs. Groups are expanded by default. */
 private val collapsedGroups = mutableStateListOf<String>()
 
@@ -108,7 +111,15 @@ private fun GroupCard(group: SatelliteGroup, osnmaMarks: Map<Int, OsnmaMark>) {
                     } else {
                         null
                     }
-                    SatelliteRow(satellite, mark)
+                    val showDetails = satellite.key in satellitesWithDetails
+                    SatelliteRow(satellite, mark) {
+                        if (showDetails) {
+                            satellitesWithDetails.remove(satellite.key)
+                        } else {
+                            satellitesWithDetails.add(satellite.key)
+                        }
+                    }
+                    if (showDetails) SatelliteDetails(satellite)
                 }
             }
         }
@@ -132,12 +143,22 @@ private fun GroupHeader(group: SatelliteGroup, expanded: Boolean, onClick: () ->
             modifier = Modifier.padding(start = 6.dp)
         )
         Spacer(modifier = Modifier.weight(1f))
+        val averageCn0 = group.averageCn0
         Text(
-            text = stringResource(
-                R.string.status_group_summary,
-                group.numUsed,
-                group.satellites.size
-            ) + if (expanded) "  ▴" else "  ▾",
+            text = if (averageCn0 != null) {
+                stringResource(
+                    R.string.status_group_summary_cn0,
+                    group.numUsed,
+                    group.satellites.size,
+                    averageCn0
+                )
+            } else {
+                stringResource(
+                    R.string.status_group_summary,
+                    group.numUsed,
+                    group.satellites.size
+                )
+            } + if (expanded) "  ▴" else "  ▾",
             fontSize = 12.sp,
             maxLines = 1
         )
@@ -191,10 +212,11 @@ private fun satelliteId(satellite: GroupedSatellite): String {
 }
 
 @Composable
-private fun SatelliteRow(satellite: GroupedSatellite, osnmaMark: OsnmaMark?) {
+private fun SatelliteRow(satellite: GroupedSatellite, osnmaMark: OsnmaMark?, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .alpha(if (satellite.usedInFix) 1f else 0.55f)
             .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -326,4 +348,61 @@ private fun elevationAzimuth(status: SatelliteStatus): String {
         "–"
     }
     return "$elevation · $azimuth"
+}
+
+/**
+ * Details shown below a satellite after tapping it: per signal the exact carrier frequency, the
+ * C/N0 with one decimal and, if the device reports it, the baseband C/N0; then the exact elevation
+ * and azimuth
+ */
+@Composable
+private fun SatelliteDetails(satellite: GroupedSatellite) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colors.onSurface.copy(alpha = 0.05f))
+            .padding(start = 66.dp, end = 12.dp, top = 4.dp, bottom = 6.dp)
+    ) {
+        satellite.signals.forEach { status ->
+            val label = carrierLabel(status).ifEmpty { "\u2013" }
+            val frequency = if (status.hasCarrierFrequency) {
+                stringResource(
+                    R.string.status_details_frequency,
+                    MathUtils.toMhz(status.carrierFrequencyHz)
+                )
+            } else {
+                stringResource(R.string.status_details_no_frequency)
+            }
+            val cn0 = if (status.cn0DbHz != SatelliteStatus.NO_DATA) {
+                stringResource(R.string.status_details_cn0, status.cn0DbHz)
+            } else {
+                stringResource(R.string.status_details_no_cn0)
+            }
+            val baseband = if (status.hasBasebandCn0DbHz &&
+                status.basebandCn0DbHz != SatelliteStatus.NO_DATA
+            ) {
+                stringResource(R.string.status_details_baseband_cn0, status.basebandCn0DbHz)
+            } else {
+                ""
+            }
+            Text(
+                text = "$label: $frequency, $cn0$baseband",
+                fontSize = 12.sp
+            )
+        }
+        val first = satellite.first
+        if (first.elevationDegrees != SatelliteStatus.NO_DATA ||
+            first.azimuthDegrees != SatelliteStatus.NO_DATA
+        ) {
+            Text(
+                text = stringResource(
+                    R.string.status_details_position,
+                    first.elevationDegrees,
+                    first.azimuthDegrees
+                ),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
 }

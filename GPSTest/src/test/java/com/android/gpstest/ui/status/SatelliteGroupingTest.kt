@@ -19,6 +19,7 @@ import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
 import com.android.gpstest.library.model.SbasType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -202,6 +203,32 @@ class SatelliteGroupingTest {
             listOf(6, 23, 2, 21, 34),
             groupSatellites(mixed, true, GroupedSortOrder.USED_IN_FIX).ids(0)
         )
+    }
+
+    @Test
+    fun averageCn0IgnoresSignalsWithoutCn0() {
+        val group = groupSatellites(mixed, true)[0]
+        // 25.8, 41.9, 28.6, 34.7 and 42.0; the satellite without C/N0 doesn't count
+        assertEquals(34.6f, group.averageCn0!!, 0.001f)
+    }
+
+    @Test
+    fun averageCn0IsNullWithoutAnyCn0() {
+        val group = groupSatellites(
+            listOf(signal(GnssType.NAVSTAR, 1, cn0 = SatelliteStatus.NO_DATA)),
+            true
+        )[0]
+        assertNull(group.averageCn0)
+    }
+
+    @Test
+    fun satelliteKeyIncludesConstellation() {
+        val groups = groupSatellites(
+            listOf(signal(GnssType.GALILEO, 8), signal(GnssType.BEIDOU, 8)),
+            true
+        )
+        assertEquals("GALILEO_8", groups[0].satellites[0].key)
+        assertEquals("BEIDOU_8", groups[1].satellites[0].key)
     }
 
     @Test
