@@ -35,9 +35,11 @@ import com.android.gpstest.library.osnma.OsnmaEvent
 import com.android.gpstest.library.osnma.OsnmaPublicKey
 import com.android.gpstest.library.osnma.OsnmaStatus
 import com.android.gpstest.library.osnma.StoredTeslaKey
+import com.android.gpstest.library.osnma.TimeSync
 import com.android.gpstest.library.util.PreferenceUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.time.DateTimeException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -59,11 +61,17 @@ data class OsnmaUiState(
     /** An OSNMA Alert Message revoked the key material; new keys must be imported */
     val keysRevoked: Boolean = false,
     /**
-     * Difference between the device clock and the Galileo System Time read from the signal, in
-     * seconds, or null if unknown. OSNMA is only meaningful if the receiver knows the time
-     * independently of the signal it authenticates (OSNMA Receiver Guidelines section 3.1).
+     * Difference between the reference time ([timeSourceNetwork]) and the Galileo System Time
+     * read from the signal, in seconds, or null if unknown. OSNMA is only meaningful if the
+     * receiver knows the time independently of the signal it authenticates (OSNMA Receiver
+     * Guidelines sections 2.1 and 5.3.1); see TimeSync.
      */
     val clockOffsetSeconds: Long? = null,
+    /**
+     * The reference time is Android's network time (NTP, Android 13 and later). Otherwise it's
+     * the device clock, which some devices set from GNSS and so isn't independent of the signal.
+     */
+    val timeSourceNetwork: Boolean = false,
     /** Galileo pages were being received but stopped arriving while tracking continued */
     val pagesStalled: Boolean = false,
     /** Page timing diagnostics, see [InavTimeTracker] */
@@ -87,6 +95,8 @@ data class OsnmaUiState(
     val layoutOffsetBits: Int? = null,
     /** Page times are estimated with the receiver's GNSS clock (GnssClock) */
     val timingUsesReceiverClock: Boolean = false,
+    /** Why the receiver clock is or isn't used for page timing */
+    val receiverClockStatus: ReceiverClockStatus = ReceiverClockStatus.NO_MEASUREMENTS,
     /** The last DSM-KROOT verified from the signal (hex, see BuiltInKroot), for logging */
     val lastVerifiedKroot: String? = null
 ) {
@@ -99,19 +109,41 @@ data class OsnmaUiState(
                 (status?.statistics?.subframeCompleteness
                         ?.let { it < MIN_SUBFRAME_COMPLETENESS } == true)
 
+    /** Tags that may be used, given [clockOffsetSeconds] */
+    val timeSync: TimeSync
+        get() = TimeSync.forOffset(clockOffsetSeconds)
+
+    /** The time is known, but too far off to use all tags */
     val clockOffsetTooLarge: Boolean
-        get() = clockOffsetSeconds != null &&
-                kotlin.math.abs(clockOffsetSeconds) > MAX_CLOCK_OFFSET_SECONDS
+        get() = clockOffsetSeconds != null && timeSync != TimeSync.FULL
 
     companion object {
-        /**
-         * TESLA keys are disclosed 30 s after their tags, so time must be known better than that
-         */
-        const val MAX_CLOCK_OFFSET_SECONDS = 30L
-
         /** Below this share of complete subframes, authentication becomes slow or impossible */
         const val MIN_SUBFRAME_COMPLETENESS = 0.5
     }
+}
+
+/** Whether the receiver clock (GnssClock) can be used to time Galileo pages, and if not, why */
+enum class ReceiverClockStatus {
+    OK,
+
+    /** No GNSS measurements received (not supported, or not started) */
+    NO_MEASUREMENTS,
+
+    /** Android 9 or older: no common time base with the page arrival times */
+    ANDROID_TOO_OLD,
+
+    /** The chipset doesn't report the GNSS time (FullBiasNanos) */
+    NO_FULL_BIAS,
+
+    /** The chipset reports the GNSS time with more than 1 ms uncertainty */
+    UNCERTAIN,
+
+    /** The chipset doesn't report when the measurement was taken (ElapsedRealtimeNanos) */
+    NO_ELAPSED_TIME,
+
+    /** The reported values are implausible */
+    INVALID
 }
 
 /**
@@ -145,6 +177,13 @@ class OsnmaRepository @Inject constructor(
     private var crcChecked = 0
     private var trustPlatformParity = false
     private var clockOffsetSeconds: Long? = null
+    private var timeSourceNetwork = false
+    @Volatile
+    private var receiverClockStatus = ReceiverClockStatus.NO_MEASUREMENTS
+
+    // Network time minus SystemClock.elapsedRealtime(), refreshed every minute
+    private var networkTimeOffset: Long? = null
+    private var networkTimeCheckedAt = 0L
     private var engineKeys: Set<String> = emptySet()
     private var lastKeySaveMillis = 0L
     private var lastDsmSaveMillis = 0L
@@ -313,9 +352,13 @@ class OsnmaRepository @Inject constructor(
             if (timeTracker.lastWasExact) {
                 // Only pages with their own time stamp: the page ended about 2 s after its
                 // start, plus decoding and delivery latency
-                clockOffsetSeconds = deviceGstSeconds(pageWallClock) - 2 - gst.totalSeconds
+                val networkUtc = networkTimeAt(pageArrival)
+                timeSourceNetwork = networkUtc != null
+                val referenceUtc = networkUtc ?: pageWallClock
+                clockOffsetSeconds = deviceGstSeconds(referenceUtc) - 2 - gst.totalSeconds
             }
             val e = engine ?: newEngine().also { engine = it }
+            e.timeSync = TimeSync.forOffset(clockOffsetSeconds)
             e.feedPage(
                 svid,
                 gst,
@@ -349,20 +392,55 @@ class OsnmaRepository @Inject constructor(
      * data, and despite delivery jitter.
      */
     fun onMeasurements(event: GnssMeasurementsEvent) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val status = receiverClockStatus(event)
+        receiverClockStatus = status.first
+        val (elapsedMillis, gstMillis) = status.second ?: return
+        executor.execute { timeTracker.updateReceiverClock(elapsedMillis, gstMillis) }
+    }
+
+    /**
+     * Whether the receiver clock in [event] can be used for page timing, and if so the local
+     * monotonic time and the GST (both in ms) it gives
+     */
+    private fun receiverClockStatus(
+        event: GnssMeasurementsEvent
+    ): Pair<ReceiverClockStatus, Pair<Long, Long>?> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return ReceiverClockStatus.ANDROID_TOO_OLD to null
+        }
         val clock = event.clock
-        if (!clock.hasFullBiasNanos()) return
+        if (!clock.hasFullBiasNanos()) return ReceiverClockStatus.NO_FULL_BIAS to null
         // A bias uncertainty above 1 ms means the receiver doesn't know the time well yet
-        if (clock.hasBiasUncertaintyNanos() && clock.biasUncertaintyNanos > 1_000_000.0) return
+        if (clock.hasBiasUncertaintyNanos() && clock.biasUncertaintyNanos > 1_000_000.0) {
+            return ReceiverClockStatus.UNCERTAIN to null
+        }
+        // Same clock as SystemClock.elapsedRealtime(), used for the page arrival times
+        if (!clock.hasElapsedRealtimeNanos()) return ReceiverClockStatus.NO_ELAPSED_TIME to null
         val bias = if (clock.hasBiasNanos()) clock.biasNanos else 0.0
         val gpsNanos = clock.timeNanos - clock.fullBiasNanos - bias.toLong()
-        if (gpsNanos <= 0) return
         val gstMillis = gpsNanos / 1_000_000 - GST_GPS_WEEK_OFFSET_MILLIS
-        // Same clock as SystemClock.elapsedRealtime(), used for the page arrival times
-        if (!clock.hasElapsedRealtimeNanos()) return
         val elapsedMillis = clock.elapsedRealtimeNanos / 1_000_000
-        if (elapsedMillis <= 0 || gstMillis <= 0) return
-        executor.execute { timeTracker.updateReceiverClock(elapsedMillis, gstMillis) }
+        if (elapsedMillis <= 0 || gstMillis <= 0) return ReceiverClockStatus.INVALID to null
+        return ReceiverClockStatus.OK to Pair(elapsedMillis, gstMillis)
+    }
+
+    /**
+     * Android's network time (NTP) at the local monotonic time [elapsedMillis], or null if it's
+     * not available (before Android 13, or no network time yet). It's independent of GNSS,
+     * unlike the device clock on some devices.
+     */
+    private fun networkTimeAt(elapsedMillis: Long): Long? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null
+        val now = SystemClock.elapsedRealtime()
+        if (networkTimeCheckedAt == 0L || now - networkTimeCheckedAt >= NETWORK_TIME_CHECK_MILLIS) {
+            networkTimeCheckedAt = now
+            networkTimeOffset = try {
+                SystemClock.currentNetworkTimeClock().millis() - SystemClock.elapsedRealtime()
+            } catch (e: DateTimeException) {
+                null
+            }
+        }
+        return networkTimeOffset?.let { elapsedMillis + it }
     }
 
     private fun newEngine(): OsnmaEngine {
@@ -374,7 +452,8 @@ class OsnmaRepository @Inject constructor(
             listener = listener,
             storedKey = OsnmaKeyStore.teslaKey(context, prefs),
             storedDsm = OsnmaKeyStore.dsm(context, prefs),
-            builtInKroots = GalileoKeys.builtInKroots()
+            builtInKroots = GalileoKeys.builtInKroots(),
+            timeSync = TimeSync.forOffset(clockOffsetSeconds)
         )
     }
 
@@ -425,6 +504,7 @@ class OsnmaRepository @Inject constructor(
             trustingPlatformParity = trustPlatformParity,
             keysRevoked = OsnmaKeyStore.isRevoked(context, prefs),
             clockOffsetSeconds = clockOffsetSeconds,
+            timeSourceNetwork = timeSourceNetwork,
             pagesStalled = pagesStalled(),
             timingUsesSubframeNumbers = timeTracker.usingSubframeNumbers,
             timingCorrections = timeTracker.corrections,
@@ -437,6 +517,7 @@ class OsnmaRepository @Inject constructor(
             pagesRepaired = assembler.repaired,
             layoutOffsetBits = layout.offsetBits,
             timingUsesReceiverClock = timeTracker.usingReceiverClock,
+            receiverClockStatus = receiverClockStatus,
             lastVerifiedKroot = lastVerifiedKroot
         )
     }
@@ -446,6 +527,7 @@ class OsnmaRepository @Inject constructor(
         private const val RESET_GAP_MILLIS = 10 * 60 * 1000L
         private const val STALL_MILLIS = 30 * 1000L
         private const val KEY_SAVE_INTERVAL_MILLIS = 60 * 1000L
+        private const val NETWORK_TIME_CHECK_MILLIS = 60 * 1000L
         private const val STALL_CHECK_MILLIS = 5 * 1000L
 
         /** GPS time - UTC, in seconds (leap seconds since 1980, unchanged since 2017) */

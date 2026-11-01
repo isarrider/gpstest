@@ -41,8 +41,8 @@ class OsnmaEngine(
     merkleRoot: ByteArray?,
     initialKeys: List<OsnmaPublicKey> = emptyList(),
     private val listener: Listener? = null,
-    /** Only process Slow MAC (ADKD 12) tags, as recommended when time sync is loose */
-    private val onlySlowMac: Boolean = false,
+    /** How well the receiver knows GST independently of the signal; see [timeSync] */
+    timeSync: TimeSync = TimeSync.FULL,
     /** A TESLA key verified in an earlier session, to start without the DSM-KROOT */
     storedKey: StoredTeslaKey? = null,
     /** DSM bytes collected in an earlier session (see [exportDsm]) */
@@ -71,6 +71,22 @@ class OsnmaEngine(
     }
 
     private var merkleTree: MerkleTree? = merkleRoot?.let { MerkleTree(it) }
+
+    /**
+     * Which tags may be used, given how well the receiver knows the time (OSNMA Receiver
+     * Guidelines section 2.1). TESLA keys are verified in any case. When it gets stricter, what
+     * was authenticated with tags no longer allowed is forgotten.
+     */
+    var timeSync: TimeSync = timeSync
+        set(value) {
+            if (value.ordinal > field.ordinal) {
+                satellites.values.forEach { s ->
+                    s.timing = null
+                    if (value == TimeSync.NONE) s.ced = null
+                }
+            }
+            field = value
+        }
 
     private val pageStore = PageStore()
     private val dsmAssembler = DsmAssembler()
@@ -677,8 +693,9 @@ class OsnmaEngine(
             val steps = k.gstSubframe.subframesSince(gstKeySlowMac)
             if (steps >= 0) k.derive(steps) else null
         }
+        if (timeSync == TimeSync.NONE) return
         for (svn in 1..36) {
-            if (!onlySlowMac) {
+            if (timeSync == TimeSync.FULL) {
                 pageStore.get(svn, gstMack)
                     ?.let { processMack(it, key, key, gstMack, slowMac = false) }
             }
@@ -908,6 +925,7 @@ class OsnmaEngine(
             alertMessage = alertReceived,
             warmStart = warmStart && current != null,
             warmStartBuiltIn = warmStart && warmStartBuiltIn && current != null,
+            timeSync = timeSync,
             krootProgress = lastKrootDsmId?.let { dsmAssembler.progress(it) },
             satellites = sats,
             events = events.toList(),
@@ -1021,6 +1039,8 @@ data class OsnmaStatus(
     val warmStart: Boolean,
     /** The chain in force comes from a built-in TESLA root key (see [BuiltInKroot]) */
     val warmStartBuiltIn: Boolean = false,
+    /** Tags in use, given how well the time is known */
+    val timeSync: TimeSync = TimeSync.FULL,
     /** Blocks of the DSM-KROOT received so far and the number needed (0 until known) */
     val krootProgress: Pair<Int, Int>?,
     val satellites: List<SatelliteAuthStatus>,
@@ -1072,6 +1092,37 @@ data class OsnmaStatus(
     companion object {
         /** How long a satellite with a failed tag stays flagged */
         const val RECENT_FAILURE_SECONDS = 600L
+    }
+}
+
+/**
+ * How well the receiver knows Galileo System Time without relying on the signal it
+ * authenticates, which decides the tags that may be used (OSNMA Receiver Guidelines 2.1, 5.3.1)
+ */
+enum class TimeSync {
+    /** Within T_L / 2 = 15 s: all tags */
+    FULL,
+
+    /** Within (T_L + 300 s) / 2 = 165 s: only Slow MAC tags (ADKD 12), whose key comes later */
+    SLOW_MAC_ONLY,
+
+    /** Unknown or further off: OSNMA must not be used */
+    NONE;
+
+    companion object {
+        const val FULL_MAX_OFFSET_SECONDS = 15L
+        const val SLOW_MAC_MAX_OFFSET_SECONDS = 165L
+
+        /**
+         * @param offsetSeconds difference between the receiver's own time and the GST read from
+         * the signal, or null if not known yet
+         */
+        fun forOffset(offsetSeconds: Long?): TimeSync = when {
+            offsetSeconds == null -> NONE
+            kotlin.math.abs(offsetSeconds) <= FULL_MAX_OFFSET_SECONDS -> FULL
+            kotlin.math.abs(offsetSeconds) <= SLOW_MAC_MAX_OFFSET_SECONDS -> SLOW_MAC_ONLY
+            else -> NONE
+        }
     }
 }
 

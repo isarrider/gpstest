@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.gpstest.R
 import com.android.gpstest.library.data.OsnmaUiState
+import com.android.gpstest.library.data.ReceiverClockStatus
 import com.android.gpstest.library.osnma.Gst
 import com.android.gpstest.library.osnma.KeySource
 import com.android.gpstest.library.osnma.MacFunction
@@ -53,6 +54,7 @@ import com.android.gpstest.library.osnma.OsnmaEvent
 import com.android.gpstest.library.osnma.OsnmaStatistics
 import com.android.gpstest.library.osnma.OsnmaStatus
 import com.android.gpstest.library.osnma.OsnmaStatus.Phase
+import com.android.gpstest.library.osnma.TimeSync
 import kotlin.math.roundToInt
 
 // Chip backgrounds (white text on top)
@@ -116,13 +118,18 @@ fun OsnmaCard(state: OsnmaUiState) {
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                 )
                 if (state.clockOffsetTooLarge) {
+                    val slowMac = state.timeSync == TimeSync.SLOW_MAC_ONLY
                     Text(
                         text = stringResource(
-                            R.string.osnma_clock_offset_warning,
+                            if (slowMac) {
+                                R.string.osnma_clock_offset_slow_mac
+                            } else {
+                                R.string.osnma_clock_offset_warning
+                            },
                             state.clockOffsetSeconds ?: 0L
                         ),
                         fontSize = 13.sp,
-                        color = MaterialTheme.colors.error,
+                        color = if (slowMac) amberText else MaterialTheme.colors.error,
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
@@ -149,8 +156,17 @@ private var osnmaCardExpanded = false
 private fun collapsedSummary(state: OsnmaUiState): String {
     val status = state.status ?: return ""
     return when {
-        status.phase == Phase.AUTHENTICATING ->
-            stringResource(R.string.osnma_summary_satellites, status.authenticatedSatellites.size)
+        status.phase == Phase.AUTHENTICATING -> {
+            val sats = stringResource(
+                R.string.osnma_summary_satellites,
+                status.authenticatedSatellites.size
+            )
+            if (status.timeSync == TimeSync.SLOW_MAC_ONLY) {
+                sats + " " + stringResource(R.string.osnma_summary_slow_mac)
+            } else {
+                sats
+            }
+        }
         state.poorReception -> stringResource(R.string.osnma_summary_poor_reception)
         else -> ""
     }
@@ -161,11 +177,13 @@ private fun PhaseChip(state: OsnmaUiState) {
     val status = state.status
     val phase = if (state.keysRevoked) Phase.ALERT else status?.phase ?: Phase.NO_DATA
     val failures = status != null && status.recentFailures().isNotEmpty()
+    // The time is known but too far off for OSNMA to be used
+    val timeRejected = state.clockOffsetSeconds != null && state.timeSync == TimeSync.NONE
     val (color, textId) = when (phase) {
-        Phase.AUTHENTICATING -> if (state.clockOffsetTooLarge) {
-            Pair(MaterialTheme.colors.error, R.string.osnma_chip_time)
-        } else {
-            Pair(Green, R.string.osnma_chip_authenticated)
+        Phase.WAITING_FOR_TAGS, Phase.AUTHENTICATING -> when {
+            timeRejected -> Pair(MaterialTheme.colors.error, R.string.osnma_chip_time)
+            phase == Phase.AUTHENTICATING -> Pair(Green, R.string.osnma_chip_authenticated)
+            else -> Pair(Amber, R.string.osnma_chip_waiting)
         }
         Phase.ALERT -> Pair(MaterialTheme.colors.error, R.string.osnma_chip_alert)
         Phase.DONT_USE -> Pair(MaterialTheme.colors.error, R.string.osnma_chip_dont_use)
@@ -209,7 +227,11 @@ private fun phaseDescription(state: OsnmaUiState): String {
         Phase.NO_OSNMA -> stringResource(R.string.osnma_phase_no_osnma)
         Phase.WAITING_FOR_PUBLIC_KEY -> stringResource(R.string.osnma_phase_waiting_public_key)
         Phase.WAITING_FOR_KROOT -> stringResource(R.string.osnma_phase_waiting_kroot)
-        Phase.WAITING_FOR_TAGS -> stringResource(R.string.osnma_phase_waiting_tags)
+        Phase.WAITING_FOR_TAGS -> if (state.clockOffsetSeconds == null) {
+            stringResource(R.string.osnma_phase_waiting_time)
+        } else {
+            stringResource(R.string.osnma_phase_waiting_tags)
+        }
         Phase.AUTHENTICATING -> stringResource(
             R.string.osnma_phase_authenticating,
             status.authenticatedSatellites.size
@@ -371,21 +393,34 @@ private fun Expanded(state: OsnmaUiState) {
             } ?: unknown
         )
         DetailRow(R.string.osnma_label_gst, status?.gst?.let { formatGst(it) } ?: unknown)
+        val timing = stringResource(
+            when {
+                state.timingUsesReceiverClock -> R.string.osnma_timing_receiver_clock
+                state.timingUsesSubframeNumbers -> R.string.osnma_timing_subframe_numbers
+                else -> R.string.osnma_timing_word_types
+            },
+            state.timingCorrections
+        )
+        val receiverClock = receiverClockReason(state.receiverClockStatus)
         DetailRow(
             R.string.osnma_label_timing,
-            stringResource(
-                when {
-                    state.timingUsesReceiverClock -> R.string.osnma_timing_receiver_clock
-                    state.timingUsesSubframeNumbers -> R.string.osnma_timing_subframe_numbers
-                    else -> R.string.osnma_timing_word_types
-                },
-                state.timingCorrections
-            )
+            if (state.timingUsesReceiverClock || receiverClock == null) {
+                timing
+            } else {
+                timing + " " + stringResource(R.string.osnma_receiver_clock_unused, receiverClock)
+            }
         )
         DetailRow(
             R.string.osnma_label_clock_offset,
             state.clockOffsetSeconds?.let {
-                stringResource(R.string.osnma_clock_offset_value, it)
+                stringResource(
+                    if (state.timeSourceNetwork) {
+                        R.string.osnma_clock_offset_network
+                    } else {
+                        R.string.osnma_clock_offset_device
+                    },
+                    it
+                )
             } ?: unknown
         )
         if (state.trustingPlatformParity) {
@@ -407,6 +442,19 @@ private fun Expanded(state: OsnmaUiState) {
         }
         SmallText(stringResource(R.string.osnma_explanation), FontStyle.Italic)
     }
+}
+
+/** Why the receiver clock isn't used for page timing, or null if it is (or nearly) */
+@Composable
+private fun receiverClockReason(status: ReceiverClockStatus): String? = when (status) {
+    ReceiverClockStatus.OK -> null
+    ReceiverClockStatus.NO_MEASUREMENTS ->
+        stringResource(R.string.osnma_receiver_clock_no_measurements)
+    ReceiverClockStatus.ANDROID_TOO_OLD -> stringResource(R.string.osnma_receiver_clock_android)
+    ReceiverClockStatus.NO_FULL_BIAS -> stringResource(R.string.osnma_receiver_clock_no_full_bias)
+    ReceiverClockStatus.UNCERTAIN -> stringResource(R.string.osnma_receiver_clock_uncertain)
+    ReceiverClockStatus.NO_ELAPSED_TIME -> stringResource(R.string.osnma_receiver_clock_no_elapsed)
+    ReceiverClockStatus.INVALID -> stringResource(R.string.osnma_receiver_clock_invalid)
 }
 
 @Composable

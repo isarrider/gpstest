@@ -402,6 +402,53 @@ class OsnmaEngineTest {
         assertTrue(engine.statistics.tagsOk > 1000)
     }
 
+    @Test
+    fun timeSync_thresholds() {
+        assertEquals(TimeSync.NONE, TimeSync.forOffset(null))
+        assertEquals(TimeSync.FULL, TimeSync.forOffset(0))
+        assertEquals(TimeSync.FULL, TimeSync.forOffset(-15))
+        assertEquals(TimeSync.SLOW_MAC_ONLY, TimeSync.forOffset(16))
+        assertEquals(TimeSync.SLOW_MAC_ONLY, TimeSync.forOffset(-165))
+        assertEquals(TimeSync.NONE, TimeSync.forOffset(166))
+    }
+
+    /** With loose time sync, only slow MAC tags are used; without, none, but keys still are */
+    @Test
+    fun timeSync_limitsTags() {
+        val pages = TestVectors.configuration1()
+        val slow = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            timeSync = TimeSync.SLOW_MAC_ONLY
+        )
+        val none = OsnmaEngine(
+            Bits.fromHex(TestVectors.MERKLE_ROOT_1),
+            listOf(TestVectors.publicKey1()),
+            timeSync = TimeSync.NONE
+        )
+        pages.forEach {
+            slow.feedPage(it.svn, it.gst, it.page)
+            none.feedPage(it.svn, it.gst, it.page)
+        }
+        val s = slow.statistics
+        assertEquals(0, s.tagsOkAdkd0)
+        assertEquals(0, s.tagsOkAdkd4)
+        assertTrue("slow MAC tags ${s.tagsOkAdkd12}", s.tagsOkAdkd12 > 0)
+        assertEquals(0, s.tagsFailed)
+        assertEquals(TimeSync.SLOW_MAC_ONLY, slow.status().timeSync)
+
+        assertEquals(0, none.statistics.tagsOk)
+        assertTrue(none.statistics.teslaKeysVerified > 0)
+        assertTrue(none.status().authenticatedSatellites.isEmpty())
+
+        // Getting stricter forgets what was authenticated with tags no longer allowed
+        val full = newEngine()
+        pages.forEach { full.feedPage(it.svn, it.gst, it.page) }
+        assertTrue(full.status().authenticatedSatellites.isNotEmpty())
+        full.timeSync = TimeSync.NONE
+        assertTrue(full.status().authenticatedSatellites.isEmpty())
+    }
+
     /** The fast derivation loop gives the same keys as stepping back one key at a time */
     @Test
     fun teslaKey_deriveMatchesPrevious() {

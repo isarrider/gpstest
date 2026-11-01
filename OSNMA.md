@@ -23,7 +23,9 @@ that Android delivers to apps. The result is shown on the **Status** screen.
   device support?* in the [FAQ](FAQ.md). The OSNMA card appears once such messages arrive, and right away on later starts.
 - Galileo satellites in view, ideally with a clear sky. Authentication starts after a few
   minutes of continuous reception.
-- A correct device clock (within 30 seconds). See [Limitations](#limitations).
+- The correct time: within 15 seconds for all tags, within 165 seconds for slow MAC tags only.
+  GPSTest uses Android's network time where available (Android 13 and later), otherwise the
+  device clock. See [Time check](#time-check).
 
 ## The Status card
 
@@ -64,9 +66,11 @@ tracking notification.
 - **FAILED TAGS**: a MAC tag didn't match the received navigation data. This can be caused by
   corrupted data or timing problems, but also by spoofing. Treat data from those satellites as
   untrusted.
-- **TIME NOT VERIFIED**: the device clock differs from the Galileo time in the signal by more
-  than 30 s. OSNMA can't detect replayed or delayed signals without an independent time source,
-  so check the date and time settings.
+- **TIME NOT VERIFIED**: the time differs from the Galileo time in the signal by more than
+  165 s. OSNMA can't detect replayed or delayed signals without an independent time source, so
+  no tags are used until that's fixed. Check the date and time settings. Between 15 and 165 s,
+  only slow MAC tags are used: the chip stays green and the summary says "(slow MAC)", with an
+  amber note in the details. See [Time check](#time-check).
 - **DON'T USE**: Galileo has set the OSNMA status to "don't use". Nothing is authenticated
   until that changes.
 - **Amber reception hint**: Galileo pages arrive, but fewer than half of the 30-second subframes
@@ -103,6 +107,28 @@ OSNMA needs the Galileo ECDSA public key to verify the TESLA root key. Nothing h
 key and the saved parts of the TESLA root key. The built-in key stays.
 **Authenticate Galileo navigation data** turns the feature off.
 
+### Time check
+
+TESLA keys are published 30 s after the tags they protect, so a spoofer that can delay the
+signal could forge tags if the receiver relied only on the signal for the time. OSNMA therefore
+requires the receiver to know Galileo time on its own (OSNMA Receiver Guidelines, sections 2.1
+and 5.3.1). Each time a page carries its own time stamp, GPSTest compares it with a reference
+time:
+
+- **Network time** (Android 13 and later, when the phone has synchronized with a time server).
+  It's independent of GNSS.
+- Otherwise the **device clock**. Some phones set it from GNSS, so it isn't fully independent:
+  the **Clock offset** row says "(device clock, which may be set from GNSS)".
+
+| Difference | Tags used |
+| --- | --- |
+| Up to 15 s | All |
+| 15 to 165 s | Slow MAC only (ADKD 12, checked with a key sent 5 minutes later) |
+| More than 165 s, or not known yet | None (TESLA keys are still verified) |
+
+When the check gets stricter, what was authenticated with tags no longer allowed is dropped.
+Until the first time stamp arrives (within 30 s of reception), no tags are used.
+
 ## What is verified
 
 GPSTest follows the
@@ -135,10 +161,9 @@ scenarios and on a real receiver recording. The unit tests in
 - **Only the navigation messages are authenticated.** GPSTest can't tell whether the device's
   own position fix used authenticated data. The chipset computes the fix independently.
 - **Time comes from the signal.** Android doesn't provide the Galileo time of each page, so
-  GPSTest reads it from the I/NAV words and the arrival times. It's compared with the device
-  clock, which must be correct for authentication to be meaningful (see *TIME NOT VERIFIED*).
-  Like any OSNMA receiver without a secure time source, it can't detect all replay or delay
-  attacks.
+  GPSTest reads it from the I/NAV words and the arrival times. It's checked against an
+  independent time where possible (see [Time check](#time-check)). Like any OSNMA receiver
+  without a secure time source, it can't detect all replay or delay attacks.
 - **Data must be complete.** A satellite is only authenticated once all the words covered by
   its tags have been received, so weak or intermittent signals can delay it.
 - **Devices that skip the CRC bits.** If the CRC fails on practically every page while the device
@@ -249,8 +274,10 @@ how this is going.
 On devices that provide raw GNSS measurements, the receiver's own clock (`GnssClock`, Android 10
 and later) gives the GNSS time at a known moment. GPSTest then estimates each page's time from
 its arrival, without waiting for the first time stamp in the data, and only uses the word type
-to settle on the exact slot. **Page timing** then says "From the receiver clock". The Galileo
-time read from the signal is still compared with the device clock.
+to settle on the exact slot. **Page timing** then says "From the receiver clock". Otherwise
+it says why the receiver clock isn't used, for example "the chip doesn't report the GNSS time"
+(no `FullBiasNanos`) or "the chip's GNSS time is still uncertain" (more than 1 ms). The Galileo
+time read from the signal is still compared with the reference time (see [Time check](#time-check)).
 
 ## Logging
 
