@@ -8,6 +8,11 @@ satellites really comes from Galileo and hasn't been forged by a spoofer.
 GPSTest does all the cryptography on the phone, from the Galileo E1-B I/NAV navigation messages
 that Android delivers to apps. The result is shown on the **Status** screen.
 
+<img src="docs/osnma-pixel8pro.png" width="450" alt="Galileo OSNMA card and satellite list on a Pixel 8 Pro">
+
+*Screenshot on a Pixel 8 Pro (Android 17): 6 Galileo satellites authenticated, marked with seals
+in the satellite list. Elevation and azimuth are hidden.*
+
 ![Galileo OSNMA card states in the dark theme (mockup)](docs/osnma-card-dark.png)
 
 *Mockup of the card in the dark theme: expanded while authenticating (numbers from a Pixel 8 Pro),
