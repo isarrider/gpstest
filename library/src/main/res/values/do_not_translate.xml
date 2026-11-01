@@ -297,6 +297,14 @@
     <string name="pref_key_osnma_tesla_key">osnma_tesla_key</string>
     <string name="pref_key_osnma_dsm">osnma_dsm</string>
 
+    <!-- EGNOS -->
+    <string name="pref_key_egnos_category">egnos_category</string>
+    <string name="pref_key_egnos_enabled">egnos_enabled</string>
+    <string name="pref_key_egnos_host">egnos_host</string>
+    <string name="pref_key_egnos_port">egnos_port</string>
+    <string name="pref_key_egnos_user">egnos_user</string>
+    <string name="pref_key_egnos_password">egnos_password</string>
+
     <!-- Google Sheets URL for device properties -->
     <string name="device_properties_upload_url">https://script.google.com/macros/s/AKfycbx2yxZwWTIUpC2q6xfRNwuRNjJQ6yfKSTCjYaSDWkBrJWe2ViA/exec</string>
 </resources>

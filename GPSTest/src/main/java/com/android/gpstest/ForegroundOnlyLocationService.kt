@@ -47,6 +47,7 @@ import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.io.CsvFileLogger
 import com.android.gpstest.io.JsonFileLogger
 import com.android.gpstest.library.data.LocationRepository
+import com.android.gpstest.library.data.EgnosRepository
 import com.android.gpstest.library.data.OsnmaRepository
 import com.android.gpstest.library.model.SatelliteGroup
 import com.android.gpstest.library.model.SatelliteMetadata
@@ -127,6 +128,10 @@ class ForegroundOnlyLocationService : LifecycleService() {
     // Galileo OSNMA authentication of the navigation messages, injected via Hilt
     @Inject
     lateinit var osnmaRepository: OsnmaRepository
+
+    // EGNOS messages from EDAS (SISNeT), received while tracking, injected via Hilt
+    @Inject
+    lateinit var egnosRepository: EgnosRepository
 
     // Get a reference to the Job from the Flow so we can stop it from UI events
     private var locationFlow: Job? = null
@@ -288,6 +293,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         observeMeasurementsFlow()
         observeSensorFlow()
         observeOsnmaFlow()
+        egnosRepository.start()
         if (SatelliteUtils.isGnssAntennaInfoSupported(getSystemService(Context.LOCATION_SERVICE) as LocationManager)) {
             observeAntennaFlow()
         }
@@ -302,6 +308,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         antennaFlow?.cancel()
         sensorFlow?.cancel()
         osnmaFlow?.cancel()
+        egnosRepository.stop()
     }
 
     @ExperimentalCoroutinesApi
