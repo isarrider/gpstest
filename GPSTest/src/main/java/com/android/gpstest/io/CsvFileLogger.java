@@ -343,6 +343,9 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
                 fileWriter.write(record);
                 fileWriter.newLine();
             }
+            // Only a few records every 30 s: write them out right away, so that they're in the
+            // file even while logging continues or if the app is stopped abruptly
+            fileWriter.flush();
         } catch (IOException e) {
             logException(Application.Companion.getApp().getString(R.string.error_writing_file), e);
         }
