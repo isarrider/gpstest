@@ -641,6 +641,7 @@
     <string name="status_details_cn0">C/N0 %1$.1f dB-Hz</string>
     <string name="status_details_no_cn0">no C/N0</string>
     <string name="status_details_baseband_cn0">, baseband %1$.1f dB-Hz</string>
+    <string name="status_details_history_caption">C/N0 over the last %1$d minutes, from 10 to 50 dB-Hz</string>
     <string name="status_details_used">, used in fix</string>
     <string name="status_details_not_used">, not used in fix</string>
     <!-- Screen reader texts for the grouped satellite list -->

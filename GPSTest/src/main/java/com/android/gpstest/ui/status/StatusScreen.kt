@@ -35,8 +35,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -105,12 +105,19 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
         p.getInt(key, 0)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        Column {
+    val sortOrder = GroupedSortOrder.fromIndex(groupedSortIndex)
+    val gnssGroups = remember(gnssStatuses, sortOrder) {
+        groupSatellites(gnssStatuses, true, sortOrder)
+    }
+    val sbasGroups = remember(sbasStatuses, sortOrder) {
+        groupSatellites(sbasStatuses, false, sortOrder)
+    }
+    val osnmaMarks = osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
+
+    // A lazy column, so that the group headers of the grouped list can stay at the top while
+    // scrolling
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item(key = "location") {
             LocationCard(
                 location,
                 ttff,
@@ -118,19 +125,25 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
                 dop,
                 satelliteMetadata,
                 fixState)
+        }
+        item(key = "osnma") {
             OsnmaCard(osnma)
-            if (gnssFilter(app, prefs).isNotEmpty()) {
+        }
+        if (gnssFilter(app, prefs).isNotEmpty()) {
+            item(key = "filter") {
                 Filter(allStatuses.size, satelliteMetadata) { PreferenceUtils.clearGnssFilter(app, prefs) }
             }
-            val osnmaMarks = osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
-            if (classicList) {
-                GnssStatusCard(gnssStatuses, osnmaMarks)
-                SbasStatusCard(sbasStatuses)
-            } else {
-                val sortOrder = GroupedSortOrder.fromIndex(groupedSortIndex)
-                GroupedStatusCards(gnssStatuses, true, osnmaMarks, sortOrder)
-                GroupedStatusCards(sbasStatuses, false, sortOrder = sortOrder)
+        }
+        if (classicList) {
+            item(key = "classic") {
+                Column {
+                    GnssStatusCard(gnssStatuses, osnmaMarks)
+                    SbasStatusCard(sbasStatuses)
+                }
             }
+        } else {
+            groupedStatusItems(gnssGroups, true, osnmaMarks, viewModel.cn0History)
+            groupedStatusItems(sbasGroups, false, emptyMap(), viewModel.cn0History)
         }
     }
 }

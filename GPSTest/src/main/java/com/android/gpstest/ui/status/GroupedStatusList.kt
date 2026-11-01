@@ -15,6 +15,8 @@
  */
 package com.android.gpstest.ui.status
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -26,10 +28,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Card
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -37,7 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
@@ -50,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.gpstest.R
+import com.android.gpstest.library.model.Cn0History
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
 import com.android.gpstest.library.model.SbasType
@@ -59,33 +69,102 @@ import com.android.gpstest.library.util.LibUIUtils
 import com.android.gpstest.library.util.MathUtils
 
 /**
- * Status screen satellite list with one row per satellite (its signals side by side) and the
- * satellites grouped by constellation (GNSS) or SBAS system. Each group can be collapsed.
+ * Adds the grouped satellite list to the Status screen's lazy column: one row per satellite (its
+ * signals side by side) and the satellites grouped by constellation (GNSS) or SBAS system. Each
+ * group looks like a card, its header stays at the top of the screen while its satellites are
+ * scrolled, and tapping the header collapses the group.
  */
-@Composable
-fun GroupedStatusCards(
-    satStatuses: List<SatelliteStatus>,
+@OptIn(ExperimentalFoundationApi::class)
+fun LazyListScope.groupedStatusItems(
+    groups: List<SatelliteGroup>,
     isGnss: Boolean,
-    osnmaMarks: Map<Int, OsnmaMark> = emptyMap(),
-    sortOrder: GroupedSortOrder = GroupedSortOrder.ID,
+    osnmaMarks: Map<Int, OsnmaMark>,
+    cn0History: Cn0History?,
 ) {
-    if (satStatuses.isEmpty()) {
+    if (groups.isEmpty()) {
+        // Like the classic table, nothing is shown for SBAS if there are no SBAS satellites
         if (isGnss) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(5.dp),
-                elevation = 2.dp
-            ) {
-                NotAvailable(true)
+            item(key = "gnss_not_available") {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(5.dp),
+                    elevation = 2.dp
+                ) {
+                    NotAvailable(true)
+                }
             }
         }
-        // Like the classic table, nothing is shown for SBAS if there are no SBAS satellites
         return
     }
-    groupSatellites(satStatuses, isGnss, sortOrder).forEach { group ->
-        GroupCard(group, osnmaMarks)
+    groups.forEach { group ->
+        val expanded = group.key !in collapsedGroups
+        stickyHeader(key = "header_" + group.key) {
+            GroupSurface(
+                shape = if (expanded) {
+                    RoundedCornerShape(topStart = cardCorner, topEnd = cardCorner)
+                } else {
+                    RoundedCornerShape(cardCorner)
+                }
+            ) {
+                GroupHeader(group, groupName(group), expanded) {
+                    if (expanded) collapsedGroups.add(group.key) else collapsedGroups.remove(group.key)
+                }
+            }
+        }
+        if (expanded) {
+            val last = group.satellites.lastOrNull()
+            items(group.satellites, key = { "satellite_" + it.key }) { satellite ->
+                GroupSurface(
+                    shape = if (satellite === last) {
+                        RoundedCornerShape(bottomStart = cardCorner, bottomEnd = cardCorner)
+                    } else {
+                        RectangleShape
+                    }
+                ) {
+                    Column {
+                        Divider()
+                        val mark = if (satellite.gnssType == GnssType.GALILEO) {
+                            osnmaMarks[satellite.svid]
+                        } else {
+                            null
+                        }
+                        val showDetails = satellite.key in satellitesWithDetails
+                        SatelliteRow(satellite, mark, groupName(group), showDetails) {
+                            if (showDetails) {
+                                satellitesWithDetails.remove(satellite.key)
+                            } else {
+                                satellitesWithDetails.add(satellite.key)
+                            }
+                        }
+                        if (showDetails) SatelliteDetails(satellite, cn0History)
+                    }
+                }
+            }
+        }
+        item(key = "gap_" + group.key) {
+            Spacer(modifier = Modifier.height(10.dp))
+        }
     }
+}
+
+/** Same corner radius as Material cards */
+private val cardCorner = 4.dp
+
+/**
+ * Background of one part of a group (header or satellite row), so that the parts together look
+ * like one card. Each part is a separate item of the list so that the header can stick to the top.
+ */
+@Composable
+private fun GroupSurface(shape: Shape, content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 5.dp),
+        shape = shape,
+        elevation = 2.dp,
+        content = content
+    )
 }
 
 /** Keys of the satellites whose signal details the user opened by tapping them */
@@ -93,43 +172,6 @@ private val satellitesWithDetails = mutableStateListOf<String>()
 
 /** Keys of the groups the user collapsed, kept while the app runs. Groups are expanded by default. */
 private val collapsedGroups = mutableStateListOf<String>()
-
-@Composable
-private fun GroupCard(group: SatelliteGroup, osnmaMarks: Map<Int, OsnmaMark>) {
-    val expanded = group.key !in collapsedGroups
-    val name = groupName(group)
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(5.dp),
-        elevation = 2.dp
-    ) {
-        Column {
-            GroupHeader(group, name, expanded) {
-                if (expanded) collapsedGroups.add(group.key) else collapsedGroups.remove(group.key)
-            }
-            if (expanded) {
-                group.satellites.forEach { satellite ->
-                    Divider()
-                    val mark = if (satellite.gnssType == GnssType.GALILEO) {
-                        osnmaMarks[satellite.svid]
-                    } else {
-                        null
-                    }
-                    val showDetails = satellite.key in satellitesWithDetails
-                    SatelliteRow(satellite, mark, name, showDetails) {
-                        if (showDetails) {
-                            satellitesWithDetails.remove(satellite.key)
-                        } else {
-                            satellitesWithDetails.add(satellite.key)
-                        }
-                    }
-                    if (showDetails) SatelliteDetails(satellite)
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun GroupHeader(
@@ -398,7 +440,11 @@ private fun elevationAzimuth(status: SatelliteStatus): String {
  * and azimuth
  */
 @Composable
-private fun SatelliteDetails(satellite: GroupedSatellite) {
+private fun SatelliteDetails(satellite: GroupedSatellite, cn0History: Cn0History?) {
+    // Samples of all signals, with the newest sample of the satellite as the right edge of the
+    // charts, so the signals' charts line up
+    val history = satellite.signals.map { cn0History?.get(it) ?: emptyList() }
+    val newest = history.mapNotNull { it.lastOrNull()?.timeMillis }.maxOrNull()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -433,6 +479,24 @@ private fun SatelliteDetails(satellite: GroupedSatellite) {
             Text(
                 text = "$label: $frequency, $cn0$baseband$used",
                 fontSize = 12.sp
+            )
+            if (cn0History != null && newest != null) {
+                Cn0Chart(
+                    samples = history[satellite.signals.indexOf(status)],
+                    newestMillis = newest,
+                    windowMillis = cn0History.windowMillis,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+                )
+            }
+        }
+        if (cn0History != null && newest != null) {
+            Text(
+                text = stringResource(
+                    R.string.status_details_history_caption,
+                    cn0History.windowMillis / 60_000
+                ),
+                fontSize = 11.sp,
+                modifier = Modifier.alpha(0.7f)
             )
         }
         val first = satellite.first
@@ -519,4 +583,66 @@ private fun satelliteDescription(
         )
     )
     return parts.joinToString(", ")
+}
+
+private const val CHART_MIN_CN0 = 10f
+private const val CHART_MAX_CN0 = 50f
+
+/** Breaks the line where a signal wasn't received for more than this time */
+private const val CHART_GAP_MILLIS = 3_000L
+
+/**
+ * C/N0 of a signal over time, from 10 to 50 dB-Hz with grid lines at 20, 30 and 40 dB-Hz. The right
+ * edge is [newestMillis], the left edge [windowMillis] earlier. The line uses the sky view color of
+ * the latest C/N0.
+ */
+@Composable
+private fun Cn0Chart(
+    samples: List<Cn0History.Sample>,
+    newestMillis: Long,
+    windowMillis: Long,
+    modifier: Modifier = Modifier,
+) {
+    val lineColor = cn0Color(samples.lastOrNull()?.cn0DbHz ?: CHART_MIN_CN0)
+    val gridColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(28.dp)
+    ) {
+        fun y(cn0: Float): Float {
+            val clamped = cn0.coerceIn(CHART_MIN_CN0, CHART_MAX_CN0)
+            return size.height * (1f - (clamped - CHART_MIN_CN0) / (CHART_MAX_CN0 - CHART_MIN_CN0))
+        }
+
+        fun x(timeMillis: Long): Float {
+            return size.width * (1f - (newestMillis - timeMillis).toFloat() / windowMillis)
+        }
+
+        listOf(20f, 30f, 40f).forEach {
+            drawLine(gridColor, Offset(0f, y(it)), Offset(size.width, y(it)), strokeWidth = 1f)
+        }
+        val stroke = 2.dp.toPx()
+        var previous: Cn0History.Sample? = null
+        samples.forEach { sample ->
+            val p = previous
+            if (p != null && sample.timeMillis - p.timeMillis <= CHART_GAP_MILLIS) {
+                drawLine(
+                    lineColor,
+                    Offset(x(p.timeMillis), y(p.cn0DbHz)),
+                    Offset(x(sample.timeMillis), y(sample.cn0DbHz)),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round
+                )
+            } else {
+                // Start of the line or after a gap: a dot, so single samples are visible too
+                drawCircle(
+                    lineColor,
+                    radius = stroke / 2,
+                    center = Offset(x(sample.timeMillis), y(sample.cn0DbHz))
+                )
+            }
+            previous = sample
+        }
+    }
 }

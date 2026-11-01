@@ -33,6 +33,7 @@ import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.Satellite
 import com.android.gpstest.library.model.SatelliteGroup
 import com.android.gpstest.library.model.SatelliteMetadata
+import com.android.gpstest.library.model.Cn0History
 import com.android.gpstest.library.model.SatelliteStatus
 import com.android.gpstest.library.model.SbasType
 import com.android.gpstest.library.util.CarrierFreqUtils.getCarrierFrequencyLabel
@@ -74,6 +75,9 @@ class SignalInfoViewModel @Inject constructor(
     //
 
     // All statuses BEFORE filtering
+    /** C/N0 of each signal over the last two minutes, for the Status screen's signal details */
+    val cn0History = Cn0History()
+
     private val _allStatuses = MutableLiveData<List<SatelliteStatus>>()
     val allStatuses: LiveData<List<SatelliteStatus>> = _allStatuses
 
@@ -214,6 +218,7 @@ class SignalInfoViewModel @Inject constructor(
     @ExperimentalCoroutinesApi
     @VisibleForTesting
     fun updateStatus(context: Context, status: List<SatelliteStatus>, prefs: SharedPreferences) {
+        cn0History.add(status, System.nanoTime() / 1_000_000)
         _allStatuses.value = status
         _allSatellitesGroup.value = status.toSatelliteGroup()
 
