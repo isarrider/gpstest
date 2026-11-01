@@ -79,12 +79,12 @@ class SatelliteGroup(
     val numUsed: Int get() = satellites.count { it.usedInFix }
 
     /**
-     * Average C/N0 of all signals of the group that have one (in view, not only used in fix), or
-     * null if no signal has a C/N0
+     * Average of each satellite's strongest C/N0 (in view, not only used in fix), or null if no
+     * satellite has a C/N0. Using the strongest signal keeps weak secondary signals (e.g. L5 near the
+     * noise floor) from pulling the average down.
      */
     val averageCn0: Float?
-        get() = satellites.flatMap { it.signals }
-            .map { it.cn0DbHz }
+        get() = satellites.map { it.maxCn0 }
             .filter { it != SatelliteStatus.NO_DATA }
             .takeIf { it.isNotEmpty() }
             ?.average()
