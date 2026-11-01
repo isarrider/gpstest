@@ -44,12 +44,22 @@ class InavTimeTracker(
     private val samples = ArrayDeque<Sample>()
     private var weekNumber: Int? = null
 
+    /** Start of the last page of each satellite whose time was certain */
+    private val lastCertain = HashMap<Int, Long>()
+
     // Consistency of the platform's subframe numbers with the time stamps in the data
     private var subframeNumberAgree = 0
     private var subframeNumberDisagree = 0
 
     /** True if the last page returned by [gstFor] carried its own time stamp */
     var lastWasExact = false
+        private set
+
+    /**
+     * False if the time of the last page could be off by a page: its word type occupies several
+     * slots and the estimate fell close to the middle between two of them, or it has no known slot
+     */
+    var lastTimeCertain = false
         private set
 
     /** Number of time stamps that disagreed with the estimate (a measure of timing problems) */
@@ -77,17 +87,22 @@ class InavTimeTracker(
     ): Gst? {
         val exact = page.gstFromWord(weekNumber)
         if (exact != null) {
-            lastWasExact = true
             if (page.wordType != 6) weekNumber = exact.wn
             checkSubframeNumber(exact, subframeNumber)
-            val estimate = estimate(page, arrivalMillis, subframeNumber)
+            val estimate = estimate(svn, page, arrivalMillis, subframeNumber)
             if (estimate != null && estimate != exact) corrections++
+            // Set after estimate(), which updates them
+            lastWasExact = true
+            lastTimeCertain = true
+            lastCertain[svn] = exact.totalSeconds
             samples.addLast(Sample(arrivalMillis - exact.totalSeconds * 1000, arrivalMillis))
             while (samples.size > maxSamples) samples.removeFirst()
             return exact
         }
         lastWasExact = false
-        return estimate(page, arrivalMillis, subframeNumber)
+        val gst = estimate(svn, page, arrivalMillis, subframeNumber)
+        if (gst != null && lastTimeCertain) lastCertain[svn] = gst.totalSeconds
+        return gst
     }
 
     private fun checkSubframeNumber(exact: Gst, subframeNumber: Int) {
@@ -99,7 +114,7 @@ class InavTimeTracker(
     private fun subframeNumbersTrusted() =
         subframeNumberAgree >= 3 && subframeNumberDisagree * 10 <= subframeNumberAgree
 
-    private fun estimate(page: InavPage, arrivalMillis: Long, subframeNumber: Int): Gst? {
+    private fun estimate(svn: Int, page: InavPage, arrivalMillis: Long, subframeNumber: Int): Gst? {
         while (samples.isNotEmpty() && arrivalMillis - samples.first().arrivalMillis > maxSampleAgeMillis) {
             samples.removeFirst()
         }
@@ -112,13 +127,20 @@ class InavTimeTracker(
 
         val slots = WORD_TYPE_SLOTS[page.wordType]
         val useSubframe = subframeNumber in 1..SUBFRAMES_PER_FRAME && subframeNumbersTrusted()
-        val snappedSeconds = when {
-            slots == null -> rough
-            useSubframe -> slots.map {
-                nearestWithPosition(rough, (subframeNumber - 1) * PAGES_PER_SUBFRAME + it, FRAME_SECONDS)
-            }.minByOrNull { abs(it - rough) }!!
-            else -> slots.map { nearestWithPosition(rough, it, SUBFRAME_SECONDS) }.minByOrNull { abs(it - rough) }!!
-        }
+        val candidates = when {
+            slots == null -> emptyList()
+            useSubframe -> slots.flatMap {
+                nearestCandidates(rough, (subframeNumber - 1) * PAGES_PER_SUBFRAME + it, FRAME_SECONDS)
+            }
+            else -> slots.flatMap { nearestCandidates(rough, it, SUBFRAME_SECONDS) }
+        }.distinct().sortedBy { abs(it - rough) }
+        // A satellite sends a page every 2 s: if its previous page's time is known and a candidate
+        // follows it directly, that's the one (resolves word types in adjacent slots)
+        val follower = lastCertain[svn]?.plus(2)?.takeIf { it in candidates && abs(it - rough) <= MAX_FOLLOW_SECONDS }
+        val snappedSeconds = follower ?: candidates.firstOrNull() ?: rough
+        // Certain if the next possible slot is clearly further away than the chosen one
+        lastTimeCertain = follower != null || (candidates.isNotEmpty() &&
+                (candidates.size == 1 || abs(candidates[1] - rough) - abs(candidates[0] - rough) >= MIN_MARGIN_SECONDS))
         if (snappedSeconds != rough) snapped++
         if (snappedSeconds < 0) return null
         return Gst.fromTotalSeconds(snappedSeconds)
@@ -127,6 +149,7 @@ class InavTimeTracker(
     fun reset() {
         samples.clear()
         weekNumber = null
+        lastCertain.clear()
         subframeNumberAgree = 0
         subframeNumberDisagree = 0
     }
@@ -143,15 +166,20 @@ class InavTimeTracker(
         /** Subframe (0-23) of [gstSeconds] within its 720 s frame */
         fun subframeOf(gstSeconds: Long): Int = ((gstSeconds % FRAME_SECONDS) / SUBFRAME_SECONDS).toInt()
 
+        /** Required difference between the best and second best slot for a certain time */
+        private const val MIN_MARGIN_SECONDS = 4L
+
+        /** How far from the estimate the page following a satellite's previous page may be */
+        private const val MAX_FOLLOW_SECONDS = 5L
+
         /**
-         * The page start time nearest to [rough] whose position (in pages) within a period of
+         * Page start times around [rough] whose position (in pages) within a period of
          * [periodSeconds] is [position]
          */
-        private fun nearestWithPosition(rough: Long, position: Int, periodSeconds: Long): Long {
+        private fun nearestCandidates(rough: Long, position: Int, periodSeconds: Long): List<Long> {
             val periodStart = Math.floorDiv(rough, periodSeconds) * periodSeconds
             val candidate = periodStart + 2L * position + 1
             return listOf(candidate - periodSeconds, candidate, candidate + periodSeconds)
-                .minByOrNull { abs(it - rough) }!!
         }
 
         /**

@@ -127,6 +127,31 @@ scenarios and on a real receiver recording. The unit tests in
   uses the device's check instead and says so in the details. Some devices mark every page as
   passed, damaged or not, so this fallback is only used when no page at all passes the CRC.
 
+## Speeding things up
+
+OSNMA was designed for receivers that see every page. Phones often don't, so GPSTest uses the
+OSNMA messages page by page instead of waiting for complete 30 s subframes:
+
+- **TESLA root key assembled across satellites.** All satellites broadcast the same DSM-KROOT
+  message. Each of its bytes needs to arrive only once, from any satellite and any repetition.
+  The result is accepted only if its ECDSA signature is valid.
+- **TESLA keys from several satellites.** All satellites transmit the same TESLA key in a
+  subframe, so it's put together from the pages of any of them. When keys of some subframes
+  are missing, they're derived from the next verified key, so those subframes' tags aren't lost.
+- **Tags from partial MACK messages.** Each tag is checked as soon as its own pages have arrived.
+  The MACSEQ, which protects the flexible tags, is checked when its pages are there; without it,
+  flexible tags are skipped. Fixed tags are checked against the MAC look-up table as usual.
+- **Warm start.** The last verified TESLA key is saved. On the next start, new keys are verified
+  by hashing back to it, so authentication can start within about a minute, without waiting for
+  the root key. The saved key is dropped as soon as the signal shows a different chain in force,
+  a revoked chain or key, an alert message, or a "don't use" status, and when keys are forgotten
+  in the settings. The details then show the TESLA chain as "(from the previous session)".
+
+On the GSC test data with pages dropped at random, authentication still works when most pages
+are missing (24 satellites at 30 % loss, 17 satellites at 70 % loss), where complete subframes
+practically never occur. Pages whose timing is ambiguous aren't used for OSNMA data, so a page
+in the wrong slot can't make a tag fail.
+
 ## Device quirks
 
 Real phones don't always deliver Galileo I/NAV pages the way the Android documentation
@@ -170,8 +195,9 @@ consecutive messages from the same satellite, and keeps the result only if the C
 
 Phones often deliver only part of the pages: the chip saves power (duty cycling) or tracks the
 E1 pilot signal, which carries no data. The Pixel 8 Pro log contained only 7 to 32 % of each
-Galileo satellite's pages. OSNMA needs all 15 pages of a 30 s subframe from a satellite, so at
-such rates authentication can't complete. The **Subframes** row shows how many subframes were
+Galileo satellite's pages. With complete subframes only, authentication couldn't complete at
+such rates; with the page-by-page processing above it can, but it takes longer, mostly until all
+parts of the TESLA root key have been received once. The **Subframes** row shows how many subframes were
 complete, and the card shows a hint when fewer than half are. Turning on **Force full GNSS
 measurements**, both in GPSTest's settings and in Android's developer options, and keeping the
 screen on can help.

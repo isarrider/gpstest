@@ -30,6 +30,7 @@ import com.android.gpstest.library.osnma.OsnmaEngine
 import com.android.gpstest.library.osnma.OsnmaEvent
 import com.android.gpstest.library.osnma.OsnmaPublicKey
 import com.android.gpstest.library.osnma.OsnmaStatus
+import com.android.gpstest.library.osnma.StoredTeslaKey
 import com.android.gpstest.library.util.PreferenceUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -131,6 +132,7 @@ class OsnmaRepository @Inject constructor(
     private var trustPlatformParity = false
     private var clockOffsetSeconds: Long? = null
     private var engineKeys: Set<String> = emptySet()
+    private var lastKeySaveMillis = 0L
     private var pagesWithoutTime = 0L
     private var pagesWrongSize = 0L
     private var pagesParityPassed = 0L
@@ -149,6 +151,19 @@ class OsnmaRepository @Inject constructor(
 
         override fun onEvent(event: OsnmaEvent) {
             Log.d(TAG, event.toString())
+        }
+
+        override fun onTeslaKeyVerified(key: StoredTeslaKey) {
+            // Keep the latest verified key for a warm start; no need to write every 30 s
+            val now = SystemClock.elapsedRealtime()
+            if (lastKeySaveMillis == 0L || now - lastKeySaveMillis >= KEY_SAVE_INTERVAL_MILLIS) {
+                lastKeySaveMillis = now
+                OsnmaKeyStore.saveTeslaKey(context, prefs, key)
+            }
+        }
+
+        override fun onStoredKeyDiscarded() {
+            OsnmaKeyStore.clearTeslaKey(context, prefs)
         }
     }
 
@@ -271,7 +286,7 @@ class OsnmaRepository @Inject constructor(
                 clockOffsetSeconds = deviceGstSeconds(pageWallClock) - 2 - gst.totalSeconds
             }
             val e = engine ?: newEngine().also { engine = it }
-            e.feedPage(svid, gst, page, checkCrc = !trustPlatformParity)
+            e.feedPage(svid, gst, page, checkCrc = !trustPlatformParity, timeCertain = timeTracker.lastTimeCertain)
         } else {
             pagesWithoutTime++
         }
@@ -284,7 +299,8 @@ class OsnmaRepository @Inject constructor(
         return OsnmaEngine(
             merkleRoot = OsnmaKeyStore.merkleRoot(context, prefs),
             initialKeys = keys,
-            listener = listener
+            listener = listener,
+            storedKey = OsnmaKeyStore.teslaKey(context, prefs)
         )
     }
 
@@ -352,6 +368,7 @@ class OsnmaRepository @Inject constructor(
         private const val PUBLISH_INTERVAL_MILLIS = 1000L
         private const val RESET_GAP_MILLIS = 10 * 60 * 1000L
         private const val STALL_MILLIS = 30 * 1000L
+        private const val KEY_SAVE_INTERVAL_MILLIS = 60 * 1000L
         private const val STALL_CHECK_MILLIS = 5 * 1000L
 
         /** GPS time - UTC, in seconds (leap seconds since 1980, unchanged since 2017) */

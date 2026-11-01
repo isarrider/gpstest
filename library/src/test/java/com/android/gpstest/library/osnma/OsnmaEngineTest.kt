@@ -182,7 +182,7 @@ class OsnmaEngineTest {
                 val gst = tracker.gstFor(p.svn, android, arrival, subframeNumber) ?: return@repeat
                 // Dummy pages (word type 63) carry nothing and are ignored by the engine
                 if (gst != p.gst && android.wordType != 63) wrong++
-                engine.feedPage(p.svn, gst, android)
+                engine.feedPage(p.svn, gst, android, timeCertain = tracker.lastTimeCertain)
             }
         }
         return engine.statistics to wrong
@@ -239,7 +239,7 @@ class OsnmaEngineTest {
             val expectedGst = if (swappedSat) p.gst.addSeconds(-2) else p.gst
             val gst = tracker.gstFor(p.svn, assembled.page, assembled.arrivalMillis) ?: return@forEach
             if (gst != expectedGst && assembled.page.wordType != 63) wrongTime++
-            engine.feedPage(p.svn, gst, assembled.page)
+            engine.feedPage(p.svn, gst, assembled.page, timeCertain = tracker.lastTimeCertain)
         }
         assertTrue(assembler.repaired > 1000)
         assertTrue("wrong time $wrongTime", wrongTime < pages.size / 100)
@@ -271,6 +271,92 @@ class OsnmaEngineTest {
         assertEquals(0, documented.offsetBits)
     }
 
+    /**
+     * With pages missing, the DSM-KROOT is assembled byte by byte across satellites, TESLA keys
+     * from the pages of several satellites and tags from partial MACKs. With 50 % of the pages
+     * lost, practically no subframe is complete, but authentication must still work.
+     */
+    @Test
+    fun missingPages_partialSubframesStillAuthenticate() {
+        val random = Random(11)
+        val engine = newEngine()
+        TestVectors.configuration1().forEach {
+            if (random.nextInt(100) >= 50) engine.feedPage(it.svn, it.gst, it.page)
+        }
+        val stats = engine.statistics
+        assertEquals(0L, stats.subframesCompletedCounted)
+        assertTrue(stats.krootVerified > 0)
+        assertTrue(stats.teslaKeysVerified > 0)
+        assertTrue("tags ${stats.tagsOk}", stats.tagsOk > 50)
+        assertEquals(0, stats.tagsFailed)
+        assertEquals(0, stats.teslaKeysFailed)
+        assertTrue(engine.status().authenticatedSatellites.isNotEmpty())
+    }
+
+    /**
+     * A TESLA key stored in an earlier session lets a new session authenticate without the
+     * DSM-KROOT, the public key or the Merkle tree.
+     */
+    @Test
+    fun warmStart_withStoredTeslaKey() {
+        val pages = TestVectors.configuration1()
+        val half = pages.indexOfFirst { it.gst.tow >= 277201 + 240 }
+        var stored: StoredTeslaKey? = null
+        val first = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()),
+            object : OsnmaEngine.Listener {
+                override fun onTeslaKeyVerified(key: StoredTeslaKey) {
+                    stored = key
+                }
+            })
+        pages.subList(0, half).forEach { first.feedPage(it.svn, it.gst, it.page) }
+        val key = StoredTeslaKey.decode(stored!!.encode())!!
+        assertTrue(key.key.contentEquals(stored!!.key))
+
+        // Second session: no Merkle tree, no public key, and a gap of a minute
+        val second = OsnmaEngine(null, emptyList(), storedKey = key)
+        val resume = pages.indexOfFirst { it.gst.tow >= 277201 + 300 }
+        var firstTagGst: Gst? = null
+        pages.subList(resume, pages.size).forEach {
+            second.feedPage(it.svn, it.gst, it.page)
+            if (firstTagGst == null && second.statistics.tagsOk > 0) firstTagGst = it.gst
+        }
+        val stats = second.statistics
+        assertEquals(0, stats.krootVerified)
+        assertTrue(stats.tagsOk > 300)
+        assertEquals(0, stats.tagsFailed)
+        // Tags verified within about a minute of resuming
+        assertTrue(firstTagGst!!.totalSeconds - pages[resume].gst.totalSeconds <= 90)
+        val status = second.status()
+        assertTrue(status.warmStart)
+        assertEquals(OsnmaStatus.Phase.AUTHENTICATING, status.phase)
+    }
+
+    /** A stored key of another chain than the one in force is discarded */
+    @Test
+    fun warmStart_otherChainDiscarded() {
+        var stored: StoredTeslaKey? = null
+        val first = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()),
+            object : OsnmaEngine.Listener {
+                override fun onTeslaKeyVerified(key: StoredTeslaKey) {
+                    stored = key
+                }
+            })
+        val pages = TestVectors.configuration1()
+        pages.take(pages.size / 2).forEach { first.feedPage(it.svn, it.gst, it.page) }
+        val s = stored!!
+        val otherChain = StoredTeslaKey(s.chain.copy(chainId = (s.chain.chainId + 1) % 4), s.key, s.gstSubframe)
+        var discarded = false
+        val second = OsnmaEngine(null, emptyList(), object : OsnmaEngine.Listener {
+            override fun onStoredKeyDiscarded() {
+                discarded = true
+            }
+        }, storedKey = otherChain)
+        pages.drop(pages.size / 2).forEach { second.feedPage(it.svn, it.gst, it.page) }
+        assertTrue(discarded)
+        assertNull(second.status().teslaKey)
+        assertEquals(0, second.statistics.tagsOk)
+    }
+
     @Test
     fun corruptedPage_isRejectedByCrc() {
         val p = TestVectors.configuration1().first()
@@ -299,7 +385,7 @@ class OsnmaEngineTest {
             val gst = tracker.gstFor(p.svn, android, arrival) ?: return@forEach
             known++
             if (gst == p.gst) correct++
-            engine.feedPage(p.svn, gst, android)
+            engine.feedPage(p.svn, gst, android, timeCertain = tracker.lastTimeCertain)
         }
         assertEquals(known, correct)
         // Only the pages before the first time stamp are lost

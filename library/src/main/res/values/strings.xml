@@ -567,10 +567,14 @@
     <string name="osnma_public_key_value">PKID %1$d (%2$s, %3$s)</string>
     <string name="osnma_public_key_none">Not available yet</string>
     <string name="osnma_chain_value">ID %1$d, %2$s, %3$d-bit tags, key at %4$s</string>
+    <string name="osnma_chain_warm_start">(from the previous session)</string>
+    <string name="osnma_label_kroot">TESLA root key</string>
+    <string name="osnma_kroot_progress">%1$d of %2$d blocks received</string>
+    <string name="osnma_kroot_progress_unknown">%1$d blocks received</string>
     <string name="osnma_tags_value">%1$d (CED %2$d, timing %3$d, slow MAC %4$d), failed %5$d</string>
     <string name="osnma_pages_value">%1$d received, %2$d used (%3$d with OSNMA), %4$d without time, %5$d not nominal, %6$d CRC errors, %7$d rejoined</string>
     <string name="osnma_reception_stalled">Galileo navigation pages stopped arriving.</string>
-    <string name="osnma_reception_incomplete">Only %1$d%% of the Galileo navigation subframes are complete, so few tags can be checked.</string>
+    <string name="osnma_reception_incomplete">Many Galileo navigation pages are missing (only %1$d%% of the subframes are complete), so authentication takes longer.</string>
     <string name="osnma_reception_advice">The GNSS chip may be saving power: keep \"Force full GNSS measurements\" on in Settings, keep the screen on, and give it a clear view of the sky.</string>
     <string name="osnma_label_subframes">Subframes</string>
     <string name="osnma_label_device_parity">Device parity</string>
@@ -594,7 +598,7 @@
     <string name="pref_osnma_import_title">Import OSNMA public key or Merkle tree</string>
     <string name="pref_osnma_import_summary">Optional. Only needed if the Galileo Merkle tree changes or after an alert message. Use the files from the European GNSS Service Centre (OSNMA_MerkleTree_*.xml or OSNMA_PublicKey_*.crt/.xml/.pem)</string>
     <string name="pref_osnma_clear_title">Forget OSNMA keys</string>
-    <string name="pref_osnma_clear_summary">Delete the stored public keys and any imported Merkle tree. The built-in key stays.</string>
+    <string name="pref_osnma_clear_summary">Delete the stored public and TESLA keys and any imported Merkle tree. The built-in key stays.</string>
     <string name="osnma_import_success">Imported: %1$s</string>
     <string name="osnma_import_merkle_root">Merkle tree root</string>
     <string name="osnma_import_public_key">public key PKID %1$d</string>

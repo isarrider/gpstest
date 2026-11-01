@@ -250,16 +250,25 @@ private fun Details(status: OsnmaStatus) {
     val tesla = status.teslaKey
     if (tesla != null) {
         val mac = if (tesla.chain.macFunction == MacFunction.HMAC_SHA_256) "HMAC-SHA-256" else "CMAC-AES"
+        val chain = stringResource(
+            R.string.osnma_chain_value,
+            tesla.chain.chainId,
+            mac,
+            tesla.chain.tagSizeBits,
+            formatGst(tesla.gstSubframe)
+        )
         DetailRow(
             R.string.osnma_label_chain,
-            stringResource(
-                R.string.osnma_chain_value,
-                tesla.chain.chainId,
-                mac,
-                tesla.chain.tagSizeBits,
-                formatGst(tesla.gstSubframe)
-            )
+            if (status.warmStart) chain + " " + stringResource(R.string.osnma_chain_warm_start) else chain
         )
+    } else {
+        status.krootProgress?.let { (have, needed) ->
+            DetailRow(
+                R.string.osnma_label_kroot,
+                if (needed > 0) stringResource(R.string.osnma_kroot_progress, have, needed)
+                else stringResource(R.string.osnma_kroot_progress_unknown, have)
+            )
+        }
     }
 
     val authenticated = status.authenticatedSatellites

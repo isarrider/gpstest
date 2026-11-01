@@ -16,129 +16,179 @@
 package com.android.gpstest.library.osnma
 
 /**
- * Collects the 15 OSNMA fields that each satellite transmits during a subframe into the 120-bit
- * HKROOT message and the 480-bit MACK message (ICD section 2).
+ * Stores the OSNMA field of every page received, by satellite and subframe, so that the HKROOT and
+ * MACK messages can be used even when some pages are missing.
  *
- * Each satellite's pages must be fed in chronological order. A page from a new subframe discards
- * that satellite's partial data of the previous one. Satellites are independent, so pages of
- * different satellites may arrive slightly out of order (e.g. rejoined pages lag by 2 s).
+ * Each page carries 8 HKROOT bits and 32 MACK bits (ICD section 2). Instead of waiting for all 15
+ * pages of a subframe, the engine uses whatever parts of the messages have arrived: the DSM bytes
+ * of any satellite, the TESLA key from the pages of any satellite (all transmit the same key in a
+ * subframe) and each tag as soon as its own pages are there. Everything assembled this way is
+ * still verified cryptographically, so mixing up parts can only make a check fail.
  */
-internal class SubframeCollector {
-    private val hkroot = Array(NUM_SVNS) { ByteArray(HKROOT_BYTES) }
-    private val mack = Array(NUM_SVNS) { ByteArray(MACK_BYTES) }
-    private val numValid = IntArray(NUM_SVNS)
-    private val current = arrayOfNulls<Gst>(NUM_SVNS)
+internal class PageStore(private val depthSubframes: Int = 13) {
+
+    class SubframePages(val svn: Int, val gstSubframe: Gst) {
+        val hkroot = ByteArray(SubframeLayout.HKROOT_BYTES)
+        val mack = ByteArray(SubframeLayout.MACK_BYTES)
+        /** Bit i set if page i of the subframe was received */
+        var mask = 0
+        val complete: Boolean get() = mask == SubframeLayout.ALL_PAGES
+        fun has(page: Int) = mask and (1 shl page) != 0
+
+        /** True if all pages carrying MACK bits [start, start + length) were received */
+        fun hasMackBits(start: Int, length: Int): Boolean {
+            if (length <= 0) return true
+            for (page in start / 32..(start + length - 1) / 32) if (!has(page)) return false
+            return true
+        }
+    }
+
+    private val bySubframe = LinkedHashMap<Gst, HashMap<Int, SubframePages>>()
+
+    /** NMA header (HKROOT byte 0) per subframe; the same for all satellites */
+    private val headers = HashMap<Gst, Int>()
+
     private var first: Gst? = null
 
-    /**
-     * Number of (satellite, subframe) pairs for which OSNMA data was received, not counting the
-     * first subframe, which reception usually starts in the middle of
-     */
+    /** (Satellite, subframe) pairs with OSNMA data, not counting the first, partial subframe */
     var started = 0L
         private set
 
-    /** Subframes completed within the first subframe (excluded from [started]) */
+    /** Pairs completed (all 15 pages), all subframes */
+    var completed = 0L
+        private set
+
+    /** Pairs completed in the first subframe */
     var firstCompleted = 0L
         private set
 
-    class Completed(val hkroot: ByteArray, val mack: ByteArray, val gstSubframe: Gst)
+    class Stored(val pages: SubframePages, val page: Int, val newlyComplete: Boolean)
 
-    fun feed(osnma: ByteArray, svn: Int, gst: Gst): Completed? {
+    fun store(svn: Int, gst: Gst, osnma: ByteArray): Stored {
         val subframe = gst.subframe()
-        val idx = svn - 1
+        val page = SubframeLayout.pageOf(gst)
         if (first == null) first = subframe
-        val currentSubframe = current[idx]
-        if (currentSubframe != null && subframe < currentSubframe) {
-            // Older than what this satellite is collecting: ignore
-            return null
-        }
-        if (subframe != currentSubframe) {
-            current[idx] = subframe
-            numValid[idx] = 0
+        val map = bySubframe.getOrPut(subframe) { HashMap() }
+        val pages = map.getOrPut(svn) {
             if (subframe != first) started++
+            SubframePages(svn, subframe)
         }
-        val wordNum = (gst.tow / 2) % WORDS_PER_SUBFRAME
-        if (wordNum != numValid[idx]) {
-            // A page is missing; this subframe can't be completed for this satellite
-            return null
-        }
-        hkroot[idx][wordNum] = osnma[0]
-        System.arraycopy(osnma, 1, mack[idx], wordNum * 4, 4)
-        numValid[idx]++
-        return if (numValid[idx] == WORDS_PER_SUBFRAME) {
+        val wasComplete = pages.complete
+        pages.hkroot[page] = osnma[0]
+        System.arraycopy(osnma, 1, pages.mack, page * 4, 4)
+        pages.mask = pages.mask or (1 shl page)
+        if (page == 0) headers[subframe] = osnma[0].toInt() and 0xFF
+        val newlyComplete = !wasComplete && pages.complete
+        if (newlyComplete) {
+            completed++
             if (subframe == first) firstCompleted++
-            Completed(hkroot[idx].copyOf(), mack[idx].copyOf(), subframe)
-        } else null
+        }
+        prune(subframe)
+        return Stored(pages, page, newlyComplete)
     }
 
-    companion object {
-        const val NUM_SVNS = 36
-        const val WORDS_PER_SUBFRAME = 15
-        const val HKROOT_BYTES = 15
-        const val MACK_BYTES = 60
+    private fun prune(latest: Gst) {
+        val oldest = latest.addSubframes(-depthSubframes)
+        val it = bySubframe.keys.iterator()
+        while (it.hasNext()) {
+            val k = it.next()
+            if (k < oldest) {
+                it.remove()
+                headers.remove(k)
+            }
+        }
+    }
+
+    fun get(svn: Int, gstSubframe: Gst): SubframePages? = bySubframe[gstSubframe]?.get(svn)
+
+    fun subframe(gstSubframe: Gst): Collection<SubframePages> = bySubframe[gstSubframe]?.values ?: emptyList()
+
+    fun header(gstSubframe: Gst): NmaHeader? = headers[gstSubframe]?.let { NmaHeader(it) }
+
+    /** Distinct NMA headers seen recently, newest first */
+    fun recentHeaders(): List<NmaHeader> =
+        headers.entries.sortedByDescending { it.key }.map { it.value }.distinct().map { NmaHeader(it) }
+
+    fun clear() {
+        bySubframe.clear()
+        headers.clear()
     }
 }
 
+internal object SubframeLayout {
+    const val PAGES = 15
+    const val HKROOT_BYTES = 15
+    const val MACK_BYTES = 60
+    const val ALL_PAGES = (1 shl PAGES) - 1
+
+    /** Page (0-14) of the page starting at [gst] within its subframe */
+    fun pageOf(gst: Gst): Int = (gst.tow / 2) % PAGES
+}
+
 /**
- * Collects the 13-byte DSM blocks broadcast in the HKROOT messages into complete DSM-KROOT and
- * DSM-PKR messages (ICD section 3.2). Blocks of the same DSM can come from any satellite.
+ * Collects DSM-KROOT and DSM-PKR messages byte by byte (ICD section 3.2). All satellites broadcast
+ * the same DSMs, so each byte of a DSM block needs to be received only once, from any satellite and
+ * any repetition. A block's ID comes from the DSM header (HKROOT byte 1, page 1), so the bytes of a
+ * satellite's subframe are only used once its page 1 has been received.
  */
-internal class DsmCollector {
-    private val dsm = ByteArray(MAX_BLOCKS * BLOCK_BYTES)
-    private val blockValid = BooleanArray(MAX_BLOCKS)
-    private var dsmId: Int = -1
-    private var done = false
+internal class DsmAssembler {
+
+    private class Entry {
+        val blocks = arrayOfNulls<ByteArray>(MAX_BLOCKS)
+        val masks = IntArray(MAX_BLOCKS)
+        var lastProcessed: ByteArray? = null
+    }
+
+    private val entries = HashMap<Int, Entry>()
 
     class Completed(val id: Int, val isPkr: Boolean, val data: ByteArray)
 
-    fun feed(header: Int, block: ByteArray): Completed? {
-        val id = (header ushr 4) and 0xF
-        val blockId = header and 0xF
-        if (id != dsmId) {
-            dsmId = id
-            blockValid.fill(false)
-            done = false
-        }
-        if (done) return null
-        if (!blockValid[blockId]) {
-            System.arraycopy(block, 0, dsm, blockId * BLOCK_BYTES, BLOCK_BYTES)
-            blockValid[blockId] = true
-        }
-        if (!blockValid[0]) return null
-        val isPkr = id >= 12
-        val nb = (dsm[0].toInt() ushr 4) and 0xF
+    /** Writes byte [index] (0-12) of block [blockId] of DSM [dsmId] */
+    fun write(dsmId: Int, blockId: Int, index: Int, value: Byte): Completed? {
+        val entry = entries.getOrPut(dsmId) { Entry() }
+        val block = entry.blocks[blockId] ?: ByteArray(BLOCK_BYTES).also { entry.blocks[blockId] = it }
+        block[index] = value
+        entry.masks[blockId] = entry.masks[blockId] or (1 shl index)
+        return completed(dsmId, entry)
+    }
+
+    private fun completed(dsmId: Int, entry: Entry): Completed? {
+        if (entry.masks[0] and 1 == 0) return null
+        val isPkr = dsmId >= 12
+        val nb = (entry.blocks[0]!![0].toInt() ushr 4) and 0xF
         val n = if (isPkr) {
             if (nb in 7..10) nb + 6 else return null
         } else {
             if (nb in 1..8) nb + 6 else return null
         }
-        if ((0 until n).any { !blockValid[it] }) return null
-        done = true
-        return Completed(id, isPkr, dsm.copyOf(n * BLOCK_BYTES))
+        for (b in 0 until n) if (entry.masks[b] != FULL_BLOCK) return null
+        val data = ByteArray(n * BLOCK_BYTES)
+        for (b in 0 until n) System.arraycopy(entry.blocks[b]!!, 0, data, b * BLOCK_BYTES, BLOCK_BYTES)
+        if (entry.lastProcessed?.contentEquals(data) == true) return null
+        entry.lastProcessed = data
+        return Completed(dsmId, isPkr, data)
     }
+
+    /** Fraction of the blocks of [dsmId] received, for display; null if unknown */
+    fun progress(dsmId: Int): Pair<Int, Int>? {
+        val entry = entries[dsmId] ?: return null
+        val full = entry.masks.count { it == FULL_BLOCK }
+        val nb = entry.blocks[0]?.takeIf { entry.masks[0] and 1 != 0 }?.let { (it[0].toInt() ushr 4) and 0xF }
+        val n = when {
+            nb == null -> null
+            dsmId >= 12 -> nb + 6
+            else -> nb + 6
+        }
+        return full to (n ?: 0)
+    }
+
+    fun clear() = entries.clear()
 
     companion object {
         const val MAX_BLOCKS = 16
         const val BLOCK_BYTES = 13
+        private const val FULL_BLOCK = (1 shl BLOCK_BYTES) - 1
     }
-}
-
-/** MACK messages of recent subframes, needed because tags are verified with a delay */
-internal class MackStore(private val depth: Int = 12) {
-    class Stored(val mack: ByteArray, val nmaStatus: NmaStatus)
-
-    private val bySubframe = LinkedHashMap<Gst, HashMap<Int, Stored>>()
-
-    fun store(mack: ByteArray, svn: Int, gst: Gst, nmaStatus: NmaStatus) {
-        bySubframe.getOrPut(gst) { HashMap() }[svn] = Stored(mack, nmaStatus)
-        while (bySubframe.size > depth) {
-            bySubframe.remove(bySubframe.keys.minOrNull())
-        }
-    }
-
-    fun get(svn: Int, gst: Gst): Stored? = bySubframe[gst]?.get(svn)
-
-    fun clear() = bySubframe.clear()
 }
 
 /** Navigation data authenticated by one of the ADKDs, assembled for a given subframe */

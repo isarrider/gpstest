@@ -27,6 +27,12 @@ package com.android.gpstest.library.osnma
  * modelled on the galileo-osnma Rust library by Daniel Estévez
  * (https://github.com/daniestevez/galileo-osnma, MIT/Apache-2.0).
  *
+ * Phones often deliver only part of the pages, so the OSNMA messages are used page by page
+ * instead of per complete subframe (see [PageStore]): DSM blocks are assembled byte by byte across
+ * satellites, the TESLA key of a subframe from the pages of any satellite, and each tag as soon as
+ * its own pages are there. A TESLA key verified in an earlier session can be passed in as
+ * [storedKey] ("warm start"), so that new keys can be verified without waiting for the DSM-KROOT.
+ *
  * This class is not thread safe: call it from a single thread.
  */
 class OsnmaEngine(
@@ -34,7 +40,9 @@ class OsnmaEngine(
     initialKeys: List<OsnmaPublicKey> = emptyList(),
     private val listener: Listener? = null,
     /** Only process Slow MAC (ADKD 12) tags, as recommended when time sync is loose */
-    private val onlySlowMac: Boolean = false
+    private val onlySlowMac: Boolean = false,
+    /** A TESLA key verified in an earlier session, to start without the DSM-KROOT */
+    storedKey: StoredTeslaKey? = null
 ) {
 
     interface Listener {
@@ -45,14 +53,28 @@ class OsnmaEngine(
         fun onAlertMessage() {}
 
         fun onEvent(event: OsnmaEvent) {}
+
+        /** A TESLA key was verified; apps may persist it for a warm start (see [StoredTeslaKey]) */
+        fun onTeslaKeyVerified(key: StoredTeslaKey) {}
+
+        /** The key passed as storedKey can't be used (chain changed or revoked); forget it */
+        fun onStoredKeyDiscarded() {}
     }
 
     private var merkleTree: MerkleTree? = merkleRoot?.let { MerkleTree(it) }
 
-    private val subframes = SubframeCollector()
-    private val dsmCollector = DsmCollector()
-    private val macks = MackStore()
+    private val pageStore = PageStore()
+    private val dsmAssembler = DsmAssembler()
     private val navData = NavDataStore()
+
+    // Attempts to assemble and verify the TESLA key of each subframe
+    private val keyAttempts = HashMap<Gst, Int>()
+
+    // Warm start: the chain in force comes from a key stored in an earlier session, and no
+    // DSM-KROOT has been verified yet in this one
+    private var warmStart = false
+    private var warmStartFailures = 0
+    private var lastKrootDsmId: Int? = null
 
     // Public keys: the one in force and possibly the next one (ICD section 5.3)
     private var currentPubKey: OsnmaPublicKey? = null
@@ -64,7 +86,7 @@ class OsnmaEngine(
     private var chainStart: Gst? = null
 
     // DSM-KROOT waiting for its public key
-    private var pendingKroot: Triple<DsmKroot, NmaHeader, Gst>? = null
+    private var pendingKroot: Triple<DsmKroot, List<NmaHeader>, Gst>? = null
 
     // Status tracking
     private var latestGst: Gst? = null
@@ -91,6 +113,11 @@ class OsnmaEngine(
 
     init {
         initialKeys.sortedBy { it.pkid }.forEach { storePublicKey(it, notify = false) }
+        storedKey?.let {
+            keySlots[0] = TeslaKey(it.key, it.chain, it.gstSubframe)
+            chainInForce = it.chain.chainId
+            warmStart = true
+        }
     }
 
     // ------------------------------------------------------------------------------------------
@@ -100,10 +127,12 @@ class OsnmaEngine(
     /**
      * Processes one I/NAV page from satellite [svn] (1-36), where [gst] is the GST at the start
      * of the page (page TOWs are odd). Pages from all satellites must be fed in time order.
+     * Pass timeCertain = false if [gst] might be off by a page (see InavTimeTracker.lastTimeCertain):
+     * the page is then not used for OSNMA data.
      *
      * @return false if the page was discarded (not a nominal page or bad CRC)
      */
-    fun feedPage(svn: Int, gst: Gst, page: InavPage, checkCrc: Boolean = true): Boolean {
+    fun feedPage(svn: Int, gst: Gst, page: InavPage, checkCrc: Boolean = true, timeCertain: Boolean = true): Boolean {
         if (svn !in 1..36) return false
         if (!page.isNominal) {
             stats.pagesRejected++
@@ -126,11 +155,11 @@ class OsnmaEngine(
 
         if (page.osnmaEmpty) return true
         stats.osnmaPages++
+        // With pages used one by one, a page in the wrong slot would corrupt the MACK bits
+        if (!timeCertain) return true
         sat.transmitsOsnma = true
         sat.lastOsnmaGst = gst
-        subframes.feed(page.osnma, svn, gst)?.let {
-            processSubframe(it.hkroot, it.mack, svn, it.gstSubframe)
-        }
+        processOsnmaField(svn, gst, page.osnma)
         return true
     }
 
@@ -148,43 +177,101 @@ class OsnmaEngine(
     // Subframe processing
     // ------------------------------------------------------------------------------------------
 
-    private fun processSubframe(hkroot: ByteArray, mack: ByteArray, svn: Int, gst: Gst) {
-        stats.subframes++
-        val header = NmaHeader(hkroot[0].toInt() and 0xFF)
-        if (header != lastHeader) lastHeaderAuthenticated = false
-        lastHeader = header
-        // The NMA status isn't authenticated here. It's only stored and later used as an input to
-        // the tag MACs, so a forged status just makes the tags fail.
-        macks.store(mack, svn, gst, header.nmaStatus)
+    private fun processOsnmaField(svn: Int, gst: Gst, osnma: ByteArray) {
+        val stored = pageStore.store(svn, gst, osnma)
+        val pages = stored.pages
+        val subframe = pages.gstSubframe
+        if (stored.newlyComplete) stats.subframes++
+        if (stored.page == 0) processNmaHeaderPage(NmaHeader(osnma[0].toInt() and 0xFF), subframe)
 
-        val block = hkroot.copyOfRange(2, 15)
-        dsmCollector.feed(hkroot[1].toInt() and 0xFF, block)?.let { dsm ->
-            if (dsm.isPkr) processDsmPkr(DsmPkr(dsm.data), gst) else processDsmKroot(DsmKroot(dsm.data), header, gst)
+        // DSM bytes: usable once the DSM header (page 1) of this satellite's subframe is known
+        when {
+            stored.page == 1 -> for (i in 2 until SubframeLayout.PAGES) if (pages.has(i)) writeDsmByte(pages, i)
+            stored.page >= 2 && pages.has(1) -> writeDsmByte(pages, stored.page)
         }
-        validateKey(mack, gst)
+        tryTeslaKey(subframe, stored.page)
     }
 
-    private fun processDsmKroot(dsm: DsmKroot, header: NmaHeader, gst: Gst) {
+    private fun processNmaHeaderPage(header: NmaHeader, subframe: Gst) {
+        if (header != lastHeader) lastHeaderAuthenticated = false
+        lastHeader = header
+        if (warmStart) {
+            val cid = chainInForce
+            val reason = when {
+                header.nmaStatus == NmaStatus.DONT_USE -> "NMA status is don't use"
+                header.cpks == Cpks.CHAIN_REVOKED || header.cpks == Cpks.PUBLIC_KEY_REVOKED ||
+                        header.cpks == Cpks.ALERT_MESSAGE -> "chain or key revoked"
+                cid != null && header.chainId != cid -> "chain ${header.chainId} is now in force"
+                else -> null
+            }
+            if (reason != null) discardStoredKey(subframe, reason)
+        }
+    }
+
+    private fun discardStoredKey(gst: Gst, reason: String) {
+        val cid = chainInForce
+        if (cid != null) revokeChain(cid)
+        chainInForce = null
+        chainStart = null
+        warmStart = false
+        event(gst, OsnmaEvent.Type.WARNING, "TESLA key from the previous session not used: $reason")
+        listener?.onStoredKeyDiscarded()
+    }
+
+    private fun writeDsmByte(pages: PageStore.SubframePages, page: Int) {
+        val header = pages.hkroot[1].toInt() and 0xFF
+        val dsmId = header ushr 4
+        val blockId = header and 0xF
+        if (dsmId < 12) lastKrootDsmId = dsmId
+        val completed = dsmAssembler.write(dsmId, blockId, page - 2, pages.hkroot[page]) ?: return
+        val gst = pages.gstSubframe
+        if (completed.isPkr) {
+            processDsmPkr(DsmPkr(completed.data), gst)
+        } else {
+            processDsmKroot(DsmKroot(completed.data), gst)
+        }
+    }
+
+    /**
+     * The NMA header is part of the signed message. Since the DSM may have been assembled from
+     * pages of several subframes, the headers seen recently are tried in turn.
+     */
+    private fun processDsmKroot(dsm: DsmKroot, gst: Gst) {
+        val candidates = (listOfNotNull(pageStore.header(gst)) + pageStore.recentHeaders() +
+                listOfNotNull(lastHeader)).distinct()
+        if (candidates.isEmpty()) return
+        processDsmKroot(dsm, candidates, gst)
+    }
+
+    private fun processDsmKroot(dsm: DsmKroot, headers: List<NmaHeader>, gst: Gst) {
         val pkid = dsm.publicKeyId
         val pubKey = applicablePubKey(pkid)
         if (pubKey == null) {
-            pendingKroot = Triple(dsm, header, gst)
+            pendingKroot = Triple(dsm, headers, gst)
             event(gst, OsnmaEvent.Type.INFO, "DSM-KROOT received, waiting for public key PKID $pkid")
             return
         }
         pendingKroot = null
         val chain = TeslaChain.fromDsmKroot(dsm)
         val curve = dsm.curve
-        val error = when {
-            chain == null -> "reserved value in DSM-KROOT"
-            curve == null -> "unknown DSM-KROOT signature length"
-            curve != pubKey.curve -> "public key type doesn't match DSM-KROOT"
-            !dsm.paddingOk(header) -> "wrong DSM-KROOT padding"
-            !OsnmaCrypto.verifyEcdsa(curve, pubKey.key, dsm.signedMessage(header), dsm.signature!!) ->
-                "invalid DSM-KROOT signature"
-            else -> null
+        var error: String? = null
+        var header: NmaHeader? = null
+        for (candidate in headers) {
+            error = when {
+                chain == null -> "reserved value in DSM-KROOT"
+                curve == null -> "unknown DSM-KROOT signature length"
+                curve != pubKey.curve -> "public key type doesn't match DSM-KROOT"
+                !dsm.paddingOk(candidate) -> "wrong DSM-KROOT padding"
+                !OsnmaCrypto.verifyEcdsa(curve, pubKey.key, dsm.signedMessage(candidate), dsm.signature!!) ->
+                    "invalid DSM-KROOT signature"
+                else -> null
+            }
+            if (error == null) {
+                header = candidate
+                break
+            }
         }
-        if (error != null) {
+        if (header == null) {
             stats.krootFailed++
             event(gst, OsnmaEvent.Type.ERROR, "Could not verify KROOT with PKID $pkid: $error")
             return
@@ -200,13 +287,30 @@ class OsnmaEngine(
         krootGst = gst
         lastHeader = header
         lastHeaderAuthenticated = true
+        if (warmStart) {
+            warmStart = false
+            event(gst, OsnmaEvent.Type.INFO, "TESLA chain confirmed by the DSM-KROOT")
+        }
         storeKroot(kroot, header, gst)
         processNmaHeader(header, pkid, gst)
+        // Keys of recent subframes may have been received before this KROOT: try them now
+        retryRecentTeslaKeys(gst)
+    }
+
+    private fun retryRecentTeslaKeys(gst: Gst) {
+        for (k in 1 downTo 0) {
+            val subframe = gst.addSubframes(-k)
+            keyAttempts.remove(subframe)
+            val current = currentKey() ?: return
+            val chain = current.chain
+            val numTags = (Mack.MACK_BITS - chain.keySizeBits) / (chain.tagSizeBits + 16)
+            tryTeslaKey(subframe, numTags * (chain.tagSizeBits + 16) / 32)
+        }
     }
 
     private fun retryPendingKroot() {
-        val (dsm, header, gst) = pendingKroot ?: return
-        if (applicablePubKey(dsm.publicKeyId) != null) processDsmKroot(dsm, header, gst)
+        val (dsm, headers, gst) = pendingKroot ?: return
+        if (applicablePubKey(dsm.publicKeyId) != null) processDsmKroot(dsm, headers, gst)
     }
 
     private fun processNmaHeader(header: NmaHeader, pkid: Int, gst: Gst) {
@@ -242,6 +346,7 @@ class OsnmaEngine(
         chainInForce = null
         chainStart = null
         pendingKroot = null
+        warmStart = false
         listener?.onAlertMessage()
     }
 
@@ -383,22 +488,51 @@ class OsnmaEngine(
         }
     }
 
-    private fun validateKey(mackBytes: ByteArray, gst: Gst) {
+    /**
+     * All satellites transmit the same TESLA key in a subframe, so it's assembled from the pages
+     * of any of them as soon as the pages carrying it have arrived.
+     */
+    private fun tryTeslaKey(subframe: Gst, page: Int) {
         val current = currentKey() ?: return
+        if (subframe <= current.gstSubframe) return
         val chain = current.chain
-        val mack = Mack(mackBytes, chain.keySizeBits, chain.tagSizeBits)
-        val newKey = TeslaKey(mack.key(), chain, gst)
-        when {
-            current.gstSubframe == newKey.gstSubframe -> {}
-            current.gstSubframe > newKey.gstSubframe -> {}
-            current.authenticates(newKey) -> {
-                stats.teslaKeysVerified++
-                storeKey(newKey)
-                processTags(newKey)
+        val numTags = (Mack.MACK_BITS - chain.keySizeBits) / (chain.tagSizeBits + 16)
+        val offset = numTags * (chain.tagSizeBits + 16)
+        val firstPage = offset / 32
+        val lastPage = (offset + chain.keySizeBits - 1) / 32
+        if (page !in firstPage..lastPage) return
+        val attempts = keyAttempts[subframe] ?: 0
+        if (attempts >= MAX_KEY_ATTEMPTS) return
+        val buffer = ByteArray(SubframeLayout.MACK_BYTES)
+        val sources = pageStore.subframe(subframe)
+        for (p in firstPage..lastPage) {
+            val source = sources.firstOrNull { it.has(p) } ?: return
+            System.arraycopy(source.mack, p * 4, buffer, p * 4, 4)
+        }
+        keyAttempts[subframe] = attempts + 1
+        keyAttempts.keys.removeAll { it < subframe.addSubframes(-PageStoreDepth) }
+        validateKey(TeslaKey(Bits.slice(buffer, offset, chain.keySizeBits), chain, subframe), current)
+    }
+
+    private fun validateKey(newKey: TeslaKey, current: TeslaKey) {
+        val maxDerivations = if (warmStart) TeslaKey.MAX_DERIVATIONS_STORED else TeslaKey.MAX_DERIVATIONS
+        if (current.authenticates(newKey, maxDerivations)) {
+            stats.teslaKeysVerified++
+            warmStartFailures = 0
+            storeKey(newKey)
+            listener?.onTeslaKeyVerified(newKey.toStored())
+            // Keys of subframes in between (not received completely) follow from the new key: use
+            // them for the tags of those subframes, oldest first
+            val skipped = newKey.gstSubframe.subframesSince(current.gstSubframe) - 1
+            for (k in minOf(skipped, PageStoreDepth) downTo 1) {
+                processTags(newKey.derive(k))
             }
-            else -> {
-                stats.teslaKeysFailed++
-                event(gst, OsnmaEvent.Type.ERROR, "TESLA key at $gst could not be verified")
+            processTags(newKey)
+        } else {
+            stats.teslaKeysFailed++
+            event(newKey.gstSubframe, OsnmaEvent.Type.ERROR, "TESLA key at ${newKey.gstSubframe} could not be verified")
+            if (warmStart && ++warmStartFailures >= MAX_WARM_START_FAILURES) {
+                discardStoredKey(newKey.gstSubframe, "new keys don't follow from it")
             }
         }
     }
@@ -418,65 +552,89 @@ class OsnmaEngine(
         }
         for (svn in 1..36) {
             if (!onlySlowMac) {
-                macks.get(svn, gstMack)?.let { stored ->
-                    val mack = Mack(stored.mack, key.chain.keySizeBits, key.chain.tagSizeBits)
-                    if (mackValid(mack, key, svn, gstMack)) {
-                        processMack(mack, key, svn, gstMack, stored.nmaStatus)
-                    }
-                }
+                pageStore.get(svn, gstMack)?.let { processMack(it, key, key, gstMack, slowMac = false) }
             }
             if (slowMacKey != null) {
-                macks.get(svn, gstSlowMac)?.let { stored ->
-                    val mack = Mack(stored.mack, key.chain.keySizeBits, key.chain.tagSizeBits)
-                    // slowMacKey authenticates the MACK; the current key authenticates its tags
-                    if (mackValid(mack, slowMacKey, svn, gstSlowMac)) {
-                        processMackSlowMac(mack, key, svn, gstSlowMac, stored.nmaStatus)
-                    }
+                // slowMacKey authenticates the MACK; the current key authenticates its tags
+                pageStore.get(svn, gstSlowMac)?.let { processMack(it, slowMacKey, key, gstSlowMac, slowMac = true) }
+            }
+        }
+    }
+
+    /**
+     * Verifies the tags of a MACK message, using only the parts that were received.
+     *
+     * - The MACSEQ (ICD 6.6) protects the Tag-Info of the flexible tags. It's checked when its
+     *   pages are there; a wrong MACSEQ rejects the whole MACK. Without it, flexible tags are
+     *   skipped.
+     * - Each tag whose pages were received is checked against the MAC look-up table and verified.
+     *   The tag MAC binds the PRND, PRNA, GST, counter and NMA status, and fixed tags' Tag-Info
+     *   isn't covered by the MACSEQ anyway, so this is as strong as with the complete MACK.
+     */
+    private fun processMack(
+        pages: PageStore.SubframePages,
+        macseqKey: TeslaKey,
+        tagKey: TeslaKey,
+        gstMack: Gst,
+        slowMac: Boolean
+    ) {
+        // The NMA status is an input to the tag MACs: from page 0 of any satellite
+        val nmaStatus = pageStore.header(gstMack)?.nmaStatus ?: return
+        val chain = tagKey.chain
+        val prna = pages.svn
+        if (!MacLookupTable.isKnown(chain.macLookupTable)) {
+            stats.mackFailed++
+            return
+        }
+        val mack = Mack(pages.mack, chain.keySizeBits, chain.tagSizeBits)
+        val step = chain.tagSizeBits + 16
+        val msg = (gstMack.tow / 30) % 2
+        val flex = MacLookupTable.flexIndices(chain.macLookupTable, msg)!!
+        val headerReceived = pages.hasMackBits(0, step)
+        val macseqVerified = if (headerReceived && flex.all { pages.hasMackBits(it * step + chain.tagSizeBits, 16) }) {
+            if (!macseqKey.verifyMacseq(mack, prna, gstMack)) {
+                stats.mackFailed++
+                event(gstMack, OsnmaEvent.Type.ERROR, "Wrong MACSEQ from E%02d".format(prna))
+                return
+            }
+            true
+        } else false
+
+        val usable = ArrayList<Int>()
+        for (j in 1 until mack.numTags) {
+            if (!pages.hasMackBits(j * step, step)) continue
+            if (j in flex && !macseqVerified) continue
+            if (!chain.adkdValid(j, mack.tag(j), prna, gstMack)) {
+                if (macseqVerified && pages.complete) {
+                    stats.mackFailed++
+                    event(gstMack, OsnmaEvent.Type.ERROR, "Tag $j from E%02d doesn't match the MAC look-up table".format(prna))
+                    return
+                }
+                continue
+            }
+            usable.add(j)
+        }
+
+        val gstNav = gstMack.addSeconds(-30)
+        if (!slowMac) {
+            // Tag0: self-authentication of the CED and status of the transmitting satellite
+            if (headerReceived) {
+                verifyTagFor(tagKey, mack, 0, mack.cop, Adkd.INAV_CED, prna, prna, gstMack, gstNav, nmaStatus)
+            }
+            for (j in usable) {
+                val tag = mack.tag(j)
+                if ((tag.adkd == Adkd.INAV_CED || tag.adkd == Adkd.INAV_TIMING) && tag.prnd in 1..36) {
+                    verifyTagFor(tagKey, mack, j, tag.cop, tag.adkd, tag.prnd, prna, gstMack, gstNav, nmaStatus)
+                }
+                // Slow MAC tags need a key with an extra delay
+            }
+        } else {
+            for (j in usable) {
+                val tag = mack.tag(j)
+                if (tag.adkd == Adkd.SLOW_MAC && tag.prnd in 1..36) {
+                    verifyTagFor(tagKey, mack, j, tag.cop, Adkd.SLOW_MAC, tag.prnd, prna, gstMack, gstNav, nmaStatus)
                 }
             }
-        }
-    }
-
-    private fun mackValid(mack: Mack, key: TeslaKey, prna: Int, gstMack: Gst): Boolean {
-        if (!MacLookupTable.isKnown(key.chain.macLookupTable)) {
-            stats.mackFailed++
-            return false
-        }
-        if (!key.verifyMacseq(mack, prna, gstMack)) {
-            stats.mackFailed++
-            event(gstMack, OsnmaEvent.Type.ERROR, "Wrong MACSEQ from E%02d".format(prna))
-            return false
-        }
-        for (j in 1 until mack.numTags) {
-            if (!key.chain.adkdValid(j, mack.tag(j), prna, gstMack)) {
-                stats.mackFailed++
-                event(gstMack, OsnmaEvent.Type.ERROR, "Tag $j from E%02d doesn't match the MAC look-up table".format(prna))
-                return false
-            }
-        }
-        return true
-    }
-
-    private fun processMack(mack: Mack, key: TeslaKey, prna: Int, gstMack: Gst, nmaStatus: NmaStatus) {
-        val gstNav = gstMack.addSeconds(-30)
-        // Tag0: self-authentication of the CED and status of the transmitting satellite
-        verifyTagFor(key, mack, 0, mack.cop, Adkd.INAV_CED, prna, prna, gstMack, gstNav, nmaStatus)
-        for (j in 1 until mack.numTags) {
-            val tag = mack.tag(j)
-            if (tag.adkd == Adkd.INAV_CED || tag.adkd == Adkd.INAV_TIMING) {
-                if (tag.prnd !in 1..36) continue
-                verifyTagFor(key, mack, j, tag.cop, tag.adkd, tag.prnd, prna, gstMack, gstNav, nmaStatus)
-            }
-            // Slow MAC tags need a key with an extra delay; see processMackSlowMac
-        }
-    }
-
-    private fun processMackSlowMac(mack: Mack, key: TeslaKey, prna: Int, gstMack: Gst, nmaStatus: NmaStatus) {
-        val gstNav = gstMack.addSeconds(-30)
-        for (j in 1 until mack.numTags) {
-            val tag = mack.tag(j)
-            if (tag.adkd != Adkd.SLOW_MAC || tag.prnd !in 1..36) continue
-            verifyTagFor(key, mack, j, tag.cop, Adkd.SLOW_MAC, tag.prnd, prna, gstMack, gstNav, nmaStatus)
         }
     }
 
@@ -559,8 +717,8 @@ class OsnmaEngine(
 
     val statistics: OsnmaStatistics
         get() = stats.copy(
-            subframesStarted = subframes.started,
-            subframesCompletedCounted = stats.subframes - subframes.firstCompleted
+            subframesStarted = pageStore.started,
+            subframesCompletedCounted = stats.subframes - pageStore.firstCompleted
         )
 
     fun status(): OsnmaStatus {
@@ -593,6 +751,8 @@ class OsnmaEngine(
             chainInForce = chainInForce,
             teslaKey = current?.let { TeslaKeyInfo(it.chain, it.gstSubframe) },
             alertMessage = alertReceived,
+            warmStart = warmStart && current != null,
+            krootProgress = lastKrootDsmId?.let { dsmAssembler.progress(it) },
             satellites = sats,
             events = events.toList(),
             statistics = statistics
@@ -605,6 +765,9 @@ class OsnmaEngine(
     companion object {
         const val MAX_EVENTS = 50
         private const val DUMMY_WORD_TYPE = 63
+        private const val MAX_KEY_ATTEMPTS = 3
+        private const val MAX_WARM_START_FAILURES = 3
+        private const val PageStoreDepth = 13
     }
 }
 
@@ -697,6 +860,10 @@ data class OsnmaStatus(
     val chainInForce: Int?,
     val teslaKey: TeslaKeyInfo?,
     val alertMessage: Boolean,
+    /** The chain in force comes from a TESLA key stored in an earlier session */
+    val warmStart: Boolean,
+    /** Blocks of the DSM-KROOT received so far and the number needed (0 until known) */
+    val krootProgress: Pair<Int, Int>?,
     val satellites: List<SatelliteAuthStatus>,
     val events: List<OsnmaEvent>,
     val statistics: OsnmaStatistics
@@ -711,7 +878,7 @@ data class OsnmaStatus(
             gst == null -> Phase.NO_DATA
             statistics.osnmaPages == 0L -> Phase.NO_OSNMA
             nmaHeader?.nmaStatus == NmaStatus.DONT_USE -> Phase.DONT_USE
-            publicKey == null -> Phase.WAITING_FOR_PUBLIC_KEY
+            publicKey == null && teslaKey == null -> Phase.WAITING_FOR_PUBLIC_KEY
             teslaKey == null -> Phase.WAITING_FOR_KROOT
             authenticatedSatellites.isEmpty() -> Phase.WAITING_FOR_TAGS
             else -> Phase.AUTHENTICATING

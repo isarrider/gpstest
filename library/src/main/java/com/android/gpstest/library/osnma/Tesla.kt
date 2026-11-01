@@ -98,10 +98,10 @@ class TeslaKey internal constructor(
      * Uses this (authenticated) key to authenticate [other], a later key of the same chain
      * (ICD section 6.4). Returns true if [other] is genuine.
      */
-    fun authenticates(other: TeslaKey): Boolean {
+    fun authenticates(other: TeslaKey, maxDerivations: Int = MAX_DERIVATIONS): Boolean {
         if (other.chain != chain || other.gstSubframe <= gstSubframe) return false
         val steps = other.gstSubframe.subframesSince(gstSubframe)
-        if (steps > MAX_DERIVATIONS) return false
+        if (steps > maxDerivations) return false
         return other.derive(steps).data.contentEquals(data)
     }
 
@@ -158,8 +158,53 @@ class TeslaKey internal constructor(
 
     override fun toString(): String = "TESLA key CID ${chain.chainId} at $gstSubframe"
 
+    fun toStored(): StoredTeslaKey = StoredTeslaKey(chain, data.copyOf(), gstSubframe)
+
     companion object {
         /** Arbitrary limit (slightly more than one day) on key derivations */
         const val MAX_DERIVATIONS = 3000
+
+        /**
+         * Limit when starting from a key stored in an earlier session: 30 days. Deriving that
+         * many keys takes well under a second.
+         */
+        const val MAX_DERIVATIONS_STORED = 30 * 24 * 120
+    }
+}
+
+/**
+ * An authenticated TESLA key with its chain parameters, saved between sessions for a warm start.
+ *
+ * Any later key of the same chain can be authenticated with it by applying the one-way function
+ * (ICD 6.4), so a receiver that remembers it doesn't need to wait for the DSM-KROOT again. It's
+ * dropped as soon as the signal says the chain changed or was revoked.
+ */
+class StoredTeslaKey(val chain: TeslaChain, val key: ByteArray, val gstSubframe: Gst) {
+
+    /** Compact text form for storage */
+    fun encode(): String = listOf(
+        chain.chainId, chain.hashFunction.name, chain.macFunction.name, chain.keySizeBytes,
+        chain.tagSizeBits, chain.macLookupTable, chain.alpha, gstSubframe.wn, gstSubframe.tow,
+        Bits.toHex(key)
+    ).joinToString("|")
+
+    companion object {
+        fun decode(text: String): StoredTeslaKey? = try {
+            val f = text.split('|')
+            val chain = TeslaChain(
+                chainId = f[0].toInt(),
+                hashFunction = HashFunction.valueOf(f[1]),
+                macFunction = MacFunction.valueOf(f[2]),
+                keySizeBytes = f[3].toInt(),
+                tagSizeBits = f[4].toInt(),
+                macLookupTable = f[5].toInt(),
+                alpha = f[6].toLong()
+            )
+            val gst = Gst(f[7].toInt(), f[8].toInt())
+            val key = Bits.fromHex(f[9])
+            if (key.size == chain.keySizeBytes && gst.isSubframe) StoredTeslaKey(chain, key, gst) else null
+        } catch (e: Exception) {
+            null
+        }
     }
 }

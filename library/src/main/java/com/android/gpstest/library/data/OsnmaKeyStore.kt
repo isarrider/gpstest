@@ -23,6 +23,7 @@ import com.android.gpstest.library.osnma.ImportedKeyMaterial
 import com.android.gpstest.library.osnma.KeySource
 import com.android.gpstest.library.osnma.OsnmaKeyFiles
 import com.android.gpstest.library.osnma.OsnmaPublicKey
+import com.android.gpstest.library.osnma.StoredTeslaKey
 
 /**
  * Persists the OSNMA cryptographic material in SharedPreferences: public keys received from the
@@ -119,8 +120,21 @@ object OsnmaKeyStore {
         prefs.edit()
             .putString(context.getString(R.string.pref_key_osnma_revoked_merkle_root), current)
             .remove(context.getString(R.string.pref_key_osnma_public_keys))
+            .remove(context.getString(R.string.pref_key_osnma_tesla_key))
             .remove(context.getString(R.string.pref_key_osnma_merkle_root))
             .apply()
+    }
+
+    /** The last verified TESLA key, for a warm start, or null */
+    fun teslaKey(context: Context, prefs: SharedPreferences): StoredTeslaKey? =
+        prefs.getString(context.getString(R.string.pref_key_osnma_tesla_key), null)?.let { StoredTeslaKey.decode(it) }
+
+    fun saveTeslaKey(context: Context, prefs: SharedPreferences, key: StoredTeslaKey) {
+        prefs.edit().putString(context.getString(R.string.pref_key_osnma_tesla_key), key.encode()).apply()
+    }
+
+    fun clearTeslaKey(context: Context, prefs: SharedPreferences) {
+        prefs.edit().remove(context.getString(R.string.pref_key_osnma_tesla_key)).apply()
     }
 
     /** Forgets all stored keys and the imported Merkle tree root */
@@ -128,6 +142,7 @@ object OsnmaKeyStore {
         prefs.edit()
             .remove(context.getString(R.string.pref_key_osnma_public_keys))
             .remove(context.getString(R.string.pref_key_osnma_merkle_root))
+            .remove(context.getString(R.string.pref_key_osnma_tesla_key))
             .apply()
     }
 
