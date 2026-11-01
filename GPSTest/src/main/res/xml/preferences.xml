@@ -135,6 +135,11 @@
                     android:summary="@string/pref_file_orientation_output_summary"
                     android:defaultValue="false" />
                 <CheckBoxPreference
+                    android:key="@string/pref_key_file_osnma_output"
+                    android:title="@string/pref_file_osnma_output_title"
+                    android:summary="@string/pref_file_osnma_output_summary"
+                    android:defaultValue="false" />
+                <CheckBoxPreference
                     android:key="@string/pref_key_file_location_output"
                     android:title="@string/pref_file_location_output_title"
                     android:summary="@string/pref_file_location_output_summary"

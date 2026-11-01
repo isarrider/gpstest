@@ -136,6 +136,8 @@ internal class DsmAssembler {
     private class Entry {
         val blocks = arrayOfNulls<ByteArray>(MAX_BLOCKS)
         val masks = IntArray(MAX_BLOCKS)
+        /** Bytes restored from an earlier session and not received again since */
+        val restoredMasks = IntArray(MAX_BLOCKS)
         var lastProcessed: ByteArray? = null
     }
 
@@ -149,6 +151,7 @@ internal class DsmAssembler {
         val block = entry.blocks[blockId] ?: ByteArray(BLOCK_BYTES).also { entry.blocks[blockId] = it }
         block[index] = value
         entry.masks[blockId] = entry.masks[blockId] or (1 shl index)
+        entry.restoredMasks[blockId] = entry.restoredMasks[blockId] and (1 shl index).inv()
         return completed(dsmId, entry)
     }
 
@@ -183,6 +186,56 @@ internal class DsmAssembler {
     }
 
     fun clear() = entries.clear()
+
+    /**
+     * Called when the assembled DSM [dsmId] failed verification: drops the bytes restored from an
+     * earlier session that haven't been received again, since they may be outdated. Bytes
+     * received in this session are kept; wrong ones get overwritten as pages keep coming.
+     */
+    fun dropRestored(dsmId: Int) {
+        val entry = entries[dsmId] ?: return
+        for (b in 0 until MAX_BLOCKS) {
+            entry.masks[b] = entry.masks[b] and entry.restoredMasks[b].inv()
+            entry.restoredMasks[b] = 0
+        }
+        entry.lastProcessed = null
+    }
+
+    /**
+     * Collected bytes as text, to continue collecting in a later session. Format: entries
+     * separated by ';', each "dsmId:blockId=maskHex/bytesHex,...".
+     */
+    fun export(): String = entries.entries.sortedBy { it.key }.joinToString(";") { (id, e) ->
+        val blocks = (0 until MAX_BLOCKS).filter { e.masks[it] != 0 }.joinToString(",") {
+            "$it=${Integer.toHexString(e.masks[it])}/${Bits.toHex(e.blocks[it]!!)}"
+        }
+        "$id:$blocks"
+    }
+
+    /** Restores bytes saved with [export]; invalid text is ignored */
+    fun import(text: String) {
+        try {
+            for (part in text.split(';')) {
+                if (part.isBlank()) continue
+                val id = part.substringBefore(':').toInt()
+                if (id !in 0 until MAX_BLOCKS) continue
+                val entry = Entry()
+                for (block in part.substringAfter(':').split(',')) {
+                    if (block.isBlank()) continue
+                    val blockId = block.substringBefore('=').toInt()
+                    val mask = block.substringAfter('=').substringBefore('/').toInt(16)
+                    val bytes = Bits.fromHex(block.substringAfter('/'))
+                    if (blockId !in 0 until MAX_BLOCKS || bytes.size != BLOCK_BYTES) continue
+                    entry.blocks[blockId] = bytes
+                    entry.masks[blockId] = mask and FULL_BLOCK
+                    entry.restoredMasks[blockId] = mask and FULL_BLOCK
+                }
+                entries[id] = entry
+            }
+        } catch (e: Exception) {
+            entries.clear()
+        }
+    }
 
     companion object {
         const val MAX_BLOCKS = 16

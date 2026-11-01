@@ -17,7 +17,9 @@ package com.android.gpstest.library.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.location.GnssMeasurementsEvent
 import android.location.GnssNavigationMessage
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import com.android.gpstest.library.R
@@ -80,7 +82,9 @@ data class OsnmaUiState(
     /** Pages restored from two messages whose halves were paired the wrong way round */
     val pagesRepaired: Long = 0,
     /** Bit offset of the page in the platform's data (0 as documented, 4 on some devices) */
-    val layoutOffsetBits: Int? = null
+    val layoutOffsetBits: Int? = null,
+    /** Page times are estimated with the receiver's GNSS clock (GnssClock) */
+    val timingUsesReceiverClock: Boolean = false
 ) {
     /**
      * Pages arrive, but too many are missing to complete the OSNMA subframes, or they stopped.
@@ -133,6 +137,7 @@ class OsnmaRepository @Inject constructor(
     private var clockOffsetSeconds: Long? = null
     private var engineKeys: Set<String> = emptySet()
     private var lastKeySaveMillis = 0L
+    private var lastDsmSaveMillis = 0L
     private var pagesWithoutTime = 0L
     private var pagesWrongSize = 0L
     private var pagesParityPassed = 0L
@@ -287,10 +292,46 @@ class OsnmaRepository @Inject constructor(
             }
             val e = engine ?: newEngine().also { engine = it }
             e.feedPage(svid, gst, page, checkCrc = !trustPlatformParity, timeCertain = timeTracker.lastTimeCertain)
+            saveDsm(e, force = false)
         } else {
             pagesWithoutTime++
         }
         publish(force = false)
+    }
+
+    /**
+     * Keeps the DSM bytes collected so far, so that the next session doesn't have to receive
+     * every part of the TESLA root key again (important on devices that miss most pages)
+     */
+    private fun saveDsm(e: OsnmaEngine, force: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - lastDsmSaveMillis < KEY_SAVE_INTERVAL_MILLIS) return
+        lastDsmSaveMillis = now
+        if (OsnmaKeyStore.isRevoked(context, prefs)) return
+        val dsm = e.exportDsm()
+        if (dsm.isNotEmpty()) OsnmaKeyStore.saveDsm(context, prefs, dsm)
+    }
+
+    /**
+     * Called for every GNSS measurement event. The receiver clock (GnssClock) gives the GNSS time
+     * at a known local time, which places pages in time without waiting for a time stamp in the
+     * data, and despite delivery jitter.
+     */
+    fun onMeasurements(event: GnssMeasurementsEvent) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val clock = event.clock
+        if (!clock.hasFullBiasNanos()) return
+        // A bias uncertainty above 1 ms means the receiver doesn't know the time well yet
+        if (clock.hasBiasUncertaintyNanos() && clock.biasUncertaintyNanos > 1_000_000.0) return
+        val bias = if (clock.hasBiasNanos()) clock.biasNanos else 0.0
+        val gpsNanos = clock.timeNanos - clock.fullBiasNanos - bias.toLong()
+        if (gpsNanos <= 0) return
+        val gstMillis = gpsNanos / 1_000_000 - GST_GPS_WEEK_OFFSET_MILLIS
+        // Same clock as SystemClock.elapsedRealtime(), used for the page arrival times
+        if (!clock.hasElapsedRealtimeNanos()) return
+        val elapsedMillis = clock.elapsedRealtimeNanos / 1_000_000
+        if (elapsedMillis <= 0 || gstMillis <= 0) return
+        executor.execute { timeTracker.updateReceiverClock(elapsedMillis, gstMillis) }
     }
 
     private fun newEngine(): OsnmaEngine {
@@ -300,7 +341,8 @@ class OsnmaRepository @Inject constructor(
             merkleRoot = OsnmaKeyStore.merkleRoot(context, prefs),
             initialKeys = keys,
             listener = listener,
-            storedKey = OsnmaKeyStore.teslaKey(context, prefs)
+            storedKey = OsnmaKeyStore.teslaKey(context, prefs),
+            storedDsm = OsnmaKeyStore.dsm(context, prefs)
         )
     }
 
@@ -324,6 +366,7 @@ class OsnmaRepository @Inject constructor(
     }
 
     private fun resetEngine() {
+        engine?.let { saveDsm(it, force = true) }
         engine = null
         timeTracker.reset()
         assembler.reset()
@@ -360,7 +403,8 @@ class OsnmaRepository @Inject constructor(
             pagesCorrupted = pagesCorrupted,
             inavSeenBefore = inavSeen,
             pagesRepaired = assembler.repaired,
-            layoutOffsetBits = layout.offsetBits
+            layoutOffsetBits = layout.offsetBits,
+            timingUsesReceiverClock = timeTracker.usingReceiverClock
         )
     }
 
@@ -373,6 +417,9 @@ class OsnmaRepository @Inject constructor(
 
         /** GPS time - UTC, in seconds (leap seconds since 1980, unchanged since 2017) */
         private const val GPS_UTC_LEAP_SECONDS = 18L
+
+        /** The GST week 0 starts at GPS week 1024 */
+        private const val GST_GPS_WEEK_OFFSET_MILLIS = 1024L * 7 * 24 * 3600 * 1000
 
         /** GST from a UTC time in milliseconds since the Unix epoch */
         fun deviceGstSeconds(utcMillis: Long): Long {

@@ -24,7 +24,9 @@ import kotlin.math.floor
  *
  * 1. Word types 0 (with time), 5 and 6 carry the GST at the start of their page. Each gives a
  *    sample of the offset between the local clock and GST (mostly decoding and delivery latency).
- * 2. Other pages get a rough estimate from the arrival time and the median offset.
+ * 2. Other pages get a rough estimate from the arrival time: with the receiver clock when the
+ *    platform provides it (GnssClock, see [updateReceiverClock]) and the typical delivery delay,
+ *    otherwise with the median offset of the time stamps.
  * 3. The estimate is then snapped to the page slot implied by the word type: the E1-B nominal
  *    subframe has a fixed word sequence (OS SIS ICD 4.3.2). When the platform reports the
  *    subframe number within the 720 s frame (getMessageId, 1-24) and it agrees with the time
@@ -46,6 +48,29 @@ class InavTimeTracker(
 
     /** Start of the last page of each satellite whose time was certain */
     private val lastCertain = HashMap<Int, Long>()
+
+    // Receiver clock: local monotonic time minus GST, both in ms, and when it was measured
+    private var receiverOffsetMillis: Long? = null
+    private var receiverOffsetAt = 0L
+
+    // Delay between the end of a page and its delivery, from pages with time stamps
+    private val delaySamples = ArrayDeque<Long>()
+
+    /** True if the receiver clock is being used for page timing */
+    val usingReceiverClock: Boolean get() = receiverOffsetMillis != null
+
+    /**
+     * Provides the receiver's GNSS time: [gstMillis] (GST in ms since the GST epoch) at the local
+     * monotonic time [elapsedMillis]. Android gives both in GnssClock (FullBiasNanos and
+     * ElapsedRealtimeNanos).
+     */
+    fun updateReceiverClock(elapsedMillis: Long, gstMillis: Long) {
+        receiverOffsetMillis = elapsedMillis - gstMillis
+        receiverOffsetAt = elapsedMillis
+    }
+
+    private fun receiverOffset(arrivalMillis: Long): Long? =
+        receiverOffsetMillis?.takeIf { abs(arrivalMillis - receiverOffsetAt) <= MAX_RECEIVER_CLOCK_AGE_MILLIS }
 
     // Consistency of the platform's subframe numbers with the time stamps in the data
     private var subframeNumberAgree = 0
@@ -85,7 +110,8 @@ class InavTimeTracker(
         arrivalMillis: Long,
         subframeNumber: Int = -1
     ): Gst? {
-        val exact = page.gstFromWord(weekNumber)
+        val wn = weekNumber ?: receiverOffset(arrivalMillis)?.let { ((arrivalMillis - it) / 1000 / Gst.SECS_IN_WEEK).toInt() }
+        val exact = page.gstFromWord(wn)
         if (exact != null) {
             if (page.wordType != 6) weekNumber = exact.wn
             checkSubframeNumber(exact, subframeNumber)
@@ -97,6 +123,13 @@ class InavTimeTracker(
             lastCertain[svn] = exact.totalSeconds
             samples.addLast(Sample(arrivalMillis - exact.totalSeconds * 1000, arrivalMillis))
             while (samples.size > maxSamples) samples.removeFirst()
+            receiverOffset(arrivalMillis)?.let { offset ->
+                val delay = arrivalMillis - offset - (exact.totalSeconds * 1000 + 2000)
+                if (delay in -2000..10_000) {
+                    delaySamples.addLast(delay)
+                    while (delaySamples.size > maxSamples) delaySamples.removeFirst()
+                }
+            }
             return exact
         }
         lastWasExact = false
@@ -118,10 +151,16 @@ class InavTimeTracker(
         while (samples.isNotEmpty() && arrivalMillis - samples.first().arrivalMillis > maxSampleAgeMillis) {
             samples.removeFirst()
         }
-        if (samples.isEmpty()) return null
-        val sorted = samples.map { it.offsetMillis }.sorted()
-        val offset = sorted[sorted.size / 2]
-        val roughMillis = arrivalMillis - offset
+        val receiver = receiverOffset(arrivalMillis)
+        val roughMillis = if (receiver != null) {
+            // Page start = delivery time in GST - delivery delay - 2 s page duration
+            val delay = if (delaySamples.isEmpty()) DEFAULT_DELAY_MILLIS else delaySamples.sorted()[delaySamples.size / 2]
+            arrivalMillis - receiver - delay - 2000
+        } else {
+            if (samples.isEmpty()) return null
+            val sorted = samples.map { it.offsetMillis }.sorted()
+            arrivalMillis - sorted[sorted.size / 2]
+        }
         // Nearest page start (odd second)
         val rough = 2 * floor((roughMillis - 1000) / 2000.0 + 0.5).toLong() + 1
 
@@ -150,6 +189,8 @@ class InavTimeTracker(
         samples.clear()
         weekNumber = null
         lastCertain.clear()
+        delaySamples.clear()
+        receiverOffsetMillis = null
         subframeNumberAgree = 0
         subframeNumberDisagree = 0
     }
@@ -165,6 +206,12 @@ class InavTimeTracker(
 
         /** Subframe (0-23) of [gstSeconds] within its 720 s frame */
         fun subframeOf(gstSeconds: Long): Int = ((gstSeconds % FRAME_SECONDS) / SUBFRAME_SECONDS).toInt()
+
+        /** Receiver clock readings older than this aren't used */
+        private const val MAX_RECEIVER_CLOCK_AGE_MILLIS = 120_000L
+
+        /** Typical delay between the end of a page and its delivery, until measured */
+        private const val DEFAULT_DELAY_MILLIS = 500L
 
         /** Required difference between the best and second best slot for a certain time */
         private const val MIN_MARGIN_SECONDS = 4L

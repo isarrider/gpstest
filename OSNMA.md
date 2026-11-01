@@ -41,6 +41,21 @@ authenticated satellites. Tap it to expand: the fields above, tag counts by type
 slow MAC), page counters (received, used, without time, not nominal, CRC errors), device parity,
 subframe completeness, page timing, clock offset and the latest events.
 
+### Satellite list and sky view
+
+Galileo satellites are marked in the satellite list on the Status screen (next to the ID) and in
+the sky view (at the upper right of the triangle):
+
+- **Green closed lock**: the satellite's ephemeris, clock and health data is authenticated.
+- **Red open lock**: a tag of this satellite failed in the last 10 minutes.
+
+### Warning notification
+
+When a tag fails, GPSTest posts a notification ("Galileo authentication failed") naming the
+satellites, at most once every 10 minutes. It has its own notification channel, *Galileo OSNMA
+warnings*, so it can be turned off in Android's notification settings without affecting the
+tracking notification.
+
 ### Red states
 
 - **FAILED TAGS**: a MAC tag didn't match the received navigation data. This can be caused by
@@ -81,8 +96,8 @@ OSNMA needs the Galileo ECDSA public key to verify the TESLA root key. Nothing h
    - `OSNMA_PublicKey_*.crt` or a PEM public key. The PKID is taken from the file name
      (`…PKID_2…`).
 
-**Forget OSNMA keys** deletes the stored public keys and any imported Merkle tree. The built-in key
-stays.
+**Forget OSNMA keys** deletes the stored public keys, any imported Merkle tree, the saved TESLA
+key and the saved parts of the TESLA root key. The built-in key stays.
 **Authenticate Galileo navigation data** turns the feature off.
 
 ## What is verified
@@ -146,6 +161,12 @@ OSNMA messages page by page instead of waiting for complete 30 s subframes:
   the root key. The saved key is dropped as soon as the signal shows a different chain in force,
   a revoked chain or key, an alert message, or a "don't use" status, and when keys are forgotten
   in the settings. The details then show the TESLA chain as "(from the previous session)".
+- **Root key parts kept between sessions.** The parts of the TESLA root key (DSM-KROOT) and of
+  public key messages received so far are saved every minute and when tracking stops. The next
+  session continues collecting where the last one stopped, which matters on phones that miss
+  most pages. Saved parts older than 3 days are ignored. They can't do harm: a message is only
+  used once its signature or Merkle tree path checks out, and if the check fails, the saved
+  parts are dropped and the message is collected again from the signal.
 
 On the GSC test data with pages dropped at random, authentication still works when most pages
 are missing (24 satellites at 30 % loss, 17 satellites at 70 % loss), where complete subframes
@@ -209,3 +230,23 @@ that carry it (word types 0, 5 and 6) and places other pages in the slot their w
 in the fixed E1-B subframe sequence. This tolerates delivery delays of several seconds. Pages
 that fail the CRC are never used for timing. The **Page timing** and **Clock offset** rows show
 how this is going.
+
+On devices that provide raw GNSS measurements, the receiver's own clock (`GnssClock`, Android 10
+and later) gives the GNSS time at a known moment. GPSTest then estimates each page's time from
+its arrival, without waiting for the first time stamp in the data, and only uses the word type
+to settle on the exact slot. **Page timing** then says "From the receiver clock". The Galileo
+time read from the signal is still compared with the device clock.
+
+## Logging
+
+With **Settings > Logging and Output > File Output > Galileo OSNMA** turned on (off by default), GPSTest
+writes the OSNMA result to the CSV log file every 30 seconds, one record per satellite that
+sends OSNMA data:
+
+```
+OSNMA,UnixTimeMillis,GstWeek,GstTimeOfWeekSeconds,Phase,NmaStatus,ChainId,PublicKeyId,Svid,CedAuthenticated,CedAuthBits,TimingAuthenticated,TimingAuthBits,TagsOk,TagsFailed
+```
+
+`Phase` is the overall state (for example `WAITING_FOR_KROOT` or `AUTHENTICATING`). Before any
+satellite sends OSNMA data, a single record with empty satellite fields is written. To record
+the raw pages too, turn on **Navigation messages** in the same category.

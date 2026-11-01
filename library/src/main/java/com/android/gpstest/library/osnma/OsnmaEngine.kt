@@ -42,7 +42,9 @@ class OsnmaEngine(
     /** Only process Slow MAC (ADKD 12) tags, as recommended when time sync is loose */
     private val onlySlowMac: Boolean = false,
     /** A TESLA key verified in an earlier session, to start without the DSM-KROOT */
-    storedKey: StoredTeslaKey? = null
+    storedKey: StoredTeslaKey? = null,
+    /** DSM bytes collected in an earlier session (see [exportDsm]) */
+    storedDsm: String? = null
 ) {
 
     interface Listener {
@@ -75,6 +77,8 @@ class OsnmaEngine(
     private var warmStart = false
     private var warmStartFailures = 0
     private var lastKrootDsmId: Int? = null
+    private var krootDsmIdInProcess: Int? = null
+    private var pkrDsmIdInProcess: Int? = null
 
     // Public keys: the one in force and possibly the next one (ICD section 5.3)
     private var currentPubKey: OsnmaPublicKey? = null
@@ -118,7 +122,15 @@ class OsnmaEngine(
             chainInForce = it.chain.chainId
             warmStart = true
         }
+        storedDsm?.let { dsmAssembler.import(it) }
     }
+
+    /**
+     * DSM bytes collected so far, so that a later session can continue collecting the TESLA root
+     * key instead of starting over. Whatever is restored is still verified (ECDSA signature,
+     * Merkle tree), and bytes of a DSM that fails verification are dropped.
+     */
+    fun exportDsm(): String = dsmAssembler.export()
 
     // ------------------------------------------------------------------------------------------
     // Input
@@ -226,8 +238,10 @@ class OsnmaEngine(
         val completed = dsmAssembler.write(dsmId, blockId, page - 2, pages.hkroot[page]) ?: return
         val gst = pages.gstSubframe
         if (completed.isPkr) {
+            pkrDsmIdInProcess = completed.id
             processDsmPkr(DsmPkr(completed.data), gst)
         } else {
+            krootDsmIdInProcess = completed.id
             processDsmKroot(DsmKroot(completed.data), gst)
         }
     }
@@ -274,6 +288,8 @@ class OsnmaEngine(
         if (header == null) {
             stats.krootFailed++
             event(gst, OsnmaEvent.Type.ERROR, "Could not verify KROOT with PKID $pkid: $error")
+            // Bytes restored from an earlier session may be outdated: collect those anew
+            krootDsmIdInProcess?.let { dsmAssembler.dropRestored(it) }
             return
         }
         stats.krootVerified++
@@ -361,6 +377,7 @@ class OsnmaEngine(
                 val key = tree.publicKeyFrom(pkr)
                 if (key == null) {
                     stats.pkrFailed++
+                    pkrDsmIdInProcess?.let { dsmAssembler.dropRestored(it) }
                     event(gst, OsnmaEvent.Type.ERROR, "Could not verify public key PKID ${pkr.newPublicKeyId} against the Merkle tree")
                 } else {
                     stats.pkrVerified++
@@ -871,6 +888,27 @@ data class OsnmaStatus(
     val authenticatedSatellites: List<SatelliteAuthStatus>
         get() = satellites.filter { it.cedAuthenticated }
 
+    /** Satellites with a failed tag in the last [seconds] */
+    fun recentFailures(seconds: Long = RECENT_FAILURE_SECONDS): List<SatelliteAuthStatus> {
+        val now = gst ?: return emptyList()
+        return satellites.filter { sat ->
+            val last = sat.lastFailureGst
+            last != null && now.totalSeconds - last.totalSeconds <= seconds
+        }
+    }
+
+    /**
+     * Marks for satellite lists and the sky view, by Galileo SVN: authenticated satellites, and
+     * satellites with recently failed tags (which take precedence)
+     */
+    fun marks(): Map<Int, OsnmaMark> {
+        if (phase == Phase.ALERT || phase == Phase.DONT_USE) return emptyMap()
+        val marks = HashMap<Int, OsnmaMark>()
+        authenticatedSatellites.forEach { marks[it.svn] = OsnmaMark.AUTHENTICATED }
+        recentFailures().forEach { marks[it.svn] = OsnmaMark.FAILED }
+        return marks
+    }
+
     /** Overall state, in order of progress */
     val phase: Phase
         get() = when {
@@ -888,4 +926,12 @@ data class OsnmaStatus(
         NO_DATA, NO_OSNMA, WAITING_FOR_PUBLIC_KEY, WAITING_FOR_KROOT, WAITING_FOR_TAGS,
         AUTHENTICATING, DONT_USE, ALERT
     }
+
+    companion object {
+        /** How long a satellite with a failed tag stays flagged */
+        const val RECENT_FAILURE_SECONDS = 600L
+    }
 }
+
+/** OSNMA state of a satellite, as shown in satellite lists */
+enum class OsnmaMark { AUTHENTICATED, FAILED }

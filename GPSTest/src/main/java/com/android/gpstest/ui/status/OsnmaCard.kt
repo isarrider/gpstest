@@ -158,7 +158,7 @@ private fun collapsedSummary(state: OsnmaUiState): String {
 private fun PhaseChip(state: OsnmaUiState) {
     val status = state.status
     val phase = if (state.keysRevoked) Phase.ALERT else status?.phase ?: Phase.NO_DATA
-    val failures = status != null && recentFailures(status).isNotEmpty()
+    val failures = status != null && status.recentFailures().isNotEmpty()
     val (color, textId) = when (phase) {
         Phase.AUTHENTICATING -> if (state.clockOffsetTooLarge) {
             Pair(MaterialTheme.colors.error, R.string.osnma_chip_time)
@@ -279,7 +279,7 @@ private fun Details(status: OsnmaStatus) {
             color = greenText
         )
     }
-    val failed = recentFailures(status)
+    val failed = status.recentFailures()
     if (failed.isNotEmpty()) {
         DetailRow(
             R.string.osnma_label_failed,
@@ -349,7 +349,11 @@ private fun Expanded(state: OsnmaUiState) {
             DetailRow(
                 R.string.osnma_label_timing,
                 stringResource(
-                    if (state.timingUsesSubframeNumbers) R.string.osnma_timing_subframe_numbers else R.string.osnma_timing_word_types,
+                    when {
+                        state.timingUsesReceiverClock -> R.string.osnma_timing_receiver_clock
+                        state.timingUsesSubframeNumbers -> R.string.osnma_timing_subframe_numbers
+                        else -> R.string.osnma_timing_word_types
+                    },
                     state.timingCorrections
                 )
             )
@@ -412,15 +416,6 @@ private fun SmallText(text: String, fontStyle: FontStyle = FontStyle.Normal) {
     )
 }
 
-/** Satellites with a failed tag in the last [RECENT_FAILURE_SECONDS] */
-private fun recentFailures(status: OsnmaStatus): List<SatelliteAuthStatus> {
-    val now = status.gst ?: return emptyList()
-    return status.satellites.filter { sat ->
-        val last = sat.lastFailureGst
-        last != null && now.totalSeconds - last.totalSeconds <= RECENT_FAILURE_SECONDS
-    }
-}
-
 /** Formats a GST as "WN 1385 Tue 14:30:00" */
 private fun formatGst(gst: Gst): String {
     val day = gst.tow / 86400
@@ -432,4 +427,3 @@ private fun formatGst(gst: Gst): String {
 }
 
 private const val MAX_EVENTS_SHOWN = 10
-private const val RECENT_FAILURE_SECONDS = 600L

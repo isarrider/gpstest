@@ -377,6 +377,8 @@
     <string name="pref_file_gnss_status_output_summary">Logs GnssStatus data per signal to the CSV file</string>
     <string name="pref_file_orientation_output_title">Orientation</string>
     <string name="pref_file_orientation_output_summary">Logs orientation sensor data to the CSV file</string>
+    <string name="pref_file_osnma_output_title">Galileo OSNMA</string>
+    <string name="pref_file_osnma_output_summary">Logs Galileo OSNMA authentication results to the CSV file, every 30 seconds</string>
     <string name="logging_to_new_file">Logging to new file: %1$s</string>
     <string name="unable_to_close_all_file_streams">Unable to close all file streams.</string>
     <string name="could_not_initialize_file">Count not initialize file: %1$s</string>
@@ -585,6 +587,13 @@
     <string name="osnma_label_timing">Page timing</string>
     <string name="osnma_timing_subframe_numbers">From word types and device subframe numbers, %1$d corrections</string>
     <string name="osnma_timing_word_types">From arrival time and word types, %1$d corrections</string>
+    <string name="osnma_timing_receiver_clock">From the receiver clock and word types, %1$d corrections</string>
+    <string name="osnma_mark_authenticated">Navigation data authenticated by Galileo OSNMA</string>
+    <string name="osnma_mark_failed">Galileo OSNMA authentication failed</string>
+    <string name="osnma_failure_channel_name">Galileo OSNMA warnings</string>
+    <string name="osnma_failure_channel_description">Warns when Galileo navigation data fails authentication</string>
+    <string name="osnma_failure_notification_title">Galileo authentication failed</string>
+    <string name="osnma_failure_notification_text">Navigation data of %1$s didn't match its OSNMA tag. This can be caused by corrupted data, but also by spoofing: don't trust these satellites.</string>
     <string name="osnma_label_clock_offset">Clock offset</string>
     <string name="osnma_clock_offset_value">%1$d s</string>
     <string name="osnma_subframes_value">%1$d of %2$d complete (%3$d%%)</string>

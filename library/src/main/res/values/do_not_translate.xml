@@ -112,6 +112,7 @@
     <string name="pref_key_file_location_output">file_location_output</string>
     <string name="pref_key_file_gnss_status_output">file_gnss_status_output</string>
     <string name="pref_key_file_orientation_output">file_orientation_output</string>
+    <string name="pref_key_file_osnma_output">file_osnma_output</string>
     <string name="pref_key_inject_time_when_logging">inject_time_when_logging</string>
     <string name="pref_key_inject_psds_when_logging">inject_psds_when_logging</string>
 
@@ -292,6 +293,7 @@
     <string name="pref_key_osnma_revoked_merkle_root">osnma_revoked_merkle_root</string>
     <string name="pref_key_osnma_inav_seen">osnma_inav_seen</string>
     <string name="pref_key_osnma_tesla_key">osnma_tesla_key</string>
+    <string name="pref_key_osnma_dsm">osnma_dsm</string>
 
     <!-- Google Sheets URL for device properties -->
     <string name="device_properties_upload_url">https://script.google.com/macros/s/AKfycbx2yxZwWTIUpC2q6xfRNwuRNjJQ6yfKSTCjYaSDWkBrJWe2ViA/exec</string>

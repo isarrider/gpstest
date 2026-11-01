@@ -121,6 +121,7 @@ object OsnmaKeyStore {
             .putString(context.getString(R.string.pref_key_osnma_revoked_merkle_root), current)
             .remove(context.getString(R.string.pref_key_osnma_public_keys))
             .remove(context.getString(R.string.pref_key_osnma_tesla_key))
+            .remove(context.getString(R.string.pref_key_osnma_dsm))
             .remove(context.getString(R.string.pref_key_osnma_merkle_root))
             .apply()
     }
@@ -137,12 +138,32 @@ object OsnmaKeyStore {
         prefs.edit().remove(context.getString(R.string.pref_key_osnma_tesla_key)).apply()
     }
 
+    /**
+     * DSM bytes (TESLA root key and public key messages) collected in an earlier session, or null
+     * if none were saved in the last [MAX_DSM_AGE_MILLIS]. Wrong bytes can't do harm: the
+     * messages are only used after their signature or Merkle tree check passes.
+     */
+    fun dsm(context: Context, prefs: SharedPreferences, nowUtcMillis: Long = System.currentTimeMillis()): String? {
+        val saved = prefs.getString(context.getString(R.string.pref_key_osnma_dsm), null) ?: return null
+        val savedAt = saved.substringBefore('|').toLongOrNull() ?: return null
+        if (nowUtcMillis - savedAt !in 0..MAX_DSM_AGE_MILLIS) return null
+        return saved.substringAfter('|').takeIf { it.isNotEmpty() }
+    }
+
+    fun saveDsm(context: Context, prefs: SharedPreferences, dsm: String, nowUtcMillis: Long = System.currentTimeMillis()) {
+        prefs.edit().putString(context.getString(R.string.pref_key_osnma_dsm), "$nowUtcMillis|$dsm").apply()
+    }
+
+    /** The TESLA root key is renewed rarely, but old pieces are of little use after a few days */
+    private const val MAX_DSM_AGE_MILLIS = 3 * 24 * 3600 * 1000L
+
     /** Forgets all stored keys and the imported Merkle tree root */
     fun clear(context: Context, prefs: SharedPreferences) {
         prefs.edit()
             .remove(context.getString(R.string.pref_key_osnma_public_keys))
             .remove(context.getString(R.string.pref_key_osnma_merkle_root))
             .remove(context.getString(R.string.pref_key_osnma_tesla_key))
+            .remove(context.getString(R.string.pref_key_osnma_dsm))
             .apply()
     }
 

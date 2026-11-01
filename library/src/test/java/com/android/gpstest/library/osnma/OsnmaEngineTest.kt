@@ -357,6 +357,68 @@ class OsnmaEngineTest {
         assertEquals(0, second.statistics.tagsOk)
     }
 
+    /**
+     * With the receiver clock (GnssClock), pages are timed without waiting for a time stamp and
+     * despite large delivery jitter.
+     */
+    @Test
+    fun timeTracker_receiverClock() {
+        val random = Random(3)
+        val tracker = InavTimeTracker()
+        val engine = newEngine()
+        var wrong = 0
+        var known = 0
+        val pages = TestVectors.configuration1()
+        pages.forEach { p ->
+            val elapsedBase = p.gst.totalSeconds * 1000 - 756_000_000_000L
+            // The receiver clock is known from the start; delivery 300 ms after the page, +-3 s jitter
+            tracker.updateReceiverClock(elapsedBase, p.gst.totalSeconds * 1000)
+            val arrival = elapsedBase + 2300 + random.nextInt(-3000, 3001)
+            val android = InavPage.fromAndroid(p.page.toByteArray())!!
+            val gst = tracker.gstFor(p.svn, android, arrival) ?: return@forEach
+            known++
+            if (gst != p.gst && android.wordType != 63) wrong++
+            engine.feedPage(p.svn, gst, android, timeCertain = tracker.lastTimeCertain)
+        }
+        assertTrue(tracker.usingReceiverClock)
+        // No waiting for the first time stamp
+        assertEquals(pages.size, known)
+        assertTrue("wrong $wrong", wrong < pages.size / 100)
+        assertEquals(0, engine.statistics.tagsFailed)
+        assertTrue(engine.statistics.tagsOk > 1000)
+    }
+
+    /** DSM bytes collected in one session are completed in the next one */
+    @Test
+    fun dsmBytes_carriedOverToNextSession() {
+        val pages = TestVectors.configuration1()
+        val random = Random(21)
+        // First session: 4 minutes with 60 % of the pages lost, KROOT not complete
+        val first = newEngine()
+        val firstPart = pages.filter { it.gst.tow < 277201 + 240 }
+        firstPart.forEach { if (random.nextInt(100) >= 60) first.feedPage(it.svn, it.gst, it.page) }
+        val saved = first.exportDsm()
+        assertTrue(saved.isNotEmpty())
+
+        // Second session continues with the saved bytes
+        val withSaved = OsnmaEngine(Bits.fromHex(TestVectors.MERKLE_ROOT_1), listOf(TestVectors.publicKey1()), storedDsm = saved)
+        val withoutSaved = newEngine()
+        var krootWith: Gst? = null
+        var krootWithout: Gst? = null
+        val secondRandom = Random(22)
+        pages.filter { it.gst.tow >= 277201 + 240 }.forEach {
+            if (secondRandom.nextInt(100) < 60) return@forEach
+            withSaved.feedPage(it.svn, it.gst, it.page)
+            withoutSaved.feedPage(it.svn, it.gst, it.page)
+            if (krootWith == null && withSaved.statistics.krootVerified > 0) krootWith = it.gst
+            if (krootWithout == null && withoutSaved.statistics.krootVerified > 0) krootWithout = it.gst
+        }
+        assertNotNull(krootWith)
+        assertTrue(krootWithout == null || krootWith!! < krootWithout!!)
+        assertEquals(0, withSaved.statistics.krootFailed)
+        assertEquals(0, withSaved.statistics.tagsFailed)
+    }
+
     @Test
     fun corruptedPage_isRejectedByCrc() {
         val p = TestVectors.configuration1().first()

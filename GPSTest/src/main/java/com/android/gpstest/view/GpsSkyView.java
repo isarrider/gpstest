@@ -10,6 +10,7 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.WindowManager;
@@ -21,9 +22,12 @@ import com.android.gpstest.Application;
 import com.android.gpstest.R;
 import com.android.gpstest.library.model.GnssType;
 import com.android.gpstest.library.model.SatelliteStatus;
+import com.android.gpstest.library.osnma.OsnmaMark;
 import com.android.gpstest.library.util.LibUIUtils;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
 * View that shows satellite positions on a circle representing the sky
@@ -65,6 +69,11 @@ public class GpsSkyView extends View {
 
     private List<SatelliteStatus> statuses = emptyList();
 
+    // Galileo OSNMA state by SVN, shown as a small lock next to the satellite
+    private Map<Integer, OsnmaMark> osnmaMarks = Collections.emptyMap();
+
+    private Drawable osnmaAuthenticatedIcon, osnmaFailedIcon;
+
     public GpsSkyView(Context context) {
         super(context);
         init(context);
@@ -79,6 +88,8 @@ public class GpsSkyView extends View {
         mContext = context;
         mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
         SAT_RADIUS = LibUIUtils.dpToPixels(context, 5);
+        osnmaAuthenticatedIcon = ContextCompat.getDrawable(context, R.drawable.ic_osnma_authenticated);
+        osnmaFailedIcon = ContextCompat.getDrawable(context, R.drawable.ic_osnma_failed);
 
         int textColor;
         int backgroundColor;
@@ -184,6 +195,16 @@ public class GpsSkyView extends View {
     public void setStopped() {
         mStarted = false;
         invalidate();
+    }
+
+    /**
+     * Sets the Galileo OSNMA state of each satellite (by SVN)
+     */
+    public synchronized void setOsnmaMarks(Map<Integer, OsnmaMark> marks) {
+        if (!marks.equals(osnmaMarks)) {
+            osnmaMarks = marks;
+            invalidate();
+        }
     }
 
     public synchronized void setStatus(List<SatelliteStatus> statuses) {
@@ -349,6 +370,29 @@ public class GpsSkyView extends View {
 
         c.drawText(String.valueOf(prn), x - (int) (SAT_RADIUS * PRN_X_SCALE),
                 y + (int) (SAT_RADIUS * PRN_Y_SCALE), mPrnIdPaint);
+
+        if (gnssType == GnssType.GALILEO) {
+            drawOsnmaMark(c, x, y, osnmaMarks.get(prn));
+        }
+    }
+
+    /**
+     * Draws a small lock at the upper right of a Galileo satellite: closed if its navigation data
+     * is authenticated, open (red) if tags failed
+     */
+    private void drawOsnmaMark(Canvas c, float x, float y, OsnmaMark mark) {
+        if (mark == null) {
+            return;
+        }
+        Drawable icon = mark == OsnmaMark.AUTHENTICATED ? osnmaAuthenticatedIcon : osnmaFailedIcon;
+        if (icon == null) {
+            return;
+        }
+        int size = (int) (SAT_RADIUS * 2.4f);
+        int left = (int) (x + SAT_RADIUS * 0.8f);
+        int top = (int) (y - SAT_RADIUS * 1.2f - size);
+        icon.setBounds(left, top, left + size, top + size);
+        icon.draw(c);
     }
 
     private float elevationToRadius(int s, float elev) {

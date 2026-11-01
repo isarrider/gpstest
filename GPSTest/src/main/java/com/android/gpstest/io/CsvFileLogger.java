@@ -39,6 +39,7 @@ import com.android.gpstest.BuildConfig;
 import com.android.gpstest.R;
 import com.android.gpstest.library.model.Orientation;
 import com.android.gpstest.library.model.SatelliteStatus;
+import com.android.gpstest.library.osnma.OsnmaCsvLog;
 import com.android.gpstest.library.util.FormatUtils;
 import com.android.gpstest.library.util.IOUtils;
 
@@ -186,6 +187,14 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
             writer.write(COMMENT_START);
             writer.write("  OrientationDeg,utcTimeMillis,elapsedRealtimeNanos,yawDeg,rollDeg,pitchDeg");
             writer.newLine();
+            writer.write(COMMENT_START);
+            writer.newLine();
+            writer.write(COMMENT_START);
+            writer.write("Galileo OSNMA format (https://github.com/barbeau/gpstest/blob/master/OSNMA.md), one record per satellite every 30 s:");
+            writer.newLine();
+            writer.write(COMMENT_START);
+            writer.write("  " + OsnmaCsvLog.FORMAT);
+            writer.newLine();
         } catch (IOException e) {
             logException(Application.Companion.getApp().getString(R.string.could_not_initialize_file, filePath), e);
             return;
@@ -313,6 +322,24 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
             fileWriter.newLine();
         } catch (IOException e) {
             logException("Unable to write antenna info to CSV", e);
+        }
+    }
+
+    /**
+     * Called to log Galileo OSNMA results
+     * @param records lines formatted by {@link OsnmaCsvLog}
+     */
+    public synchronized void onOsnmaRecords(List<String> records) {
+        if (fileWriter == null) {
+            return;
+        }
+        try {
+            for (String record : records) {
+                fileWriter.write(record);
+                fileWriter.newLine();
+            }
+        } catch (IOException e) {
+            logException(Application.Companion.getApp().getString(R.string.error_writing_file), e);
         }
     }
 
