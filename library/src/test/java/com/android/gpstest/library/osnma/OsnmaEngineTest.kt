@@ -562,7 +562,7 @@ class OsnmaEngineTest {
         val status = engine.status()
         assertTrue(status.warmStartBuiltIn)
         assertEquals(1, status.chainInForce)
-        assertEquals(1385, status.teslaKey!!.gstSubframe.wn)
+        assertEquals(1419, status.teslaKey!!.gstSubframe.wn)
     }
 
     /** Verifying a key half a year after the built-in KROOT is fast enough for a phone */

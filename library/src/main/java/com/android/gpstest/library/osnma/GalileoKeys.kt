@@ -58,15 +58,15 @@ object GalileoKeys {
      * DSM-KROOT. The engine checks the ECDSA signature with an authenticated public key before
      * using one, and drops it when the signal shows another chain in force or a revocation.
      *
-     * Chain 1, PKID 2, KROOT at WN 1385 TOWH 40 (March 2026), recorded from the signal with a
-     * u-blox receiver. Keys can be traced back to it for up to a year
+     * Chain 1, PKID 2, KROOT at WN 1419 TOWH 10 (1 November 2026), logged by GPSTest on a
+     * Pixel 8 Pro. Keys can be traced back to it for up to a year
      * ([TeslaKey.MAX_DERIVATIONS_STORED]); a newer one is logged by GPSTest whenever it verifies
      * a DSM-KROOT (see OSNMA.md).
      */
     private val KROOTS = listOf(
-        "9222504922056928C5EFE33668F2BE563D9CD1F2AB9D929C499AA7FD8BAAD704829AF98D3D270AA9A3" +
-            "6C2C20223B8524D94ECD8427969F9A814F7E4E2A384289C5DB9FD136B58AF8333602ED44E4C475F912" +
-            "69D2AC438E94F74B7B4CA3F89A53ED9AC7D59CBF675483"
+        "9222504922058B0AC5EFE33668F2C03A473F289B5C2AB0562075E36FBC6BE3C6F163177EC9388D149590" +
+            "56B414995114A8C9CED3E7FFD40D88E1363A7791D0BF13C7104EF305D2F8277069B057C1AD27FE32EED7" +
+            "04C1C5264A55712ADB41CD08D2B2F4B52696ED899C"
     )
 
     /** The built-in DSM-KROOT messages (still unverified: the engine checks them) */
