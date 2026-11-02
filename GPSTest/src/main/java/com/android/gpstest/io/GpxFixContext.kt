@@ -39,7 +39,11 @@ data class GpxFixContext(
     /** Altitude above mean sea level from NMEA GGA, or null */
     val mslAltitude: Double? = null,
     /** Geoid separation (geoid above WGS84 ellipsoid) from NMEA GGA, or null */
-    val geoidSeparation: Double? = null
+    val geoidSeparation: Double? = null,
+    /** Battery charge in percent, or null if unknown */
+    val batteryPercent: Int? = null,
+    /** True if the battery is charging or full on power, null if unknown */
+    val batteryCharging: Boolean? = null
 ) {
     /** Signals used in the fix (one satellite can contribute several signals on different bands) */
     val usedSignals: List<SatelliteStatus> by lazy { satellites.filter { it.usedInFix } }
@@ -92,6 +96,11 @@ class GpxFixContextCollector {
     @Volatile
     private var headingTime = 0L
 
+    @Volatile
+    private var batteryPercent: Int? = null
+    @Volatile
+    private var batteryCharging: Boolean? = null
+
     private data class Gga(
         val quality: Int?,
         val msl: Double?,
@@ -121,6 +130,12 @@ class GpxFixContextCollector {
         headingTime = SystemClock.elapsedRealtime()
     }
 
+    /** Latest battery state, from the system's battery broadcast */
+    fun onBattery(percent: Int, charging: Boolean) {
+        batteryPercent = percent
+        batteryCharging = charging
+    }
+
     fun snapshot(): GpxFixContext {
         val now = SystemClock.elapsedRealtime()
         val g = if (now - ggaTime <= MAX_NMEA_AGE_MS) gga else null
@@ -132,7 +147,9 @@ class GpxFixContextCollector {
             dgpsId = g?.stationId,
             heading = if (now - headingTime <= MAX_NMEA_AGE_MS) heading else null,
             mslAltitude = g?.msl,
-            geoidSeparation = g?.geoidSep
+            geoidSeparation = g?.geoidSep,
+            batteryPercent = batteryPercent,
+            batteryCharging = batteryCharging
         )
     }
 

@@ -46,6 +46,12 @@ data class GpxTrackStats(
     val dualFrequencyShare: Double?,
     /** Share of points (0..1) with SBAS corrections (e.g. EGNOS) */
     val sbasShare: Double?,
+    /** Battery charge (%) at the first point, or null if unknown */
+    val batteryStart: Int? = null,
+    /** Battery charge (%) at the latest point, or null if unknown */
+    val batteryLast: Int? = null,
+    /** True if the phone was charging at any point of the track */
+    val batteryCharged: Boolean = false,
     /** Downsampled time series for the charts */
     val samples: List<Sample>
 ) {
@@ -55,13 +61,27 @@ data class GpxTrackStats(
         val distanceMeters: Float,
         val elevation: Float?,
         val speed: Float?,
-        val satellites: Int
+        val satellites: Int,
+        /** Battery charge (%), or null if unknown */
+        val battery: Int? = null
     )
 
     val durationMillis: Long get() = max(0L, lastFixTime - startTime)
 
     val averageMovingSpeed: Double?
         get() = if (movingTimeMillis > 0) distanceMeters / (movingTimeMillis / 1000.0) else null
+
+    /** Battery percentage points used, or null if unknown or the phone was charging */
+    val batteryUsed: Int?
+        get() = if (batteryStart != null && batteryLast != null && !batteryCharged) batteryStart - batteryLast else null
+
+    /** Battery percentage points used per hour, once the track is long enough for a useful value */
+    val batteryPerHour: Double?
+        get() {
+            val used = batteryUsed ?: return null
+            if (durationMillis < MIN_BATTERY_RATE_MILLIS) return null
+            return used / (durationMillis / 3_600_000.0)
+        }
 
     fun toJson(): JSONObject {
         val o = JSONObject()
@@ -85,6 +105,9 @@ data class GpxTrackStats(
         o.putOpt("hdop", avgHdop)
         o.putOpt("dual", dualFrequencyShare)
         o.putOpt("sbas", sbasShare)
+        o.putOpt("battStart", batteryStart)
+        o.putOpt("battLast", batteryLast)
+        o.put("battCharged", batteryCharged)
         val a = JSONArray()
         for (s in samples) {
             val r = JSONArray()
@@ -93,6 +116,7 @@ data class GpxTrackStats(
             r.put(s.elevation?.toDouble() ?: JSONObject.NULL)
             r.put(s.speed?.toDouble() ?: JSONObject.NULL)
             r.put(s.satellites)
+            r.put(s.battery ?: JSONObject.NULL)
             a.put(r)
         }
         o.put("samples", a)
@@ -100,6 +124,9 @@ data class GpxTrackStats(
     }
 
     companion object {
+        /** Battery use per hour is only shown for tracks at least this long */
+        const val MIN_BATTERY_RATE_MILLIS = 10 * 60_000L
+
         fun fromJson(o: JSONObject): GpxTrackStats {
             fun optD(k: String): Double? = if (o.isNull(k) || !o.has(k)) null else o.getDouble(k)
             val a = o.optJSONArray("samples") ?: JSONArray()
@@ -112,7 +139,8 @@ data class GpxTrackStats(
                         r.getDouble(1).toFloat(),
                         if (r.isNull(2)) null else r.getDouble(2).toFloat(),
                         if (r.isNull(3)) null else r.getDouble(3).toFloat(),
-                        r.optInt(4, 0)
+                        r.optInt(4, 0),
+                        if (r.length() > 5 && !r.isNull(5)) r.getInt(5) else null
                     )
                 )
             }
@@ -136,6 +164,9 @@ data class GpxTrackStats(
                 avgHdop = optD("hdop"),
                 dualFrequencyShare = optD("dual"),
                 sbasShare = optD("sbas"),
+                batteryStart = optD("battStart")?.toInt(),
+                batteryLast = optD("battLast")?.toInt(),
+                batteryCharged = o.optBoolean("battCharged", false),
                 samples = samples
             )
         }
@@ -178,6 +209,9 @@ class GpxTrackStatsAccumulator(
     private var dualCount = 0
     private var bandInfoCount = 0
     private var sbasCount = 0
+    private var batteryStart: Int? = null
+    private var batteryLast: Int? = null
+    private var batteryCharged = false
 
     private var anchor: Location? = null
     private var previousTime: Long? = null
@@ -249,6 +283,13 @@ class GpxTrackStatsAccumulator(
         }
         if (fix.sbasUsed) sbasCount++
 
+        // Battery
+        fix.batteryPercent?.let {
+            if (batteryStart == null) batteryStart = it
+            batteryLast = it
+        }
+        if (fix.batteryCharging == true) batteryCharged = true
+
         // Chart samples
         sinceLastSample++
         if (samples.isEmpty() || sinceLastSample >= sampleStride) {
@@ -259,7 +300,8 @@ class GpxTrackStatsAccumulator(
                     distanceMeters = distance.toFloat(),
                     elevation = ele?.toFloat(),
                     speed = if (l.hasSpeed()) l.speed else null,
-                    satellites = fix.satellitesUsed
+                    satellites = fix.satellitesUsed,
+                    battery = fix.batteryPercent
                 )
             )
             if (samples.size >= MAX_SAMPLES) {
@@ -292,6 +334,9 @@ class GpxTrackStatsAccumulator(
         avgHdop = if (hdopCount > 0) hdopSum / hdopCount else null,
         dualFrequencyShare = if (bandInfoCount > 0) dualCount.toDouble() / bandInfoCount else null,
         sbasShare = if (points > 0) sbasCount.toDouble() / points else null,
+        batteryStart = batteryStart,
+        batteryLast = batteryLast,
+        batteryCharged = batteryCharged,
         samples = ArrayList(samples)
     )
 

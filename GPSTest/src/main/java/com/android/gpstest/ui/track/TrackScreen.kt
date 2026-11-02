@@ -123,6 +123,25 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             StatRow(R.string.track_sbas, s.sbasShare?.let { percent(it) } ?: DASH)
         }
 
+        if (s.batteryStart != null) {
+            TrackCard(R.string.track_section_battery) {
+                StatRow(R.string.track_battery_start, percentPoints(s.batteryStart))
+                StatRow(
+                    if (state.isRecording) R.string.track_battery_now else R.string.track_battery_end,
+                    s.batteryLast?.let { percentPoints(it) } ?: DASH
+                )
+                if (s.batteryCharged) {
+                    StatRow(R.string.track_battery_used, stringResource(R.string.track_battery_charged))
+                } else {
+                    StatRow(R.string.track_battery_used, s.batteryUsed?.let { percentPoints(it) } ?: DASH)
+                    StatRow(
+                        R.string.track_battery_rate,
+                        s.batteryPerHour?.let { String.format(Locale.getDefault(), "%.1f %%", it) } ?: DASH
+                    )
+                }
+            }
+        }
+
         TrackCard(R.string.track_section_file) {
             StatRow(R.string.track_points, s.points.toString())
             StatRow(R.string.track_segments, s.segments.toString())
@@ -160,6 +179,14 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                     stringResource(R.string.track_chart_satellites),
                     stringResource(R.string.track_chart_axis_minutes),
                     sats
+                )
+            }
+            val battery = s.samples.mapNotNull { p -> p.battery?.let { Entry(p.seconds / 60f, it.toFloat()) } }
+            if (battery.size >= 2) {
+                ChartCard(
+                    stringResource(R.string.track_chart_battery),
+                    stringResource(R.string.track_chart_axis_minutes),
+                    battery
                 )
             }
         }
@@ -260,6 +287,8 @@ private fun ChartCard(title: String, xLabel: String, entries: List<Entry>) {
 }
 
 private const val DASH = "–"
+
+private fun percentPoints(value: Int) = String.format(Locale.getDefault(), "%d %%", value)
 
 private fun percent(share: Double) = String.format(Locale.getDefault(), "%.0f %%", share * 100)
 

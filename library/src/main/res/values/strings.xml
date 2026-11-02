@@ -407,6 +407,14 @@
     <string name="track_avg_hdop">Average HDOP</string>
     <string name="track_dual_freq">Dual-frequency</string>
     <string name="track_sbas">SBAS corrections (e.g. EGNOS)</string>
+    <string name="track_section_battery">Battery</string>
+    <string name="track_battery_start">At start</string>
+    <string name="track_battery_now">Now</string>
+    <string name="track_battery_end">At end</string>
+    <string name="track_battery_used">Used</string>
+    <string name="track_battery_rate">Used per hour</string>
+    <string name="track_battery_charged">charged during the track</string>
+    <string name="track_chart_battery">Battery (%)</string>
     <string name="track_section_file">File</string>
     <string name="track_points">Points</string>
     <string name="track_segments">Segments</string>
