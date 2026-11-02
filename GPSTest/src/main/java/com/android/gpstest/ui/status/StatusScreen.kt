@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +40,7 @@ import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
@@ -60,19 +62,22 @@ import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.library.data.FixState
+import com.android.gpstest.library.data.OsnmaUiState
 import com.android.gpstest.library.model.DilutionOfPrecision
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteMetadata
 import com.android.gpstest.library.model.SatelliteStatus
 import com.android.gpstest.library.model.SbasType
+import com.android.gpstest.library.osnma.OsnmaMark
 import com.android.gpstest.library.ui.SignalInfoViewModel
 import com.android.gpstest.library.util.CarrierFreqUtils
 import com.android.gpstest.library.util.MathUtils
 import com.android.gpstest.library.util.PreferenceUtils
 import com.android.gpstest.library.util.PreferenceUtils.gnssFilter
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
-fun StatusScreen(viewModel: SignalInfoViewModel) {
+fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiState>) {
     //
     // Observe LiveData from ViewModel
     //
@@ -87,6 +92,7 @@ fun StatusScreen(viewModel: SignalInfoViewModel) {
     val gnssStatuses: List<SatelliteStatus> by viewModel.filteredGnssStatuses.observeAsState(emptyList())
     val sbasStatuses: List<SatelliteStatus> by viewModel.filteredSbasStatuses.observeAsState(emptyList())
     val allStatuses: List<SatelliteStatus> by viewModel.allStatuses.observeAsState(emptyList())
+    val osnma: OsnmaUiState by osnmaState.collectAsState()
 
     Box(
         modifier = Modifier
@@ -101,10 +107,14 @@ fun StatusScreen(viewModel: SignalInfoViewModel) {
                 dop,
                 satelliteMetadata,
                 fixState)
+            OsnmaCard(osnma)
             if (gnssFilter(app, prefs).isNotEmpty()) {
                 Filter(allStatuses.size, satelliteMetadata) { PreferenceUtils.clearGnssFilter(app, prefs) }
             }
-            GnssStatusCard(gnssStatuses)
+            GnssStatusCard(
+                gnssStatuses,
+                osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
+            )
             SbasStatusCard(sbasStatuses)
         }
     }
@@ -154,8 +164,11 @@ fun Filter(totalNumSignals: Int, satelliteMetadata: SatelliteMetadata, onClick: 
 }
 
 @Composable
-fun GnssStatusCard(satStatuses: List<SatelliteStatus>) {
-    StatusCard(satStatuses, true)
+fun GnssStatusCard(
+    satStatuses: List<SatelliteStatus>,
+    osnmaMarks: Map<Int, OsnmaMark> = emptyMap()
+) {
+    StatusCard(satStatuses, true, osnmaMarks)
 }
 
 @Composable
@@ -167,6 +180,7 @@ fun SbasStatusCard(satStatuses: List<SatelliteStatus>) {
 fun StatusCard(
     satStatuses: List<SatelliteStatus>,
     isGnss: Boolean,
+    osnmaMarks: Map<Int, OsnmaMark> = emptyMap(),
 ) {
     val modifier = Modifier
         .fillMaxWidth()
@@ -185,7 +199,9 @@ fun StatusCard(
             Column {
                 StatusRowHeader(isGnss)
                 satStatuses.forEach {
-                    StatusRow(it)
+                    val osnmaMark =
+                        if (it.gnssType == GnssType.GALILEO) osnmaMarks[it.svid] else null
+                    StatusRow(it, osnmaMark)
                 }
                 StatusRowFooter()
             }
@@ -201,7 +217,7 @@ private fun showList(isGnss: Boolean, satStatuses: List<SatelliteStatus>): Boole
 }
 
 @Composable
-fun StatusRow(satelliteStatus: SatelliteStatus) {
+fun StatusRow(satelliteStatus: SatelliteStatus, osnmaMark: OsnmaMark? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -213,7 +229,7 @@ fun StatusRow(satelliteStatus: SatelliteStatus) {
         val medium = Modifier.defaultMinSize(minWidth = dimensionResource(R.dimen.min_column_width_medium))
         val large = Modifier.defaultMinSize(minWidth = 50.dp)
 
-        Svid(satelliteStatus, small)
+        Svid(satelliteStatus, osnmaMark, small)
         Flag(satelliteStatus, large)
         CarrierFrequency(satelliteStatus, small)
         Cn0(satelliteStatus, medium)
@@ -224,8 +240,37 @@ fun StatusRow(satelliteStatus: SatelliteStatus) {
 }
 
 @Composable
-fun Svid(satelliteStatus: SatelliteStatus, modifier: Modifier) {
-    StatusValue(satelliteStatus.svid.toString(), modifier = modifier)
+fun Svid(satelliteStatus: SatelliteStatus, osnmaMark: OsnmaMark?, modifier: Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        StatusValue(satelliteStatus.svid.toString())
+        OsnmaMarkIcon(osnmaMark)
+    }
+}
+
+/**
+ * Seal next to the ID of Galileo satellites: green with a check mark if authenticated, red with an
+ * exclamation mark if tags failed
+ */
+@Composable
+fun OsnmaMarkIcon(mark: OsnmaMark?) {
+    if (mark == null) return
+    Image(
+        painter = painterResource(
+            if (mark == OsnmaMark.AUTHENTICATED) {
+                R.drawable.ic_osnma_authenticated
+            } else {
+                R.drawable.ic_osnma_failed
+            }
+        ),
+        contentDescription = stringResource(
+            if (mark == OsnmaMark.AUTHENTICATED) {
+                R.string.osnma_mark_authenticated
+            } else {
+                R.string.osnma_mark_failed
+            }
+        ),
+        modifier = Modifier.size(12.dp)
+    )
 }
 
 @Composable
