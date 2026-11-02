@@ -306,6 +306,9 @@ private fun ToggleOption(text: String, description: String, selected: Boolean, o
 @Composable
 private fun GroupCard(group: SatelliteGroup, tableView: Boolean) {
     val name = groupName(group)
+    // One fixed slot per band seen in this constellation, so bars and columns don't jump
+    val seenBands = remember(group.key) { SeenBands() }
+    val table = remember(group) { signalTable(group, knownColumns = seenBands.update(group)) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -315,9 +318,9 @@ private fun GroupCard(group: SatelliteGroup, tableView: Boolean) {
         Column(modifier = Modifier.padding(bottom = 8.dp)) {
             GroupHeader(group, name)
             if (tableView) {
-                BandTable(group, name)
+                BandTable(table, name)
             } else {
-                SignalBars(group, name)
+                SignalBars(table, name)
             }
         }
     }
@@ -379,7 +382,7 @@ private fun barHeight(cn0: Float): Dp =
  * scroll sideways.
  */
 @Composable
-private fun SignalBars(group: SatelliteGroup, name: String) {
+private fun SignalBars(table: SignalTable, name: String) {
     val gridColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
     val axisTextColor = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
     Row(modifier = Modifier.padding(start = 4.dp, end = 8.dp, top = 4.dp)) {
@@ -421,16 +424,21 @@ private fun SignalBars(group: SatelliteGroup, name: String) {
                 )
             }
             Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                group.satellites.forEach { satellite ->
-                    SatelliteBars(satellite, name)
+                table.rows.forEach { row ->
+                    SatelliteBars(row, table.columns, name)
                 }
             }
         }
     }
 }
 
+/**
+ * The bars of one satellite: one slot per band of the constellation (see [SeenBands]), empty if
+ * the satellite doesn't send that band right now, so the bars stay in place.
+ */
 @Composable
-private fun SatelliteBars(satellite: GroupedSatellite, groupName: String) {
+private fun SatelliteBars(row: SignalTableRow, columns: List<SignalColumn>, groupName: String) {
+    val satellite = row.satellite
     val description = satelliteDescription(satellite, groupName)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -443,14 +451,14 @@ private fun SatelliteBars(satellite: GroupedSatellite, groupName: String) {
             horizontalArrangement = Arrangement.spacedBy(BAR_GAP),
             modifier = Modifier.height(VALUE_LABEL_HEIGHT + CHART_HEIGHT)
         ) {
-            satellite.signals.forEach { status ->
+            row.cells.forEach { status ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .width(BAR_WIDTH)
-                        .alpha(if (status.usedInFix) 1f else NOT_USED_ALPHA)
+                        .alpha(if (status?.usedInFix == true) 1f else NOT_USED_ALPHA)
                 ) {
-                    if (status.hasCn0) {
+                    if (status != null && status.hasCn0) {
                         Text(
                             text = String.format(Locale.US, "%.0f", status.cn0DbHz),
                             fontSize = 8.sp,
@@ -470,14 +478,17 @@ private fun SatelliteBars(satellite: GroupedSatellite, groupName: String) {
         }
         // Band label under each bar
         Row(horizontalArrangement = Arrangement.spacedBy(BAR_GAP)) {
-            satellite.signals.forEach { status ->
+            columns.forEachIndexed { index, column ->
                 Text(
-                    text = defaultSignalLabel(status),
+                    text = column.label,
                     fontSize = 7.sp,
                     maxLines = 1,
                     softWrap = false,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+                    // Faint label for a band the satellite doesn't send right now
+                    color = MaterialTheme.colors.onSurface.copy(
+                        alpha = if (row.cells[index] != null) 0.7f else 0.25f
+                    ),
                     modifier = Modifier.width(BAR_WIDTH)
                 )
             }
@@ -497,8 +508,7 @@ private val BAND_COLUMN_WIDTH = 58.dp
 
 /** One row per satellite, one column per band, C/N0 values with the sky view colours */
 @Composable
-private fun BandTable(group: SatelliteGroup, name: String) {
-    val table = remember(group) { signalTable(group) }
+private fun BandTable(table: SignalTable, name: String) {
     Column(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
