@@ -66,6 +66,8 @@ import androidx.compose.ui.unit.sp
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
+import com.android.gpstest.library.data.EgnosConnection
+import com.android.gpstest.library.data.EgnosUiState
 import com.android.gpstest.library.data.FixState
 import com.android.gpstest.library.data.OsnmaUiState
 import com.android.gpstest.library.model.DilutionOfPrecision
@@ -82,7 +84,11 @@ import com.android.gpstest.library.util.PreferenceUtils.gnssFilter
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable
-fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiState>) {
+fun StatusScreen(
+    viewModel: SignalInfoViewModel,
+    osnmaState: StateFlow<OsnmaUiState>,
+    egnosState: StateFlow<EgnosUiState>
+) {
     //
     // Observe LiveData from ViewModel
     //
@@ -99,6 +105,7 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
     val sbasStatuses: List<SatelliteStatus> by viewModel.filteredSbasStatuses.observeAsState(emptyList())
     val allStatuses: List<SatelliteStatus> by viewModel.allStatuses.observeAsState(emptyList())
     val osnma: OsnmaUiState by osnmaState.collectAsState()
+    val egnos: EgnosUiState by egnosState.collectAsState()
     val classicList: Boolean by preferenceState(R.string.pref_key_classic_status_list) { p, key ->
         p.getBoolean(key, false)
     }
@@ -120,6 +127,14 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
     }
     val osnmaMarks = osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
     val groupedListState = rememberGroupedListState()
+    // EGNOS corrections by PRN mask slot, shown in the satellite details
+    val egnosCorrections = remember(egnos.snapshot, egnos.connection) {
+        if (egnos.connection == EgnosConnection.OFF) {
+            emptyMap()
+        } else {
+            egnos.snapshot.satellites.associateBy { it.slot }
+        }
+    }
 
     // A lazy column, so that the group headers of the grouped list can stay at the top while
     // scrolling
@@ -137,6 +152,10 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
         item(key = "osnma") {
             OsnmaCard(osnma)
         }
+        item(key = "egnos") {
+            // All SBAS signals, not just the filtered ones, so the card doesn't depend on the filter
+            EgnosCard(egnos, allStatuses.filter { it.gnssType == GnssType.SBAS })
+        }
         if (gnssFilter(app, prefs).isNotEmpty()) {
             item(key = "filter") {
                 Filter(allStatuses.size, satelliteMetadata) { PreferenceUtils.clearGnssFilter(app, prefs) }
@@ -153,9 +172,9 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
             // SBAS appears where the user put it in the order of the GNSS filter dialog
             val (beforeSbas, afterSbas) = splitAroundSbas(gnssGroups, gnssOrder)
             val history = viewModel.cn0History
-            groupedStatusItems(beforeSbas, gnssGroups.isEmpty(), osnmaMarks, history, groupedListState)
-            groupedStatusItems(sbasGroups, false, emptyMap(), history, groupedListState)
-            groupedStatusItems(afterSbas, false, osnmaMarks, history, groupedListState)
+            groupedStatusItems(beforeSbas, gnssGroups.isEmpty(), osnmaMarks, history, groupedListState, egnosCorrections)
+            groupedStatusItems(sbasGroups, false, emptyMap(), history, groupedListState, egnosCorrections)
+            groupedStatusItems(afterSbas, false, osnmaMarks, history, groupedListState, egnosCorrections)
         }
     }
 }

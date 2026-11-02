@@ -111,6 +111,44 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:title="@string/pref_egnos_category_title"
+        android:key="@string/pref_key_egnos_category">
+        <CheckBoxPreference
+            android:key="@string/pref_key_egnos_enabled"
+            android:title="@string/pref_egnos_enabled_title"
+            android:summary="@string/pref_egnos_enabled_summary"
+            android:defaultValue="false" />
+        <EditTextPreference
+            android:key="@string/pref_key_egnos_host"
+            android:title="@string/pref_egnos_host_title"
+            android:summary="@string/pref_egnos_host_summary"
+            android:inputType="textUri"
+            android:singleLine="true"
+            android:dependency="@string/pref_key_egnos_enabled" />
+        <EditTextPreference
+            android:key="@string/pref_key_egnos_port"
+            android:title="@string/pref_egnos_port_title"
+            android:summary="@string/pref_egnos_port_summary"
+            android:inputType="number"
+            android:singleLine="true"
+            android:dependency="@string/pref_key_egnos_enabled" />
+        <EditTextPreference
+            android:key="@string/pref_key_egnos_user"
+            android:title="@string/pref_egnos_user_title"
+            android:summary="@string/pref_egnos_user_summary"
+            android:inputType="text"
+            android:singleLine="true"
+            android:dependency="@string/pref_key_egnos_enabled" />
+        <EditTextPreference
+            android:key="@string/pref_key_egnos_password"
+            android:title="@string/pref_egnos_password_title"
+            android:summary="@string/pref_egnos_password_summary"
+            android:inputType="textPassword"
+            android:singleLine="true"
+            android:dependency="@string/pref_key_egnos_enabled" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/pref_output_category_title">
         <PreferenceScreen
             android:title="@string/pref_output_category_title"

@@ -64,6 +64,7 @@ Questions?  Check out the [FAQ](FAQ.md), the [Slack group](https://gpstest-andro
 - Accuracy: Measuring your device GNSS accuracy? Check out the [Measuring Accuracy using GPSTest](ACCURACY.md) page, as well as the corresponding article [*Measuring GNSS accuracy on Android devices*](https://medium.com/@sjbarbeau/measuring-gnss-accuracy-on-android-devices-6824492a1389).
 
 - Galileo OSNMA: Want to check whether Galileo navigation data is authentic? See the [Galileo OSNMA](OSNMA.md) page.
+- EGNOS: Want to see which EGNOS satellites your phone uses and what corrections EGNOS currently sends? See the [EGNOS](EGNOS.md) page.
 
 - Data Output and Logging: Want to know how to output GNSS data to the system log for further analysis?  Check out the [Data Output and Logging](LOGGING.md) page.
 

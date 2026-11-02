@@ -30,6 +30,7 @@ import androidx.fragment.app.activityViewModels
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
+import com.android.gpstest.library.data.EgnosRepository
 import com.android.gpstest.library.data.OsnmaRepository
 import com.android.gpstest.library.ui.SignalInfoViewModel
 import com.android.gpstest.library.util.PreferenceUtil.darkTheme
@@ -46,6 +47,9 @@ class StatusFragment : Fragment() {
     @Inject
     lateinit var osnmaRepository: OsnmaRepository
 
+    @Inject
+    lateinit var egnosRepository: EgnosRepository
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -59,7 +63,11 @@ class StatusFragment : Fragment() {
                     // TODO - add "system dark setting" as an option in preferences - Issue #277
                     darkTheme = darkTheme(app, prefs)
                 ) {
-                    StatusScreen(viewModel = viewModel, osnmaState = osnmaRepository.state)
+                    StatusScreen(
+                        viewModel = viewModel,
+                        osnmaState = osnmaRepository.state,
+                        egnosState = egnosRepository.state
+                    )
                 }
             }
         }

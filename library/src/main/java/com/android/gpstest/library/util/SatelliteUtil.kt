@@ -19,6 +19,7 @@ import android.annotation.SuppressLint
 import android.location.GnssStatus
 import android.location.Location
 import android.os.Build
+import com.android.gpstest.library.egnos.EgnosSatellites
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.Satellite
 import com.android.gpstest.library.model.SatelliteGroup
@@ -297,7 +298,7 @@ object SatelliteUtil {
      * @return SbasType for the given GnssStatus svid for GnssStatus.CONSTELLATION_SBAS satellites
      */
     fun Int.toSbasType(): SbasType {
-        if (this == 120 || this == 123 || this == 126 || this == 136) {
+        if (EgnosSatellites.isEgnos(this)) {
             return SbasType.EGNOS
         } else if (this == 125 || this == 140 || this == 141) {
             return SbasType.SDCM

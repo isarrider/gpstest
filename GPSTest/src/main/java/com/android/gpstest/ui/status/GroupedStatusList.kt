@@ -61,6 +61,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.gpstest.R
+import com.android.gpstest.library.egnos.CorrectedSatellite
+import com.android.gpstest.library.egnos.EgnosSatellites
 import com.android.gpstest.library.model.Cn0History
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
@@ -83,6 +85,8 @@ fun LazyListScope.groupedStatusItems(
     osnmaMarks: Map<Int, OsnmaMark>,
     cn0History: Cn0History?,
     state: GroupedListState,
+    /** EGNOS corrections by PRN mask slot, see [egnosSlot] */
+    egnosCorrections: Map<Int, CorrectedSatellite> = emptyMap(),
 ) {
     if (groups.isEmpty()) {
         // Like the classic table, nothing is shown for SBAS if there are no SBAS satellites
@@ -144,7 +148,11 @@ fun LazyListScope.groupedStatusItems(
                                 state.satellitesWithDetails.add(satellite.key)
                             }
                         }
-                        if (showDetails) SatelliteDetails(satellite, cn0History)
+                        if (showDetails) {
+                            val egnos = egnosSlot(satellite.gnssType, satellite.svid)
+                                ?.let { egnosCorrections[it] }
+                            SatelliteDetails(satellite, cn0History, egnos)
+                        }
                     }
                 }
             }
@@ -481,7 +489,11 @@ private fun elevationAzimuth(status: SatelliteStatus): String {
  * and azimuth
  */
 @Composable
-private fun SatelliteDetails(satellite: GroupedSatellite, cn0History: Cn0History?) {
+private fun SatelliteDetails(
+    satellite: GroupedSatellite,
+    cn0History: Cn0History?,
+    egnos: CorrectedSatellite?
+) {
     // Samples of all signals, with the newest sample of the satellite as the right edge of the
     // charts, so the signals' charts line up
     val history = satellite.signals.map { cn0History?.get(it) ?: emptyList() }
@@ -492,6 +504,10 @@ private fun SatelliteDetails(satellite: GroupedSatellite, cn0History: Cn0History
             .background(MaterialTheme.colors.onSurface.copy(alpha = 0.05f))
             .padding(start = 66.dp, end = 12.dp, top = 4.dp, bottom = 6.dp)
     ) {
+        egnosGeoText(satellite)?.let { Text(text = it, fontSize = 12.sp) }
+        if (egnos != null) {
+            Text(text = egnosCorrectionText(egnos), fontSize = 12.sp)
+        }
         satellite.signals.forEach { status ->
             val label = carrierLabel(status).ifEmpty { "\u2013" }
             val frequency = if (status.hasCarrierFrequency) {
@@ -587,6 +603,9 @@ private fun satelliteDescription(
     val parts = mutableListOf(
         stringResource(R.string.status_a11y_satellite, groupName, satellite.svid)
     )
+    if (satellite.gnssType == GnssType.SBAS) {
+        EgnosSatellites.geo(satellite.svid)?.let { parts.add(it.name) }
+    }
     if (osnmaMark != null) {
         parts.add(
             stringResource(
@@ -700,4 +719,41 @@ private fun Cn0Chart(
             previousY = yValue
         }
     }
+}
+
+/**
+ * The slot of a satellite in the SBAS PRN mask (DO-229): GPS PRNs 1-37 are slots 1-37, GLONASS
+ * slot numbers 1-24 are mask slots 38-61, SBAS PRNs 120-158 keep their number
+ */
+fun egnosSlot(gnssType: GnssType, svid: Int): Int? = when (gnssType) {
+    GnssType.NAVSTAR -> svid.takeIf { it in 1..37 }
+    GnssType.GLONASS -> svid.takeIf { it in 1..24 }?.plus(37)
+    GnssType.SBAS -> svid.takeIf { it in 120..158 }
+    else -> null
+}
+
+/** Name and orbital position of an EGNOS GEO, e.g. "EGNOS GEO Eutelsat 5WB, 5° W" */
+@Composable
+private fun egnosGeoText(satellite: GroupedSatellite): String? {
+    if (satellite.gnssType != GnssType.SBAS) return null
+    val geo = EgnosSatellites.geo(satellite.svid) ?: return null
+    return stringResource(
+        if (geo.retired) R.string.status_details_egnos_geo_retired else R.string.status_details_egnos_geo,
+        geo.name,
+        geo.position
+    )
+}
+
+/** EGNOS correction of a satellite, e.g. "EGNOS: correction +1.25 m, UDRE 1.75 m, 3 s old" */
+@Composable
+private fun egnosCorrectionText(c: CorrectedSatellite): String = when {
+    c.doNotUse -> stringResource(R.string.status_details_egnos_dont_use)
+    c.notMonitored -> stringResource(R.string.status_details_egnos_not_monitored)
+    c.fastCorrectionMeters != null && c.udreMeters != null -> stringResource(
+        if (c.usable) R.string.status_details_egnos_correction else R.string.status_details_egnos_correction_old,
+        c.fastCorrectionMeters!!,
+        c.udreMeters!!,
+        c.fastAgeSeconds ?: 0L
+    )
+    else -> stringResource(R.string.status_details_egnos_waiting)
 }
