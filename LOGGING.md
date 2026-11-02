@@ -211,6 +211,108 @@ Here's a screenshot from the GPS Measurement Tools desktop software:
 
 ![image](https://user-images.githubusercontent.com/928045/64804800-844fae00-d55d-11e9-8212-b0ef65885dc7.png)
 
+## Recording GPX tracks
+
+GPSTest can record your GPS fixes as a [GPX 1.1](https://www.topografix.com/GPX/1/1/) track, which most mapping apps and tools can open (e.g., GPXSee, gpx.studio, OsmAnd, QGIS). Track recording is separate from the CSV/JSON file logging above and doesn't need any of those settings.
+
+Steps to record a track:
+1. Tap the record button (●) in the top action bar. If GNSS is off, it is switched on. The button turns into a stop button (■), and a red "● REC" timer appears under the screen title.
+1. Tap the stop button again, or "Stop GPX recording" in the notification, to end the track. Switching GNSS off also ends the recording.
+1. Open the "Track" screen in the navigation drawer to see details and charts, or share the file via the "Share" button (Log tab).
+
+Each tap on record starts a new file, which holds exactly one track. A recording is not resumed after the app has been closed by the system or the phone restarted - tap record again to start a new track. The file is complete up to its last write (see below).
+
+#### Files
+
+* Files are saved directly to `Download/GPSTest` and named with the start time, e.g. `gpstest_track_2026-11-02_10-15-30.gpx`. On Android 9 and lower they are saved to `Android/data/com.android.gpstest/files/GPSTest`.
+* Only fixes from the GNSS (GPS) provider are recorded; network fixes are skipped.
+* If no fix arrives for a while (e.g., in a tunnel), the track continues in a new track segment (`<trkseg>`), so mapping apps don't draw a straight line across the gap.
+
+#### Settings
+
+Under "Settings" > "Logging and Output" > "GPX track recording":
+* **Write to file every (minutes)** - Default `5`. Track points are kept in memory and written to the file in one batch at this interval, to reduce wear on the phone's storage. `0` writes every fix. Points are also written when you stop the recording, when the app shuts down, and when Android reports it is low on memory. If the system kills the app, points since the last write are lost.
+* **New segment after gap (seconds)** - Default `30`. A gap between fixes longer than this starts a new track segment.
+* **Include every satellite signal** - Off by default. Adds every received signal to each track point (see `<gpstest:sats>` below). Files get about 10 times larger. Applies from the next recording.
+
+After every write the file is a complete, valid GPX file, so you can copy it off the device while a recording is running.
+
+#### Track point contents
+
+Standard GPX 1.1 fields, in schema order:
+
+| Element | Meaning |
+|---|---|
+| `lat`, `lon` | Position (WGS84 degrees) |
+| `ele` | Elevation above mean sea level: from Android (Android 14 and higher), otherwise from the GNSS chip's NMEA `GGA` sentence, otherwise WGS84 ellipsoid height |
+| `time` | Fix time (UTC) |
+| `geoidheight` | Height of the geoid above the WGS84 ellipsoid, when MSL elevation is known |
+| `fix` | `dgps` when corrections are applied (NMEA `GGA` quality 2/4/5, or an SBAS satellite such as EGNOS used in the fix), `pps` for `GGA` quality 3, otherwise `3d` or `2d` |
+| `sat` | Number of distinct satellites used in the fix (a satellite tracked on two bands counts once) |
+| `hdop`, `vdop`, `pdop` | Dilution of precision from NMEA `GSA` |
+| `ageofdgpsdata`, `dgpsid` | Age of correction data (seconds) and reference station, from NMEA `GGA` when the chip reports them |
+
+Extensions in `<extensions>`:
+
+* [Garmin TrackPointExtension v2](https://www8.garmin.com/xmlschemas/TrackPointExtensionv2.xsd) (`gpxtpx:`), read by most mapping tools:
+    * `speed` - m/s
+    * `course` - degrees
+* GPSTest extensions (`gpstest:`, namespace `https://github.com/barbeau/gpstest/gpx/1`):
+    * `hacc`, `vacc` - horizontal and vertical accuracy (m)
+    * `sacc`, `bacc` - speed accuracy (m/s) and bearing accuracy (degrees)
+    * `heading` - compass heading from the orientation sensor (degrees)
+    * `constellations` - per constellation `<gpstest:c sys="GALILEO" used="7" view="9"/>`, satellites used in the fix / in view
+    * `cn0` - `avg` and `max` C/N0 (dB-Hz) of the signals used in the fix
+    * `bands` - bands used in the fix, e.g. `<gpstest:bands dual="true">E1,E5a,L1,L5</gpstest:bands>`
+    * `sbas` - whether SBAS corrections were used, with system and PRNs, e.g. `<gpstest:sbas used="true" system="EGNOS" prn="123,136"/>`
+    * `sats` - only with "Include every satellite signal": one `<gpstest:s sys="NAVSTAR" id="5" band="L1" cn0="38.2" el="45" az="120" used="1"/>` per signal
+
+Example track point:
+
+~~~
+<trkpt lat="48.13712345" lon="11.57534567">
+  <ele>519.40</ele>
+  <time>2026-11-02T09:15:30.000Z</time>
+  <geoidheight>47.62</geoidheight>
+  <fix>dgps</fix>
+  <sat>22</sat>
+  <hdop>0.7</hdop>
+  <vdop>1.1</vdop>
+  <pdop>1.3</pdop>
+  <extensions>
+    <gpxtpx:TrackPointExtension>
+      <gpxtpx:speed>1.42</gpxtpx:speed>
+      <gpxtpx:course>87.3</gpxtpx:course>
+    </gpxtpx:TrackPointExtension>
+    <gpstest:hacc>3.8</gpstest:hacc>
+    <gpstest:vacc>5.2</gpstest:vacc>
+    <gpstest:sacc>0.45</gpstest:sacc>
+    <gpstest:bacc>12.0</gpstest:bacc>
+    <gpstest:heading>91.0</gpstest:heading>
+    <gpstest:constellations>
+      <gpstest:c sys="NAVSTAR" used="8" view="11"/>
+      <gpstest:c sys="GALILEO" used="7" view="9"/>
+      <gpstest:c sys="BEIDOU" used="6" view="12"/>
+      <gpstest:c sys="SBAS" used="1" view="2"/>
+    </gpstest:constellations>
+    <gpstest:cn0 avg="34.6" max="44.1"/>
+    <gpstest:bands dual="true">E1,E5a,L1,L5</gpstest:bands>
+    <gpstest:sbas used="true" system="EGNOS" prn="123"/>
+  </extensions>
+</trkpt>
+~~~
+
+#### Track screen
+
+The "Track" screen shows the track being recorded, or the last recorded track when nothing is recording (also after an app restart):
+* Start time, duration, moving time, distance, average speed while moving and maximum speed
+* Elevation: current, lowest, highest, total ascent and descent
+* GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections
+* File: points, segments, file location, and while recording, the time of the last write and the points still waiting in memory
+* Charts of elevation over distance, and speed and satellites used over time
+
+Distance only counts movement larger than the fix accuracy (at least 3 m), so standing still doesn't add distance, and ascent/descent ignore changes smaller than 3 m. Units follow the distance and speed unit settings.
+
 ## Accessing the real-time output via Android Studio
 
 You can view the data output from GPSTest by using Android Monitor, which is included with Android Studio.
