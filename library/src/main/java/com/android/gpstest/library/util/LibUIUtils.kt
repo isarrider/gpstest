@@ -211,7 +211,7 @@ object LibUIUtils {
         email: String,
         location: String?,
         signalInfoViewModel: SignalInfoViewModel,
-        playServicesVersion: String,
+        playServicesVersion: String?,
         prefs: SharedPreferences,
         buildFlavor: String,
     ) {
@@ -567,7 +567,7 @@ object LibUIUtils {
     }
 
     /**
-     * Converts the provide value in meters to the corresponding value in feet
+     * Converts the provided value in meters to the corresponding value in feet
      * @param meters value in meters to convert to feet
      * @return the provided meters value converted to feet
      */
@@ -577,7 +577,7 @@ object LibUIUtils {
     }
 
     /**
-     * Converts the provide value in meters per second to the corresponding value in kilometers per hour
+     * Converts the provided value in meters per second to the corresponding value in kilometers per hour
      * @param metersPerSecond value in meters per second to convert to kilometers per hour
      * @return the provided meters per second value converted to kilometers per hour
      */
@@ -587,13 +587,23 @@ object LibUIUtils {
     }
 
     /**
-     * Converts the provide value in meters per second to the corresponding value in miles per hour
+     * Converts the provided value in meters per second to the corresponding value in miles per hour
      * @param metersPerSecond value in meters per second to convert to miles per hour
      * @return the provided meters per second value converted to miles per hour
      */
     @JvmStatic
     fun toMilesPerHour(metersPerSecond: Float): Float {
         return toKilometersPerHour(metersPerSecond) / 1.6093440f
+    }
+
+    /**
+     * Converts the provided value in meters per second to the corresponding value in knots (nautical miles per hour)
+     * @param metersPerSecond value in meters per second to convert to knots
+     * @return the provided meters per second value converted to knots
+     */
+    @JvmStatic
+    fun toKnots(metersPerSecond: Float): Float {
+        return metersPerSecond * 3600f / 1852f
     }
 
     /**

@@ -16,6 +16,8 @@ object PreferenceUtil {
     val METERS = "1"
     val METERS_PER_SECOND = "1"
     val KILOMETERS_PER_HOUR = "2"
+    val MILES_PER_HOUR = "3"
+    val KNOTS = "4"
 
     /**
      * Returns the minTime between location updates used for the LocationListener in milliseconds
