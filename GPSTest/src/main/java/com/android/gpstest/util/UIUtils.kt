@@ -35,7 +35,6 @@ import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.CsvFileLogger
 import com.android.gpstest.io.JsonFileLogger
-import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.util.IOUtils
 import com.android.gpstest.library.util.LibUIUtils
 import com.android.gpstest.library.util.LocationUtils
