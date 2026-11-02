@@ -106,9 +106,14 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
         p.getInt(key, 0)
     }
 
+    val savedGnssOrder: String? by preferenceState(R.string.pref_key_gnss_order) { p, key ->
+        p.getString(key, null)
+    }
+
     val sortOrder = GroupedSortOrder.fromIndex(groupedSortIndex)
-    val gnssGroups = remember(gnssStatuses, sortOrder) {
-        groupSatellites(gnssStatuses, true, sortOrder)
+    val gnssOrder = remember(savedGnssOrder) { parseGnssOrder(savedGnssOrder) }
+    val gnssGroups = remember(gnssStatuses, sortOrder, gnssOrder) {
+        groupSatellites(gnssStatuses, true, sortOrder, gnssOrder)
     }
     val sbasGroups = remember(sbasStatuses, sortOrder) {
         groupSatellites(sbasStatuses, false, sortOrder)
@@ -145,8 +150,12 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
                 }
             }
         } else {
-            groupedStatusItems(gnssGroups, true, osnmaMarks, viewModel.cn0History, groupedListState)
-            groupedStatusItems(sbasGroups, false, emptyMap(), viewModel.cn0History, groupedListState)
+            // SBAS appears where the user put it in the order of the GNSS filter dialog
+            val (beforeSbas, afterSbas) = splitAroundSbas(gnssGroups, gnssOrder)
+            val history = viewModel.cn0History
+            groupedStatusItems(beforeSbas, gnssGroups.isEmpty(), osnmaMarks, history, groupedListState)
+            groupedStatusItems(sbasGroups, false, emptyMap(), history, groupedListState)
+            groupedStatusItems(afterSbas, false, osnmaMarks, history, groupedListState)
         }
     }
 }

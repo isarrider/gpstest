@@ -92,8 +92,8 @@ class SatelliteGroup(
     val representative: SatelliteStatus get() = satellites.first().first
 }
 
-/** Fixed order of the constellation groups */
-private val gnssOrder = listOf(
+/** Order of the constellation groups until the user changes it in the GNSS filter dialog */
+val DEFAULT_GNSS_ORDER = listOf(
     GnssType.NAVSTAR,
     GnssType.GALILEO,
     GnssType.GLONASS,
@@ -105,10 +105,38 @@ private val gnssOrder = listOf(
 )
 
 /**
+ * Parses the saved GNSS order (comma-separated [GnssType] names). Unknown names and duplicates are
+ * ignored, and constellations missing from the saved order (e.g. added in a later version) are
+ * appended in their default order, so the result always contains every [GnssType] once.
+ */
+fun parseGnssOrder(saved: String?): List<GnssType> {
+    val order = LinkedHashSet<GnssType>()
+    saved?.split(",")?.forEach { name ->
+        GnssType.values().firstOrNull { it.name == name.trim() }?.let { order.add(it) }
+    }
+    order.addAll(DEFAULT_GNSS_ORDER)
+    return order.toList()
+}
+
+fun formatGnssOrder(order: List<GnssType>): String = order.joinToString(",") { it.name }
+
+/**
+ * Splits the GNSS groups into those shown before and after the SBAS groups, so SBAS appears where
+ * the user put it in [gnssOrder]
+ */
+fun splitAroundSbas(
+    gnssGroups: List<SatelliteGroup>,
+    gnssOrder: List<GnssType>
+): Pair<List<SatelliteGroup>, List<SatelliteGroup>> {
+    val sbasIndex = gnssOrder.indexOf(GnssType.SBAS)
+    return gnssGroups.partition { gnssOrder.indexOf(it.gnssType) < sbasIndex }
+}
+
+/**
  * Groups the signals by constellation (or, for SBAS, by system) and by satellite.
  *
- * Groups come in a fixed order (GPS, Galileo, GLONASS, BeiDou, QZSS, IRNSS; SBAS systems in the
- * order of [SbasType]). Satellites within a group are ordered by [sortOrder], with the ID as tie
+ * GNSS groups come in [gnssOrder] (by default GPS, Galileo, GLONASS, BeiDou, QZSS, IRNSS), SBAS
+ * systems in the order of [SbasType]. Satellites within a group are ordered by [sortOrder], with the ID as tie
  * breaker. Signals of a satellite are ordered from the highest to the lowest carrier frequency
  * (e.g. L1 before L5).
  */
@@ -116,6 +144,7 @@ fun groupSatellites(
     satStatuses: List<SatelliteStatus>,
     isGnss: Boolean,
     sortOrder: GroupedSortOrder = GroupedSortOrder.ID,
+    gnssOrder: List<GnssType> = DEFAULT_GNSS_ORDER,
 ): List<SatelliteGroup> {
     val byGroup = LinkedHashMap<String, MutableList<SatelliteStatus>>()
     satStatuses.forEach { status ->
@@ -144,7 +173,9 @@ fun groupSatellites(
         )
     }
     return if (isGnss) {
-        groups.sortedBy { gnssOrder.indexOf(it.gnssType) }
+        groups.sortedBy { group ->
+            gnssOrder.indexOf(group.gnssType).let { if (it < 0) Int.MAX_VALUE else it }
+        }
     } else {
         groups.sortedBy { it.sbasType.ordinal }
     }

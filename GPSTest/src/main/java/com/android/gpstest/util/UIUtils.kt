@@ -226,28 +226,8 @@ internal object UIUtils {
     }
 
     fun showFilterDialog(activity: FragmentActivity) {
-        val gnssTypes = GnssType.values()
-        val len = gnssTypes.size
-        val filter = PreferenceUtils.gnssFilter(app, prefs)
-        val items = arrayOfNulls<String>(len)
-        val checks = BooleanArray(len)
-
-        // For each GnssType, if it is in the enabled list, mark it as checked.
-        for (i in 0 until len) {
-            val gnssType = gnssTypes[i]
-            items[i] = LibUIUtils.getGnssDisplayName(app, gnssType)
-            if (filter.contains(gnssType)) {
-                checks[i] = true
-            }
-        }
-
-        // Arguments
-        val args = Bundle()
-        args.putStringArray(GnssFilterDialog.ITEMS, items)
-        args.putBooleanArray(GnssFilterDialog.CHECKS, checks)
-        val frag = GnssFilterDialog()
-        frag.arguments = args
-        frag.show(activity.supportFragmentManager, ".GnssFilterDialog")
+        // The dialog reads the filter and the GNSS order from the preferences itself
+        GnssFilterDialog().show(activity.supportFragmentManager, ".GnssFilterDialog")
     }
 
     fun showSortByDialog(activity: FragmentActivity) {

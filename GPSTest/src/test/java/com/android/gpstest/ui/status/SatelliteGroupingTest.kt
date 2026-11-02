@@ -232,6 +232,56 @@ class SatelliteGroupingTest {
     }
 
     @Test
+    fun groupsFollowCustomGnssOrder() {
+        val order = parseGnssOrder("GALILEO,BEIDOU,NAVSTAR")
+        val groups = groupSatellites(
+            listOf(
+                signal(GnssType.NAVSTAR, 1),
+                signal(GnssType.GLONASS, 1),
+                signal(GnssType.BEIDOU, 1),
+                signal(GnssType.GALILEO, 1),
+            ),
+            true,
+            gnssOrder = order
+        )
+        // GLONASS wasn't in the saved order, so it comes after the saved ones
+        assertEquals(
+            listOf(GnssType.GALILEO, GnssType.BEIDOU, GnssType.NAVSTAR, GnssType.GLONASS),
+            groups.map { it.gnssType }
+        )
+    }
+
+    @Test
+    fun parseGnssOrderIgnoresJunkAndAppendsMissing() {
+        assertEquals(DEFAULT_GNSS_ORDER, parseGnssOrder(null))
+        assertEquals(DEFAULT_GNSS_ORDER, parseGnssOrder(""))
+        val order = parseGnssOrder("SBAS, GALILEO,FOO,GALILEO")
+        assertEquals(GnssType.SBAS, order[0])
+        assertEquals(GnssType.GALILEO, order[1])
+        assertEquals(GnssType.NAVSTAR, order[2])
+        assertEquals(GnssType.values().size, order.size)
+        assertEquals(order, parseGnssOrder(formatGnssOrder(order)))
+    }
+
+    @Test
+    fun sbasIsPlacedWhereTheUserPutIt() {
+        val order = parseGnssOrder("GALILEO,SBAS,NAVSTAR")
+        val groups = groupSatellites(
+            listOf(signal(GnssType.NAVSTAR, 1), signal(GnssType.GALILEO, 1)),
+            true,
+            gnssOrder = order
+        )
+        val (before, after) = splitAroundSbas(groups, order)
+        assertEquals(listOf(GnssType.GALILEO), before.map { it.gnssType })
+        assertEquals(listOf(GnssType.NAVSTAR), after.map { it.gnssType })
+
+        // Default order: SBAS after all GNSS
+        val (allBefore, noneAfter) = splitAroundSbas(groups, DEFAULT_GNSS_ORDER)
+        assertEquals(2, allBefore.size)
+        assertTrue(noneAfter.isEmpty())
+    }
+
+    @Test
     fun sortOrderFromIndexFallsBackToId() {
         assertEquals(GroupedSortOrder.SIGNAL_STRENGTH, GroupedSortOrder.fromIndex(1))
         assertEquals(GroupedSortOrder.USED_IN_FIX, GroupedSortOrder.fromIndex(3))

@@ -128,6 +128,10 @@
     <string name="menu_option_filter">Filter</string>
     <string name="menu_option_filter_content_description">Filter signals</string>
     <string name="filter_dialog_title">Show only these GNSS</string>
+    <string name="filter_dialog_order_hint">Drag the handles to change the order of the constellations on the Status screen</string>
+    <string name="filter_dialog_drag_handle">Drag to reorder</string>
+    <string name="filter_dialog_move_up">Move up</string>
+    <string name="filter_dialog_move_down">Move down</string>
     <string name="filter_signal_text">Showing %1$d of %2$d signals</string>
     <string name="filter_showall">(show all)</string>
     <string name="error_time_title">Your GNSS time is wrong</string>

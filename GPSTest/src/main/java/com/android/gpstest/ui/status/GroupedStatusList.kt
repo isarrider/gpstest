@@ -79,14 +79,14 @@ import com.android.gpstest.library.util.MathUtils
 @OptIn(ExperimentalFoundationApi::class)
 fun LazyListScope.groupedStatusItems(
     groups: List<SatelliteGroup>,
-    isGnss: Boolean,
+    showNotAvailable: Boolean,
     osnmaMarks: Map<Int, OsnmaMark>,
     cn0History: Cn0History?,
     state: GroupedListState,
 ) {
     if (groups.isEmpty()) {
         // Like the classic table, nothing is shown for SBAS if there are no SBAS satellites
-        if (isGnss) {
+        if (showNotAvailable) {
             item(key = "gnss_not_available") {
                 Card(
                     modifier = Modifier
