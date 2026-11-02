@@ -22,7 +22,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
 import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.content.SharedPreferences
 import android.content.res.Configuration
@@ -533,11 +532,11 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
         // 3. Set up main Intent/Pending Intents for notification
         val launchActivityIntent = Intent(this, MainActivity::class.java).apply {
-            flags = FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK
-            // NOTE: The above causes the activity/viewmodel to be recreated from scratch for Accuracy when it's already visible
-            // and the notification is tapped (strangely if it's destroyed Accuracy viewmodel seems to keep it's state)
-            // FLAG_ACTIVITY_REORDER_TO_FRONT seems like it should work, but if this is used then onResume() is called
-            // again (and onPause() is never called). This seems to freeze up Status into a blank state because GNSS inits again.
+            // Bring the running app back like the launcher icon does. MainActivity is singleInstance,
+            // so an existing instance is reused (onNewIntent with a normal pause/resume) and keeps its
+            // state - screen, view model and C/N0 history. FLAG_ACTIVITY_CLEAR_TASK used to be set
+            // here, which recreated the activity and view model from scratch on every tap.
+            flags = FLAG_ACTIVITY_NEW_TASK
         }
         val openActivityPendingIntent = PendingIntentCompat.getActivity(
             applicationContext,
