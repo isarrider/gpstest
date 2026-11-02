@@ -155,6 +155,28 @@
             android:summary="@string/pref_output_category_summary">
 
             <PreferenceCategory
+                android:title="@string/pref_gpx_category_title"
+                android:key="@string/pref_key_gpx_category">
+                <EditTextPreference
+                    android:key="@string/pref_key_gpx_write_interval"
+                    android:title="@string/pref_gpx_write_interval_title"
+                    android:summary="@string/pref_gpx_write_interval_summary"
+                    android:dialogTitle="@string/pref_gpx_write_interval_title"
+                    android:defaultValue="@string/pref_gpx_write_interval_default_min" />
+                <EditTextPreference
+                    android:key="@string/pref_key_gpx_segment_gap"
+                    android:title="@string/pref_gpx_segment_gap_title"
+                    android:summary="@string/pref_gpx_segment_gap_summary"
+                    android:dialogTitle="@string/pref_gpx_segment_gap_title"
+                    android:defaultValue="@string/pref_gpx_segment_gap_default_sec" />
+                <CheckBoxPreference
+                    android:key="@string/pref_key_gpx_include_satellites"
+                    android:title="@string/pref_gpx_include_satellites_title"
+                    android:summary="@string/pref_gpx_include_satellites_summary"
+                    android:defaultValue="false" />
+            </PreferenceCategory>
+
+            <PreferenceCategory
                 android:title="@string/pref_file_output_category_title"
                 android:key="@string/pref_key_file_output_category">
                 <CheckBoxPreference

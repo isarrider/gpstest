@@ -114,6 +114,12 @@
     <string name="pref_key_file_antenna_output_json">file_antenna_output_json</string>
     <string name="pref_key_file_antenna_output_csv">file_antenna_output_csv</string>
     <string name="pref_key_file_location_output">file_location_output</string>
+    <string name="pref_key_gpx_category">gpx_category</string>
+    <string name="pref_key_gpx_write_interval">gpx_write_interval_min</string>
+    <string name="pref_key_gpx_segment_gap">gpx_segment_gap_sec</string>
+    <string name="pref_key_gpx_include_satellites">gpx_include_satellites</string>
+    <string name="pref_gpx_write_interval_default_min">5</string>
+    <string name="pref_gpx_segment_gap_default_sec">30</string>
     <string name="pref_key_file_gnss_status_output">file_gnss_status_output</string>
     <string name="pref_key_file_orientation_output">file_orientation_output</string>
     <string name="pref_key_file_osnma_output">file_osnma_output</string>

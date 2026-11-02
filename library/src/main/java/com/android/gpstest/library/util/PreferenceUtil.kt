@@ -41,6 +41,30 @@ object PreferenceUtil {
         return prefs.getBoolean(context.getString(R.string.pref_key_file_location_output), false)
     }
 
+    /**
+     * Interval between GPX track writes in milliseconds, 0 to write every fix
+     */
+    fun gpxWriteIntervalMillis(context: Context, prefs: SharedPreferences): Long {
+        val default = context.getString(R.string.pref_gpx_write_interval_default_min).toLong()
+        val minutes = prefs.getString(context.getString(R.string.pref_key_gpx_write_interval), null)
+            ?.trim()?.toLongOrNull()?.takeIf { it >= 0 } ?: default
+        return minutes * 60_000L
+    }
+
+    /**
+     * Gap between fixes in milliseconds after which a GPX track continues in a new segment
+     */
+    fun gpxSegmentGapMillis(context: Context, prefs: SharedPreferences): Long {
+        val default = context.getString(R.string.pref_gpx_segment_gap_default_sec).toLong()
+        val seconds = prefs.getString(context.getString(R.string.pref_key_gpx_segment_gap), null)
+            ?.trim()?.toLongOrNull()?.takeIf { it > 0 } ?: default
+        return seconds * 1_000L
+    }
+
+    fun gpxIncludeSatellites(context: Context, prefs: SharedPreferences): Boolean {
+        return prefs.getBoolean(context.getString(R.string.pref_key_gpx_include_satellites), false)
+    }
+
     fun writeMeasurementToLogcat(context: Context, prefs: SharedPreferences): Boolean {
         return prefs.getBoolean(context.getString(R.string.pref_key_as_measurement_output), false)
     }

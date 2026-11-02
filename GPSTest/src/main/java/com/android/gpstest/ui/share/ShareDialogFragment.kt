@@ -25,6 +25,8 @@ class ShareDialogFragment : DialogFragment() {
         val KEY_LOGGING_ENABLED = "logging-enabled"
         val KEY_ALTERNATE_FILE_URI = "alternate-file-uri"
         val KEY_LOG_FILES = "log-file"
+        val KEY_TRACK_URI = "track-uri"
+        val KEY_TRACK_NAME = "track-name"
     }
 
     interface Listener {

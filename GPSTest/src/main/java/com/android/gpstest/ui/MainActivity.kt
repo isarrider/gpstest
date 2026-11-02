@@ -35,6 +35,10 @@ import android.view.View
 import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.ProgressBar
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.format.DateUtils
+import android.text.style.ForegroundColorSpan
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
@@ -50,6 +54,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.Application
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
@@ -73,6 +78,7 @@ import com.android.gpstest.ui.NavigationDrawerFragment.NavigationDrawerCallbacks
 import com.android.gpstest.ui.signals.SignalsFragment
 import com.android.gpstest.ui.sky.SkyFragment
 import com.android.gpstest.ui.status.StatusFragment
+import com.android.gpstest.ui.track.TrackFragment
 import com.android.gpstest.util.BuildUtils
 import com.android.gpstest.util.UIUtils
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -81,6 +87,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -108,6 +116,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private var skyFragment: SkyFragment? = null
     private var accuracyFragment: MapFragment? = null
     private var signalsFragment: SignalsFragment? = null
+    private var trackFragment: TrackFragment? = null
 
     // Main signal view model
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -127,6 +136,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private var progressBar: ProgressBar? = null
     private var isServiceBound = false
     private var service: ForegroundOnlyLocationService? = null
+    private var recordingIndicatorJob: Job? = null
 
     private var foregroundOnlyServiceConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(componentName: ComponentName, iBinder: IBinder) {
@@ -194,6 +204,30 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         setupNavigationDrawer()
         val serviceIntent = Intent(this, ForegroundOnlyLocationService::class.java)
         bindService(serviceIntent, foregroundOnlyServiceConnection, BIND_AUTO_CREATE)
+
+        // Summary of the last GPX track (for Share and the Track screen) after an app restart
+        GpxTrackRecorder.loadLastTrack(applicationContext)
+
+        // Keep the record button and the REC indicator in sync, also when recording is stopped
+        // from the notification
+        GpxTrackRecorder.state
+            .map { it.isRecording }
+            .distinctUntilChanged()
+            .onEach { recording ->
+                invalidateOptionsMenu()
+                recordingIndicatorJob?.cancel()
+                if (recording) {
+                    recordingIndicatorJob = lifecycleScope.launch {
+                        while (true) {
+                            updateRecordingIndicator()
+                            delay(1_000)
+                        }
+                    }
+                } else {
+                    supportActionBar?.subtitle = null
+                }
+            }
+            .launchIn(lifecycleScope)
 
         val backPressedCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
@@ -466,6 +500,10 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 showAccuracyFragment()
                 currentNavDrawerPosition = item
             }
+            NavigationDrawerFragment.NAVDRAWER_ITEM_TRACK -> if (currentNavDrawerPosition != NavigationDrawerFragment.NAVDRAWER_ITEM_TRACK) {
+                showTrackFragment()
+                currentNavDrawerPosition = item
+            }
             NavigationDrawerFragment.NAVDRAWER_ITEM_INJECT_PSDS_DATA -> forcePsdsInjection()
             NavigationDrawerFragment.NAVDRAWER_ITEM_INJECT_TIME_DATA -> forceTimeInjection()
             NavigationDrawerFragment.NAVDRAWER_ITEM_CLEAR_AIDING_DATA -> {
@@ -512,6 +550,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideMapFragment()
         hideSkyFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -548,6 +587,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideStatusFragment()
         hideSkyFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -587,6 +627,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideStatusFragment()
         hideMapFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -622,6 +663,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideStatusFragment()
         hideMapFragment()
         hideSkyFragment()
+        hideTrackFragment()
         // Show fragment (we use show instead of replace to keep the map state)
         if (accuracyFragment == null) {
             // First check to see if an instance of fragment already exists
@@ -645,6 +687,38 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         }
     }
 
+    private fun showTrackFragment() {
+        val fm = supportFragmentManager
+        hideStatusFragment()
+        hideMapFragment()
+        hideSkyFragment()
+        hideAccuracyFragment()
+        hideSignalsFragment()
+        if (benchmarkController != null) {
+            benchmarkController!!.hide()
+        }
+        if (trackFragment == null) {
+            trackFragment = fm.findFragmentByTag(TrackFragment.TAG) as TrackFragment?
+            if (trackFragment == null) {
+                Log.d(TAG, "Creating new TrackFragment")
+                trackFragment = TrackFragment()
+                fm.beginTransaction()
+                    .add(R.id.fragment_container, trackFragment!!, TrackFragment.TAG)
+                    .commit()
+            }
+        }
+        supportFragmentManager.beginTransaction().show(trackFragment!!).commit()
+        title = resources.getString(R.string.gps_track_title)
+    }
+
+    private fun hideTrackFragment() {
+        val fm = supportFragmentManager
+        trackFragment = fm.findFragmentByTag(TrackFragment.TAG) as TrackFragment?
+        if (trackFragment != null && !trackFragment!!.isHidden) {
+            fm.beginTransaction().hide(trackFragment!!).commit()
+        }
+    }
+
     private fun hideAccuracyFragment() {
         val fm = supportFragmentManager
         accuracyFragment = fm.findFragmentByTag(MapConstants.MODE_ACCURACY) as MapFragment?
@@ -660,6 +734,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideMapFragment()
         hideSkyFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -912,7 +987,14 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         val item = menu.findItem(R.id.share)
         if (item != null) {
-            item.isVisible = lastLocation != null || isFileLoggingEnabled(app, prefs) == true
+            item.isVisible = lastLocation != null || isFileLoggingEnabled(app, prefs) == true ||
+                    GpxTrackRecorder.stats.value?.fileUri != null
+        }
+        val record = menu.findItem(R.id.record_track)
+        if (record != null) {
+            val recording = GpxTrackRecorder.state.value.isRecording
+            record.setIcon(if (recording) R.drawable.ic_baseline_stop_24 else R.drawable.ic_baseline_fiber_manual_record_24)
+            record.title = getString(if (recording) R.string.gpx_record_stop else R.string.gpx_record_start)
         }
         return true
     }
@@ -927,11 +1009,66 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 share()
                 return true
             }
+            R.id.record_track -> {
+                toggleGpxRecording()
+                return true
+            }
             R.id.filter_sats -> {
                 UIUtils.showFilterDialog(this)
             }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    /**
+     * Shows "● REC 00:12:34" in red as toolbar subtitle while a GPX track is being recorded
+     */
+    private fun updateRecordingIndicator() {
+        val state = GpxTrackRecorder.state.value
+        if (!state.isRecording) {
+            supportActionBar?.subtitle = null
+            return
+        }
+        val elapsed = DateUtils.formatElapsedTime((System.currentTimeMillis() - state.startTime) / 1000)
+        val text = SpannableString(getString(R.string.gpx_recording_indicator, elapsed))
+        text.setSpan(
+            ForegroundColorSpan(ContextCompat.getColor(this, R.color.gpx_recording)),
+            0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        supportActionBar?.subtitle = text
+    }
+
+    /**
+     * Starts a new GPX track (starting GNSS first if needed), or stops the current one
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun toggleGpxRecording() {
+        val s = service
+        if (s == null) {
+            Toast.makeText(this, R.string.gpx_recording_not_ready, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = GpxTrackRecorder.state.value
+        if (current.isRecording) {
+            s.stopGpxRecording()
+            Toast.makeText(
+                this, getString(R.string.gpx_recording_stopped, current.location), Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        if (!isTrackingStarted(prefs)) {
+            gpsStart()
+            switch?.isChecked = true
+        }
+        if (s.startGpxRecording()) {
+            Toast.makeText(
+                this,
+                getString(R.string.gpx_recording_started, GpxTrackRecorder.state.value.location),
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, R.string.gpx_recording_failed, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun share() {

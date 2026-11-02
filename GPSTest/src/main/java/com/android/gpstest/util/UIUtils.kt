@@ -34,6 +34,7 @@ import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.CsvFileLogger
+import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.JsonFileLogger
 import com.android.gpstest.library.util.IOUtils
 import com.android.gpstest.library.util.LibUIUtils
@@ -168,8 +169,25 @@ internal object UIUtils {
         }
         dialog.setListener(shareListener)
         dialog.arguments =
-            createBundleForShareDialog(location, loggingEnabled, files, alternateFileUri)
+            createBundleForShareDialog(location, loggingEnabled, files, alternateFileUri).apply {
+                // The GPX track being recorded, or the last recorded one
+                val track = GpxTrackRecorder.stats.value
+                val trackUri = track?.fileUri?.let { Uri.parse(it) }
+                if (trackUri != null && uriExists(activity, trackUri)) {
+                    putParcelable(ShareDialogFragment.KEY_TRACK_URI, trackUri)
+                    putString(ShareDialogFragment.KEY_TRACK_NAME, track.fileName)
+                }
+            }
         dialog.show(fm, ShareDialogFragment.TAG)
+    }
+
+    /** True if the content URI can still be opened, e.g. the user didn't delete the file */
+    private fun uriExists(activity: Activity, uri: Uri): Boolean {
+        return try {
+            activity.contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**

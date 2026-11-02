@@ -48,9 +48,13 @@ class ShareLogFragment : Fragment() {
         val loggingEnabled = arguments?.getBoolean(ShareDialogFragment.KEY_LOGGING_ENABLED) ?: false
         val files = arguments?.getSerializable(ShareDialogFragment.KEY_LOG_FILES) as ArrayList<File>?
         val alternateFileUri = arguments?.getParcelable<Uri>(ShareDialogFragment.KEY_ALTERNATE_FILE_URI)
+        // GPX track being recorded or the last recorded one, shared together with the logs
+        val trackUri = arguments?.getParcelable<Uri>(ShareDialogFragment.KEY_TRACK_URI)
+        val trackName = arguments?.getString(ShareDialogFragment.KEY_TRACK_NAME)
+        val hasLogs = loggingEnabled && files != null
 
-        if (loggingEnabled && files != null) {
-            // Hide the logging instructions - logging is enabled and working
+        if (hasLogs || trackUri != null) {
+            // Hide the logging instructions - there is something to share
             logInstructions.visibility = View.GONE
         } else {
             // Hide the logging and file views so the user can see the instructions
@@ -59,30 +63,37 @@ class ShareLogFragment : Fragment() {
             logBrowse.visibility = View.GONE
             logShare.visibility = View.GONE
         }
+        if (!hasLogs) {
+            // Browsing applies to the log folder only
+            logBrowse.visibility = View.GONE
+        }
 
-        // Set the log file name
+        // Set the file names
+        var fileNameText = ""
         if (loggingEnabled) {
             if (files != null) {
                 if (alternateFileUri == null) {
-                    var fileNameText = ""
                     // Set the log file currently being logged to by the FileLogger
                     for (file in files) {
                         fileNameText += file.name + System.getProperty("line.separator")
                     }
-                    fileName.text = fileNameText
                 } else {
                     // Set the log file selected by the user using the File Browse button
                     val lastPathSegment: String? = alternateFileUri.getLastPathSegment()
                     // Parse file name from string like "primary:gnss_log/gnss_log_2019..."
                     val parts = lastPathSegment?.split("/".toRegex())?.toTypedArray()
-                    fileName.text = parts?.get(parts.size - 1) ?: ""
+                    fileNameText += (parts?.get(parts.size - 1) ?: "") + System.getProperty("line.separator")
                 }
-            } else {
+            } else if (trackUri == null) {
                 // Something went wrong - did user allow file/storage permissions when prompted when they enabled logging in Settings?
                 logInstructions.setText(R.string.log_error)
                 return
             }
         }
+        if (trackUri != null) {
+            fileNameText += trackName ?: trackUri.lastPathSegment ?: ""
+        }
+        fileName.text = fileNameText.trimEnd()
 
         logBrowse.setOnClickListener { _: View? ->
             // File browse
@@ -95,16 +106,23 @@ class ShareLogFragment : Fragment() {
         }
 
         logShare.setOnClickListener { _: View? ->
-            // Send the log file
-            if (alternateFileUri == null && files != null) {
-                // Send the log file currently being logged to by the FileLogger
-                IOUtils.sendLogFile(app, BuildConfig.APPLICATION_ID, activity, *files.toTypedArray())
-                listener.onLogFileSent()
-            } else {
-                // Send the log file selected by the user using the File Browse button
-                IOUtils.sendLogFile(app, activity, ArrayList(Collections.singleton(alternateFileUri)))
-                listener.onLogFileSent()
+            val uris = ArrayList<Uri>()
+            if (hasLogs) {
+                if (alternateFileUri == null) {
+                    // The log files currently being logged to by the FileLogger
+                    for (file in files!!) {
+                        uris.add(IOUtils.getUriFromFile(activity, BuildConfig.APPLICATION_ID, file))
+                    }
+                } else {
+                    // The log file selected by the user using the File Browse button
+                    uris.add(alternateFileUri)
+                }
             }
+            if (trackUri != null) {
+                uris.add(trackUri)
+            }
+            IOUtils.sendLogFile(app, activity, uris)
+            listener.onLogFileSent()
         }
     }
 
