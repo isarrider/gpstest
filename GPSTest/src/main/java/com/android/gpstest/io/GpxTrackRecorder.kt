@@ -86,7 +86,7 @@ class GpxTrackRecorder(
             lastFixTime = Long.MIN_VALUE
             lastFlushElapsed = SystemClock.elapsedRealtime()
             pointCount = 0
-            val acc = GpxTrackStatsAccumulator(w.displayLocation(), now.time)
+            val acc = GpxTrackStatsAccumulator(w.displayLocation(), w.displayName, w.contentUri?.toString(), now.time)
             stats = acc
             _stats.value = acc.snapshot()
             lastStatsSaveElapsed = 0L

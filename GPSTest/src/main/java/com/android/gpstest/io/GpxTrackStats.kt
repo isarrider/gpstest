@@ -23,6 +23,10 @@ import kotlin.math.max
  */
 data class GpxTrackStats(
     val fileLocation: String,
+    /** File name, e.g. gpstest_track_2026-11-02_10-00-00.gpx */
+    val fileName: String,
+    /** content:// URI for sharing, or null */
+    val fileUri: String?,
     val startTime: Long,
     /** Time of the latest fix, or [startTime] if there is none yet */
     val lastFixTime: Long,
@@ -63,6 +67,8 @@ data class GpxTrackStats(
         val o = JSONObject()
         o.put("v", 1)
         o.put("file", fileLocation)
+        o.put("name", fileName)
+        o.putOpt("uri", fileUri)
         o.put("start", startTime)
         o.put("last", lastFixTime)
         o.put("points", points)
@@ -112,6 +118,8 @@ data class GpxTrackStats(
             }
             return GpxTrackStats(
                 fileLocation = o.optString("file"),
+                fileName = o.optString("name"),
+                fileUri = if (o.isNull("uri") || !o.has("uri")) null else o.getString("uri"),
                 startTime = o.getLong("start"),
                 lastFixTime = o.getLong("last"),
                 points = o.getInt("points"),
@@ -144,7 +152,12 @@ data class GpxTrackStats(
  * - Ascent/descent only count changes beyond [ELEVATION_HYSTERESIS_METERS].
  * - Moving time counts intervals at [MOVING_SPEED] or faster that are not a segment gap.
  */
-class GpxTrackStatsAccumulator(private val fileLocation: String, private val startTime: Long) {
+class GpxTrackStatsAccumulator(
+    private val fileLocation: String,
+    private val fileName: String,
+    private val fileUri: String?,
+    private val startTime: Long
+) {
 
     private var lastFixTime = startTime
     private var points = 0
@@ -261,6 +274,8 @@ class GpxTrackStatsAccumulator(private val fileLocation: String, private val sta
 
     fun snapshot(): GpxTrackStats = GpxTrackStats(
         fileLocation = fileLocation,
+        fileName = fileName,
+        fileUri = fileUri,
         startTime = startTime,
         lastFixTime = lastFixTime,
         points = points,

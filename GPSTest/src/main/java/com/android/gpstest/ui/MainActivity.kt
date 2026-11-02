@@ -35,6 +35,10 @@ import android.view.View
 import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.ProgressBar
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.format.DateUtils
+import android.text.style.ForegroundColorSpan
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
@@ -130,6 +134,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private var progressBar: ProgressBar? = null
     private var isServiceBound = false
     private var service: ForegroundOnlyLocationService? = null
+    private var recordingIndicatorJob: Job? = null
 
     private var foregroundOnlyServiceConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(componentName: ComponentName, iBinder: IBinder) {
@@ -198,11 +203,28 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         val serviceIntent = Intent(this, ForegroundOnlyLocationService::class.java)
         bindService(serviceIntent, foregroundOnlyServiceConnection, BIND_AUTO_CREATE)
 
-        // Keep the record button in sync, also when recording is stopped from the notification
+        // Summary of the last GPX track (for Share and the Track screen) after an app restart
+        GpxTrackRecorder.loadLastTrack(applicationContext)
+
+        // Keep the record button and the REC indicator in sync, also when recording is stopped
+        // from the notification
         GpxTrackRecorder.state
             .map { it.isRecording }
             .distinctUntilChanged()
-            .onEach { invalidateOptionsMenu() }
+            .onEach { recording ->
+                invalidateOptionsMenu()
+                recordingIndicatorJob?.cancel()
+                if (recording) {
+                    recordingIndicatorJob = lifecycleScope.launch {
+                        while (true) {
+                            updateRecordingIndicator()
+                            delay(1_000)
+                        }
+                    }
+                } else {
+                    supportActionBar?.subtitle = null
+                }
+            }
             .launchIn(lifecycleScope)
 
         val backPressedCallback = object : OnBackPressedCallback(false) {
@@ -920,7 +942,8 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         val item = menu.findItem(R.id.share)
         if (item != null) {
-            item.isVisible = lastLocation != null || isFileLoggingEnabled(app, prefs) == true
+            item.isVisible = lastLocation != null || isFileLoggingEnabled(app, prefs) == true ||
+                    GpxTrackRecorder.stats.value?.fileUri != null
         }
         val record = menu.findItem(R.id.record_track)
         if (record != null) {
@@ -950,6 +973,24 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
             }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    /**
+     * Shows "● REC 00:12:34" in red as toolbar subtitle while a GPX track is being recorded
+     */
+    private fun updateRecordingIndicator() {
+        val state = GpxTrackRecorder.state.value
+        if (!state.isRecording) {
+            supportActionBar?.subtitle = null
+            return
+        }
+        val elapsed = DateUtils.formatElapsedTime((System.currentTimeMillis() - state.startTime) / 1000)
+        val text = SpannableString(getString(R.string.gpx_recording_indicator, elapsed))
+        text.setSpan(
+            ForegroundColorSpan(ContextCompat.getColor(this, R.color.gpx_recording)),
+            0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        supportActionBar?.subtitle = text
     }
 
     /**

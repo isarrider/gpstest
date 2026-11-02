@@ -127,6 +127,10 @@ class GpxTrackWriter(
         }
     }
 
+    /** content:// URI of the file for sharing (Android 10+), or null */
+    val contentUri: Uri?
+        get() = uri
+
     /** Location of the file for messages to the user */
     fun displayLocation(): String {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
