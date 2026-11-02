@@ -266,7 +266,15 @@ Extensions in `<extensions>`:
     * `cn0` - `avg` and `max` C/N0 (dB-Hz) of the signals used in the fix
     * `bands` - bands used in the fix, e.g. `<gpstest:bands dual="true">E1,E5a,L1,L5</gpstest:bands>`
     * `sbas` - whether SBAS corrections were used, with system and PRNs, e.g. `<gpstest:sbas used="true" system="EGNOS" prn="123,136"/>`
+    * `osnma` - Galileo [OSNMA](https://www.gsc-europa.eu/galileo/services/galileo-open-service-navigation-message-authentication-osnma) at the time of the fix, when OSNMA is turned on, e.g. `<gpstest:osnma phase="AUTHENTICATING" auth="6" failed="0" galileo="7" time="network"/>`:
+        * `phase` - OSNMA state (`NO_OSNMA`, `WAITING_FOR_PUBLIC_KEY`, `WAITING_FOR_KROOT`, `WAITING_FOR_TAGS`, `AUTHENTICATING`, `DONT_USE`, `ALERT`, ...)
+        * `galileo` - Galileo satellites used in the fix
+        * `auth` - of those, the ones whose navigation data OSNMA authenticated
+        * `failed` - of those, the ones whose OSNMA tags failed recently
+        * `time` - `network` if OSNMA checks time against Android's network time, `device` if against the device clock (which some devices set from GNSS, so it isn't independent of the signal)
     * `sats` - only with "Include every satellite signal": one `<gpstest:s sys="NAVSTAR" id="5" band="L1" cn0="38.2" el="45" az="120" used="1"/>` per signal
+
+*About OSNMA in tracks: OSNMA authenticates the Galileo navigation data (orbits, clocks, time) that GPSTest decodes. It does not prove that the position is authentic: the position comes from the phone's GNSS chip, which combines all constellations and doesn't say whether it used authenticated data, and OSNMA alone doesn't detect re-broadcast (meaconing) attacks. `auth` equal to `galileo` with `failed="0"` is strong evidence that the Galileo signals were genuine; failed tags are a warning. The GPX file itself is not signed.*
 
 Example track point:
 
@@ -300,6 +308,7 @@ Example track point:
     <gpstest:cn0 avg="34.6" max="44.1"/>
     <gpstest:bands dual="true">E1,E5a,L1,L5</gpstest:bands>
     <gpstest:sbas used="true" system="EGNOS" prn="123"/>
+    <gpstest:osnma phase="AUTHENTICATING" auth="7" failed="0" galileo="7" time="network"/>
   </extensions>
 </trkpt>
 ~~~
@@ -309,7 +318,7 @@ Example track point:
 The "Track" screen shows the track being recorded, or the last recorded track when nothing is recording (also after an app restart):
 * Start time, duration, moving time, distance, average speed while moving and maximum speed
 * Elevation: current, lowest, highest, total ascent and descent
-* GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections
+* GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections, and with OSNMA on: share of the track where every Galileo satellite used was authenticated, and the number of points with failed OSNMA tags
 * Battery: charge at the start and now (or at the end), percentage points used, and use per hour for tracks of 10 minutes or longer. If the phone was charging during the track, no use is calculated.
 * File: points, segments, file location, and while recording, the time of the last write and the points still waiting in memory
 * Charts of elevation over distance, and speed, satellites used and battery over time

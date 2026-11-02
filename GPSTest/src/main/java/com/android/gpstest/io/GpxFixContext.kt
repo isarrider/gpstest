@@ -14,10 +14,12 @@
 package com.android.gpstest.io
 
 import android.os.SystemClock
+import com.android.gpstest.library.data.OsnmaUiState
 import com.android.gpstest.library.model.DilutionOfPrecision
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
 import com.android.gpstest.library.model.SbasType
+import com.android.gpstest.library.osnma.OsnmaMark
 import com.android.gpstest.library.util.CarrierFreqUtils
 import com.android.gpstest.library.util.NmeaUtils
 
@@ -43,8 +45,38 @@ data class GpxFixContext(
     /** Battery charge in percent, or null if unknown */
     val batteryPercent: Int? = null,
     /** True if the battery is charging or full on power, null if unknown */
-    val batteryCharging: Boolean? = null
+    val batteryCharging: Boolean? = null,
+    /** OSNMA state, or null if OSNMA is turned off or hasn't seen Galileo data yet */
+    val osnma: Osnma? = null
 ) {
+    /**
+     * Galileo OSNMA at the moment of the fix: [phase] is the engine state, [marks] the
+     * authentication result per Galileo SVID, [timeNetwork] whether the reference time is
+     * independent of the signal (network time) rather than the device clock.
+     */
+    data class Osnma(
+        val phase: String,
+        val marks: Map<Int, OsnmaMark>,
+        val timeNetwork: Boolean
+    )
+
+    /** Distinct Galileo satellites used in the fix */
+    val galileoUsed: Set<Int> by lazy {
+        usedSignals.filter { it.gnssType == GnssType.GALILEO }.map { it.svid }.toSet()
+    }
+
+    /** Galileo satellites used in the fix whose navigation data OSNMA authenticated */
+    val osnmaAuthenticated: Int by lazy {
+        val m = osnma?.marks ?: return@lazy 0
+        galileoUsed.count { m[it] == OsnmaMark.AUTHENTICATED }
+    }
+
+    /** Galileo satellites used in the fix with recently failed OSNMA tags */
+    val osnmaFailed: Int by lazy {
+        val m = osnma?.marks ?: return@lazy 0
+        galileoUsed.count { m[it] == OsnmaMark.FAILED }
+    }
+
     /** Signals used in the fix (one satellite can contribute several signals on different bands) */
     val usedSignals: List<SatelliteStatus> by lazy { satellites.filter { it.usedInFix } }
 
@@ -97,6 +129,8 @@ class GpxFixContextCollector {
     private var headingTime = 0L
 
     @Volatile
+    private var osnma: GpxFixContext.Osnma? = null
+    @Volatile
     private var batteryPercent: Int? = null
     @Volatile
     private var batteryCharging: Boolean? = null
@@ -130,6 +164,14 @@ class GpxFixContextCollector {
         headingTime = SystemClock.elapsedRealtime()
     }
 
+    /** Latest OSNMA state; null when OSNMA is turned off */
+    fun onOsnma(state: OsnmaUiState) {
+        val status = if (state.enabled) state.status else null
+        osnma = status?.let {
+            GpxFixContext.Osnma(it.phase.name, it.marks(), state.timeSourceNetwork)
+        }
+    }
+
     /** Latest battery state, from the system's battery broadcast */
     fun onBattery(percent: Int, charging: Boolean) {
         batteryPercent = percent
@@ -149,7 +191,8 @@ class GpxFixContextCollector {
             mslAltitude = g?.msl,
             geoidSeparation = g?.geoidSep,
             batteryPercent = batteryPercent,
-            batteryCharging = batteryCharging
+            batteryCharging = batteryCharging,
+            osnma = osnma
         )
     }
 

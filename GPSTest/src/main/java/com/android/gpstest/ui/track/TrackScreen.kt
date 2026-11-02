@@ -121,6 +121,10 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             StatRow(R.string.track_avg_hdop, s.avgHdop?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
             StatRow(R.string.track_dual_freq, s.dualFrequencyShare?.let { percent(it) } ?: DASH)
             StatRow(R.string.track_sbas, s.sbasShare?.let { percent(it) } ?: DASH)
+            if (s.osnmaPoints > 0) {
+                StatRow(R.string.track_osnma_all, percent(s.osnmaAllAuthenticated.toDouble() / s.osnmaPoints))
+                StatRow(R.string.track_osnma_failed, s.osnmaFailedPoints.toString())
+            }
         }
 
         if (s.batteryStart != null) {

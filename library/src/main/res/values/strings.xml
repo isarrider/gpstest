@@ -400,6 +400,8 @@
     <string name="track_avg_hdop">Average HDOP</string>
     <string name="track_dual_freq">Dual-frequency</string>
     <string name="track_sbas">SBAS corrections (e.g. EGNOS)</string>
+    <string name="track_osnma_all">OSNMA: all Galileo satellites authenticated</string>
+    <string name="track_osnma_failed">OSNMA: points with failed tags</string>
     <string name="track_section_battery">Battery</string>
     <string name="track_battery_start">At start</string>
     <string name="track_battery_now">Now</string>
