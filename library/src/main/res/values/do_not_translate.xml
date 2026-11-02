@@ -39,9 +39,11 @@
     <string name="gps_speed_value_meters_sec">%1$.1f m/s</string>
     <string name="gps_speed_value_kilometers_hour">%1$.1f km/h</string>
     <string name="gps_speed_value_miles_hour">%1$.1f mph</string>
+    <string name="gps_speed_value_knots">%1$.1f kt</string>
     <string name="gps_speed_acc_value_meters_sec">%1$.1f m/s</string>
     <string name="gps_speed_acc_value_km_hour">%1$.1f km/h</string>
     <string name="gps_speed_acc_value_miles_hour">%1$.1f mph</string>
+    <string name="gps_speed_acc_value_knots">%1$.1f kt</string>
     <string name="gps_bearing_value">%1$.1f\u00B0</string>
     <string name="gps_bearing_acc_value">%1$.1f\u00B0</string>
     <string name="gps_num_sats_value">%1$d/%2$d/%3$d</string>
@@ -127,6 +129,7 @@
     <string name="pref_key_never_show_clear_assist_warning">never_show_clear_assist_warning</string>
     <string name="pref_key_coordinate_format">coordinate_format</string>
     <string name="pref_key_share_include_altitude">share_include_altitude</string>
+    <string name="pref_key_share_include_timestamp">share_include_timestamp</string>
 
     <string name="pref_key_never_show_qr_code_instructions">never_show_qr_code_instructions</string>
     <string name="pref_key_preferred_distance_units_v2">preference_distance_units_v2</string>
@@ -216,12 +219,14 @@
         <item>@string/preferences_preferred_speed_units_option_meters_per_second</item>
         <item>@string/preferences_preferred_speed_units_option_kilometers_per_hour</item>
         <item>@string/preferences_preferred_speed_units_option_miles_per_hour</item>
+        <item>@string/preferences_preferred_speed_units_option_knots</item>
     </string-array>
 
     <string-array name="preferred_speed_units_values">
         <item>1</item>
         <item>2</item>
         <item>3</item>
+        <item>4</item>
     </string-array>
 
     <!-- Supported languages, must stay in-order with language_values -->
