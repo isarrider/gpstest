@@ -16,7 +16,6 @@
 
 package com.android.gpstest
 
-import android.os.Build
 import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
@@ -42,13 +41,7 @@ class CarrierFreqUtilsTest {
 
         // NAVSTAR (GPS)
         label = CarrierFreqUtils.getCarrierFrequencyLabel(gpsL1(1, true))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals("L1", label)
-        } else {
-            assertEquals("unsupported", label)
-            // The rest of the responses will be the same for API < 26, so we can skip remaining tests
-            return;
-        }
+        assertEquals("L1", label)
         label = CarrierFreqUtils.getCarrierFrequencyLabel(gpsL2())
         assertEquals("L2", label)
         label = CarrierFreqUtils.getCarrierFrequencyLabel(gpsL3())

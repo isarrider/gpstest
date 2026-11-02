@@ -18,11 +18,9 @@ package com.android.gpstest.io;
 
 import android.content.Context;
 import android.location.GnssAntennaInfo;
-import android.os.Build;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
 
 import com.android.gpstest.Application;
@@ -119,7 +117,6 @@ public class JsonFileLogger extends BaseFileLogger implements FileLogger {
         super.close();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.R)
     public synchronized void onGnssAntennaInfoReceived(@NonNull List<GnssAntennaInfo> list) {
         try {
             if (mapper != null && jsonGenerator != null) {

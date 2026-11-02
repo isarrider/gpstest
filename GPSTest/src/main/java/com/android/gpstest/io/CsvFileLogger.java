@@ -31,7 +31,6 @@ import android.os.SystemClock;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
 
 import com.android.gpstest.Application;
@@ -303,7 +302,6 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
         fileWriter.newLine();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.R)
     public synchronized void onGnssAntennaInfoReceived(@NonNull List<GnssAntennaInfo> list) {
         try {
             for (GnssAntennaInfo info : list) {

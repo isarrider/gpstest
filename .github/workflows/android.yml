@@ -90,7 +90,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api-level: [24, 29, 33]
+        # minSdk is 35 (Android 15) on this fork
+        api-level: [35, 36]
         target: [default, google_apis]
         tasks: [connectedGoogleDebugAndroidTest, connectedOsmdroidDebugAndroidTest]
     steps:
@@ -134,7 +135,9 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           force-avd-creation: false
-          ram-size: 1024M
+          ram-size: 2048M
+          # Android 15+ images boot slower on the hosted runners
+          emulator-boot-timeout: 900
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           disable-animations: true
           script: |

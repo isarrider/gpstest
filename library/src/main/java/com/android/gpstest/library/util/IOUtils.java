@@ -28,12 +28,10 @@ import android.location.GnssMeasurement;
 import android.location.GnssNavigationMessage;
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
@@ -43,8 +41,6 @@ import com.google.zxing.integration.android.IntentIntegrator;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -355,7 +351,6 @@ public class IOUtils {
     /**
      * Outputs the provided GNSS navigation message to log
      */
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public static void writeNavMessageToAndroidStudio(GnssNavigationMessage message) {
         Log.d(NM_OUTPUT_TAG, message.toString());
     }
@@ -363,7 +358,6 @@ public class IOUtils {
     /**
      * Outputs the provided GNSS measurement to log
      */
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public static void writeMeasurementToLogcat(GnssMeasurement measurement) {
         Log.d(MEASURE_OUTPUT_TAG, measurement.toString());
     }
@@ -377,26 +371,7 @@ public class IOUtils {
         String year = "";
         LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            year = String.valueOf(locationManager.getGnssYearOfHardware());
-        } else {
-            Method method;
-            try {
-                method = locationManager.getClass().getMethod("getGnssYearOfHardware");
-                int hwYear = (int) method.invoke(locationManager);
-                if (hwYear == 0) {
-                    year = "<= 2015";
-                } else {
-                    year = String.valueOf(hwYear);
-                }
-            } catch (NoSuchMethodException e) {
-                Log.e(TAG, "No such method exception: ", e);
-            } catch (IllegalAccessException e) {
-                Log.e(TAG, "Illegal Access exception: ", e);
-            } catch (InvocationTargetException e) {
-                Log.e(TAG, "Invocation Target Exception: ", e);
-            }
-        }
+        year = String.valueOf(locationManager.getGnssYearOfHardware());
         return year;
     }
 
@@ -409,10 +384,8 @@ public class IOUtils {
         String modelName = "";
         LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            if (locationManager.getGnssHardwareModelName() != null) {
-                modelName = String.valueOf(locationManager.getGnssHardwareModelName());
-            }
+        if (locationManager.getGnssHardwareModelName() != null) {
+            modelName = String.valueOf(locationManager.getGnssHardwareModelName());
         }
         return modelName;
     }
@@ -438,12 +411,7 @@ public class IOUtils {
         if (locationManager == null) {
             return false;
         }
-        String command;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            command = context.getString(R.string.force_psds_injection_command);
-        } else {
-            command = context.getString(R.string.force_xtra_injection_command);
-        }
+        String command = context.getString(R.string.force_psds_injection_command);
         return locationManager.sendExtraCommand(LocationManager.GPS_PROVIDER, command, null);
     }
 

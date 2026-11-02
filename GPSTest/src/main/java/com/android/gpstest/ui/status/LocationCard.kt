@@ -18,10 +18,8 @@ package com.android.gpstest.ui.status
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
-import android.os.Build
 import android.text.TextUtils
 import android.text.format.DateFormat
-import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -127,11 +125,9 @@ fun previewLocation(): Location {
         altitude = 13.5
         speed = 21.5f
         bearing = 240f
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            bearingAccuracyDegrees = 5.6f
-            speedAccuracyMetersPerSecond = 6.1f
-            verticalAccuracyMeters = 92.5f
-        }
+        bearingAccuracyDegrees = 5.6f
+        speedAccuracyMetersPerSecond = 6.1f
+        verticalAccuracyMeters = 92.5f
     }
     return l
 }
@@ -526,11 +522,7 @@ private fun copyToClipboard(context: Context, location: Location) {
         null, null, null, coordinateFormat(app, prefs)
     )
     if (!TextUtils.isEmpty(formattedLocation)) {
+        // Android shows its own confirmation when something is copied to the clipboard
         IOUtils.copyToClipboard(app, formattedLocation)
-        // Android 12 and higher generates a Toast automatically
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_LONG)
-                .show()
-        }
     }
 }

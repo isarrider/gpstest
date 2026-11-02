@@ -17,7 +17,6 @@ package com.android.gpstest.library.util;
 
 import static java.util.Collections.emptySet;
 
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
@@ -73,14 +72,12 @@ public class PreferenceUtils {
         }
     }
 
-    @TargetApi(9)
     public static void saveString(String key, String value, SharedPreferences prefs) {
         SharedPreferences.Editor edit = prefs.edit();
         edit.putString(key, value);
         edit.apply();
     }
 
-    @TargetApi(9)
     public static void saveInt(String key, int value, SharedPreferences prefs) {
         SharedPreferences.Editor edit = prefs.edit();
         edit.putInt(key, value);
@@ -91,28 +88,24 @@ public class PreferenceUtils {
         return prefs.getInt(key, defaultValue);
     }
 
-    @TargetApi(9)
     public static void saveLong(String key, long value, SharedPreferences prefs) {
         SharedPreferences.Editor edit = prefs.edit();
         edit.putLong(key, value);
         edit.apply();
     }
 
-    @TargetApi(9)
     public static void saveBoolean(String key, boolean value, SharedPreferences prefs) {
         SharedPreferences.Editor edit = prefs.edit();
         edit.putBoolean(key, value);
         edit.apply();
     }
 
-    @TargetApi(9)
     public static void saveFloat(String key, float value, SharedPreferences prefs) {
         SharedPreferences.Editor edit = prefs.edit();
         edit.putFloat(key, value);
         edit.apply();
     }
 
-    @TargetApi(9)
     public static void saveDouble(String key, double value, SharedPreferences prefs) {
         SharedPreferences.Editor edit = prefs.edit();
         edit.putLong(key, Double.doubleToRawLongBits(value));

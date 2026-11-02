@@ -25,9 +25,6 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.location.Location;
-import android.os.Build;
-import android.os.Build.VERSION;
-import android.os.Build.VERSION_CODES;
 import android.util.Log;
 import android.util.Pair;
 import android.util.TypedValue;
@@ -636,13 +633,11 @@ public class BenchmarkControllerImpl implements BenchmarkController {
                 // Feet
                 vertError = LibUIUtils.toFeet(Math.abs(error.getVertError()));
             }
-            if (VERSION.SDK_INT >= VERSION_CODES.O) {
-                if (mPrefDistanceUnits.equalsIgnoreCase(METERS)) {
-                    vertAccuracy = location.getVerticalAccuracyMeters();
-                } else {
-                    // Feet
-                    vertAccuracy = (float) LibUIUtils.toFeet(location.getVerticalAccuracyMeters());
-                }
+            if (mPrefDistanceUnits.equalsIgnoreCase(METERS)) {
+                vertAccuracy = location.getVerticalAccuracyMeters();
+            } else {
+                // Feet
+                vertAccuracy = (float) LibUIUtils.toFeet(location.getVerticalAccuracyMeters());
             }
 
             addErrorToGraph(index, mVertErrorChart, vertError, vertAccuracy);

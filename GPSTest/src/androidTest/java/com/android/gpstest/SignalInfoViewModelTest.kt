@@ -17,7 +17,6 @@
 package com.android.gpstest
 
 import android.app.Application
-import android.os.Build
 import android.preference.PreferenceManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.InstrumentationRegistry
@@ -84,12 +83,8 @@ class SignalInfoViewModelTest {
         assertEquals(1, modelGpsL1.filteredSatelliteMetadata.value?.numSignalsTotal)
         assertEquals(1, modelGpsL1.getSupportedGnss().size)
         assertEquals(0, modelGpsL1.getSupportedSbas().size)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals(1, modelGpsL1.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1.getSupportedGnssCfs().contains("L1"))
-        } else {
-            assertEquals(0, modelGpsL1.getSupportedGnssCfs().size)
-        }
+        assertEquals(1, modelGpsL1.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1.getSupportedGnssCfs().contains("L1"))
         assertEquals(0, modelGpsL1.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1.getSupportedGnss().contains(GnssType.NAVSTAR))
 
@@ -110,12 +105,8 @@ class SignalInfoViewModelTest {
         assertEquals(1, modelGpsL1.filteredSatelliteMetadata.value?.numSignalsTotal)
         assertEquals(1, modelGpsL1.getSupportedGnss().size)
         assertEquals(0, modelGpsL1.getSupportedSbas().size)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals(1, modelGpsL1.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1.getSupportedGnssCfs().contains("L1"))
-        } else {
-            assertEquals(0, modelGpsL1.getSupportedGnssCfs().size)
-        }
+        assertEquals(1, modelGpsL1.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1.getSupportedGnssCfs().contains("L1"))
         assertEquals(0, modelGpsL1.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1.getSupportedGnss().contains(GnssType.NAVSTAR))
 
@@ -128,29 +119,19 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL1L5.getSupportedSbas().size)
         assertEquals(0, modelGpsL1L5.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1L5.getSupportedGnss().contains(GnssType.NAVSTAR))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertTrue(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
-        } else {
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            // Because carrier frequency isn't considered, these signals should be detected as duplicates
-            assertEquals(1, modelGpsL1L5.duplicateCarrierStatuses.size)
-            assertEquals(0, modelGpsL1L5.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
+        assertTrue(modelGpsL1L5.isDualFrequencyPerSatInView)
+        assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
 
         modelGpsL1L5.reset();
 
@@ -161,29 +142,19 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL1L5.getSupportedSbas().size)
         assertEquals(0, modelGpsL1L5.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1L5.getSupportedGnss().contains(GnssType.NAVSTAR))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertTrue(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertTrue(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
-        } else {
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            // Because carrier frequency isn't considered, these signals should be detected as duplicates
-            assertEquals(1, modelGpsL1L5.duplicateCarrierStatuses.size)
-            assertEquals(0, modelGpsL1L5.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
+        assertTrue(modelGpsL1L5.isDualFrequencyPerSatInView)
+        assertTrue(modelGpsL1L5.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
 
         modelGpsL1L5.reset();
 
@@ -194,29 +165,19 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL1L5.getSupportedSbas().size)
         assertEquals(0, modelGpsL1L5.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1L5.getSupportedGnss().contains(GnssType.NAVSTAR))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertTrue(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
-        } else {
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            // Because carrier frequency isn't considered, these signals should be detected as duplicates
-            assertEquals(1, modelGpsL1L5.duplicateCarrierStatuses.size)
-            assertEquals(0, modelGpsL1L5.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
+        assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
+        assertTrue(modelGpsL1L5.isDualFrequencyPerSatInView)
+        assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
 
         modelGpsL1L5.reset();
 
@@ -227,33 +188,19 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL1L5.getSupportedSbas().size)
         assertEquals(0, modelGpsL1L5.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1L5.getSupportedGnss().contains(GnssType.NAVSTAR))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
-        } else {
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(0, modelGpsL1L5.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
+        assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
+        assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
 
         modelGpsL1L5.reset();
 
@@ -264,29 +211,19 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL1L5.getSupportedSbas().size)
         assertEquals(0, modelGpsL1L5.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1L5.getSupportedGnss().contains(GnssType.NAVSTAR))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
-            assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
-        } else {
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
-            // Because carrier frequency isn't considered, these signals should be detected as duplicates
-            assertEquals(1, modelGpsL1L5.duplicateCarrierStatuses.size)
-            assertEquals(0, modelGpsL1L5.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelGpsL1L5.isNonPrimaryCarrierFreqInUse)
+        assertFalse(modelGpsL1L5.isDualFrequencyPerSatInView)
+        assertFalse(modelGpsL1L5.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(1, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGpsL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelGpsL1L5.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L1"))
+        assertTrue(modelGpsL1L5.getSupportedGnssCfs().contains("L5"))
 
         modelGpsL1L5.reset();
 
@@ -298,32 +235,18 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL5.getSupportedSbas().size)
         assertEquals(0, modelGpsL5.getSupportedSbasCfs().size)
         assertTrue(modelGpsL5.getSupportedGnss().contains(GnssType.NAVSTAR))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGpsL5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(0, modelGpsL5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(0, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(1, modelGpsL5.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL5.getSupportedGnssCfs().contains("L5"))
-        } else {
-            assertFalse(modelGpsL5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGpsL5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGpsL5.isDualFrequencyPerSatInView)
-            assertFalse(modelGpsL5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(0, modelGpsL5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(0, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(0, modelGpsL5.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGpsL5.isNonPrimaryCarrierFreqInView)
+        assertFalse(modelGpsL5.isNonPrimaryCarrierFreqInUse)
+        assertFalse(modelGpsL5.isDualFrequencyPerSatInView)
+        assertFalse(modelGpsL5.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(0, modelGpsL5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(0, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(1, modelGpsL5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(1, modelGpsL5.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL5.getSupportedGnssCfs().contains("L5"))
 
         // Test GPS L1 + GLONASS L1 - should be 2 satellites, no non-primary carrier of dual-freq
         val modelGpsL1GlonassL1 = SignalInfoViewModel(context, context.applicationContext as Application, repository, PreferenceManager.getDefaultSharedPreferences(context))
@@ -344,12 +267,8 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGpsL1GlonassL1.getSupportedSbasCfs().size)
         assertTrue(modelGpsL1GlonassL1.getSupportedGnss().contains(GnssType.NAVSTAR))
         assertTrue(modelGpsL1GlonassL1.getSupportedGnss().contains(GnssType.GLONASS))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals(1, modelGpsL1GlonassL1.getSupportedGnssCfs().size)
-            assertTrue(modelGpsL1GlonassL1.getSupportedGnssCfs().contains("L1"))
-        } else {
-            assertEquals(0, modelGpsL1GlonassL1.getSupportedGnssCfs().size)
-        }
+        assertEquals(1, modelGpsL1GlonassL1.getSupportedGnssCfs().size)
+        assertTrue(modelGpsL1GlonassL1.getSupportedGnssCfs().contains("L1"))
 
         // Test Galileo E1 + E5a - should be 2 satellites, dual frequency not in use, non-primary carrier of dual-freq
         val modelGalileoE1E5a = SignalInfoViewModel(context, context.applicationContext as Application, repository, PreferenceManager.getDefaultSharedPreferences(context))
@@ -359,33 +278,19 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGalileoE1E5a.getSupportedSbas().size)
         assertEquals(0, modelGalileoE1E5a.getSupportedSbasCfs().size)
         assertTrue(modelGalileoE1E5a.getSupportedGnss().contains(GnssType.GALILEO))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInView)
-            assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInUse)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelGalileoE1E5a.getSupportedGnssCfs().size)
-            assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E1"))
-            assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E5a"))
-        } else {
-            assertFalse(modelGalileoE1E5a.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGalileoE1E5a.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInView)
-            assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInUse)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(0, modelGalileoE1E5a.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInUse)
+        assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInView)
+        assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInUse)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelGalileoE1E5a.getSupportedGnssCfs().size)
+        assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E1"))
+        assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E5a"))
 
         modelGalileoE1E5a.reset()
 
@@ -396,28 +301,18 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelGalileoE1E5a.getSupportedSbas().size)
         assertEquals(0, modelGalileoE1E5a.getSupportedSbasCfs().size)
         assertTrue(modelGalileoE1E5a.getSupportedGnss().contains(GnssType.GALILEO))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInUse)
-            assertTrue(modelGalileoE1E5a.isDualFrequencyPerSatInView)
-            assertTrue(modelGalileoE1E5a.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(1, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E1"))
-            assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E5a"))
-        } else {
-            assertFalse(modelGalileoE1E5a.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelGalileoE1E5a.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInView)
-            assertFalse(modelGalileoE1E5a.isDualFrequencyPerSatInUse)
-            // Because carrier frequency isn't considered, these signals should be detected as duplicates
-            assertEquals(1, modelGalileoE1E5a.duplicateCarrierStatuses.size)
-            assertEquals(0, modelGalileoE1E5a.getSupportedGnssCfs().size)
-        }
+        assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelGalileoE1E5a.isNonPrimaryCarrierFreqInUse)
+        assertTrue(modelGalileoE1E5a.isDualFrequencyPerSatInView)
+        assertTrue(modelGalileoE1E5a.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(1, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelGalileoE1E5a.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E1"))
+        assertTrue(modelGalileoE1E5a.getSupportedGnssCfs().contains("E5a"))
 
         modelGalileoE1E5a.reset()
 
@@ -439,12 +334,8 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelWaasL1L5.getSupportedGnssCfs().size)
         assertEquals(1, modelWaasL1L5.getSupportedSbas().size)
         assertTrue(modelWaasL1L5.getSupportedSbas().contains(SbasType.WAAS))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals(1, modelWaasL1L5.getSupportedSbasCfs().size)
-            assertTrue(modelWaasL1L5.getSupportedSbasCfs().contains("L1"))
-        } else {
-            assertEquals(0, modelWaasL1L5.getSupportedSbasCfs().size)
-        }
+        assertEquals(1, modelWaasL1L5.getSupportedSbasCfs().size)
+        assertTrue(modelWaasL1L5.getSupportedSbasCfs().contains("L1"))
 
         modelWaasL1L5.reset()
 
@@ -455,28 +346,18 @@ class SignalInfoViewModelTest {
         assertEquals(0, modelWaasL1L5.getSupportedGnssCfs().size)
         assertEquals(1, modelWaasL1L5.getSupportedSbas().size)
         assertTrue(modelWaasL1L5.getSupportedSbas().contains(SbasType.WAAS))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertTrue(modelWaasL1L5.isNonPrimaryCarrierFreqInView)
-            assertTrue(modelWaasL1L5.isNonPrimaryCarrierFreqInUse)
-            assertTrue(modelWaasL1L5.isDualFrequencyPerSatInView)
-            assertTrue(modelWaasL1L5.isDualFrequencyPerSatInUse)
-            assertEquals(1, modelWaasL1L5.filteredSatelliteMetadata.value?.numSatsInView)
-            assertEquals(1, modelWaasL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
-            assertEquals(1, modelWaasL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
-            assertEquals(2, modelWaasL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
-            assertEquals(2, modelWaasL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
-            assertEquals(2, modelWaasL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
-            assertEquals(2, modelWaasL1L5.getSupportedSbasCfs().size)
-            assertTrue(modelWaasL1L5.getSupportedSbasCfs().contains("L1"))
-            assertTrue(modelWaasL1L5.getSupportedSbasCfs().contains("L5"))
-        } else {
-            assertFalse(modelWaasL1L5.isNonPrimaryCarrierFreqInView)
-            assertFalse(modelWaasL1L5.isNonPrimaryCarrierFreqInUse)
-            assertFalse(modelWaasL1L5.isDualFrequencyPerSatInView)
-            assertFalse(modelWaasL1L5.isDualFrequencyPerSatInUse)
-            // Because carrier frequency isn't considered, these signals should be detected as duplicates
-            assertEquals(1, modelWaasL1L5.duplicateCarrierStatuses.size)
-            assertEquals(0, modelWaasL1L5.getSupportedSbasCfs().size)
-        }
+        assertTrue(modelWaasL1L5.isNonPrimaryCarrierFreqInView)
+        assertTrue(modelWaasL1L5.isNonPrimaryCarrierFreqInUse)
+        assertTrue(modelWaasL1L5.isDualFrequencyPerSatInView)
+        assertTrue(modelWaasL1L5.isDualFrequencyPerSatInUse)
+        assertEquals(1, modelWaasL1L5.filteredSatelliteMetadata.value?.numSatsInView)
+        assertEquals(1, modelWaasL1L5.filteredSatelliteMetadata.value?.numSatsUsed)
+        assertEquals(1, modelWaasL1L5.filteredSatelliteMetadata.value?.numSatsTotal)
+        assertEquals(2, modelWaasL1L5.filteredSatelliteMetadata.value?.numSignalsInView)
+        assertEquals(2, modelWaasL1L5.filteredSatelliteMetadata.value?.numSignalsUsed)
+        assertEquals(2, modelWaasL1L5.filteredSatelliteMetadata.value?.numSignalsTotal)
+        assertEquals(2, modelWaasL1L5.getSupportedSbasCfs().size)
+        assertTrue(modelWaasL1L5.getSupportedSbasCfs().contains("L1"))
+        assertTrue(modelWaasL1L5.getSupportedSbasCfs().contains("L5"))
     }
 }

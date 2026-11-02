@@ -22,9 +22,6 @@ import android.content.SharedPreferences
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -104,17 +101,10 @@ class SharedGnssStatusManager constructor(
         Log.d(TAG, "Starting GnssStatus updates")
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                locationManager.registerGnssStatusCallback(
-                    ContextCompat.getMainExecutor(context),
-                    callback
-                )
-            } else {
-                locationManager.registerGnssStatusCallback(
-                    callback,
-                    Handler(Looper.getMainLooper())
-                )
-            }
+            locationManager.registerGnssStatusCallback(
+                ContextCompat.getMainExecutor(context),
+                callback
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Exception in location flow: $e")
             close(e) // in case of exception, close the Flow

@@ -21,11 +21,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.location.GnssNavigationMessage
 import android.location.LocationManager
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.android.gpstest.library.R
 import com.android.gpstest.library.util.PreferenceUtils
@@ -56,25 +52,13 @@ class SharedNavMessageManager constructor(
     @SuppressLint("MissingPermission")
     private val _navMessageUpdates = callbackFlow {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        // Check explicit support on Android S and higher here - Android R and lower are checked in status callbacks
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            checkNavMessageSupport(context, locationManager, prefs)
-        }
+        checkNavMessageSupport(context, locationManager, prefs)
         val callback: GnssNavigationMessage.Callback =
             object : GnssNavigationMessage.Callback() {
                 override fun onGnssNavigationMessageReceived(event: GnssNavigationMessage) {
                     //Log.d(TAG, "New nav message: ${event}")
                     // Send the new nav message info to the Flow observers
                     trySend(event)
-                }
-
-                @Deprecated("Deprecated in Java")
-                override fun onStatusChanged(status: Int) {
-                    // These status messages are deprecated on Android S and higher and should not be used
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        return
-                    }
-                    handleLegacyNavMessageStatus(context, status, prefs)
                 }
             }
 
@@ -85,18 +69,11 @@ class SharedNavMessageManager constructor(
         Log.d(TAG, "Starting NavMessage updates")
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                locationManager.registerGnssNavigationMessageCallback(
-                    ContextCompat.getMainExecutor(
-                        context
-                    ), callback
-                )
-            } else {
-                locationManager.registerGnssNavigationMessageCallback(
-                    callback,
-                    Handler(Looper.getMainLooper())
-                )
-            }
+            locationManager.registerGnssNavigationMessageCallback(
+                ContextCompat.getMainExecutor(
+                    context
+                ), callback
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Exception in location flow: $e")
             close(e) // in case of exception, close the Flow
@@ -118,7 +95,6 @@ class SharedNavMessageManager constructor(
     }
 }
 
-@RequiresApi(api = Build.VERSION_CODES.S)
 private fun checkNavMessageSupport(context: Context,locationManager: LocationManager, prefs: SharedPreferences) {
     // TODO - surface this status message in UI somewhere, like when user returned from Settings like before?  For now just disable logging option in Settings, will surface in Dashboard later
     val uiStatusMessage: String
@@ -137,39 +113,4 @@ private fun checkNavMessageSupport(context: Context,locationManager: LocationMan
         )
         context.getString(R.string.gnss_nav_msg_status_not_supported)
     }
-}
-
-private fun handleLegacyNavMessageStatus(context: Context, status: Int, prefs: SharedPreferences) {
-    val uiStatusMessage: String
-    when (status) {
-        GnssNavigationMessage.Callback.STATUS_LOCATION_DISABLED -> {
-            uiStatusMessage = context.getString(R.string.gnss_nav_msg_status_loc_disabled)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_nav_messages),
-                PreferenceUtils.CAPABILITY_LOCATION_DISABLED,
-                prefs
-            )
-        }
-        GnssNavigationMessage.Callback.STATUS_NOT_SUPPORTED -> {
-            uiStatusMessage = context.getString(R.string.gnss_nav_msg_status_not_supported)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_nav_messages),
-                PreferenceUtils.CAPABILITY_NOT_SUPPORTED,
-                prefs
-            )
-        }
-        GnssNavigationMessage.Callback.STATUS_READY -> {
-            uiStatusMessage = context.getString(R.string.gnss_nav_msg_status_ready)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_nav_messages),
-                PreferenceUtils.CAPABILITY_SUPPORTED,
-                prefs
-            )
-        }
-        else -> uiStatusMessage = context.getString(R.string.gnss_status_unknown)
-    }
-    Log.d(
-        TAG,
-        "GnssNavigationMessage.Callback.onStatusChanged() - $uiStatusMessage"
-    )
 }

@@ -15,7 +15,6 @@
  */
 package com.android.gpstest
 
-import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -33,7 +32,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.PRIORITY_LOW
 import androidx.core.app.PendingIntentCompat
@@ -266,7 +264,6 @@ class ForegroundOnlyLocationService : LifecycleService() {
         }
     }
 
-    @SuppressLint("NewApi")
     @ExperimentalCoroutinesApi
     private fun observeFlows() {
         observeLocationFlow()
@@ -428,7 +425,6 @@ class ForegroundOnlyLocationService : LifecycleService() {
             .launchIn(lifecycleScope)
     }
 
-    @RequiresApi(Build.VERSION_CODES.R)
     @ExperimentalCoroutinesApi
     private fun observeAntennaFlow() {
         if (antennaFlow?.isActive == true) {
@@ -505,18 +501,16 @@ class ForegroundOnlyLocationService : LifecycleService() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationChannel = NotificationChannel(
-                NOTIFICATION_CHANNEL,
-                getString(R.string.app_name),
-                NotificationManager.IMPORTANCE_LOW
-            )
+        val notificationChannel = NotificationChannel(
+            NOTIFICATION_CHANNEL,
+            getString(R.string.app_name),
+            NotificationManager.IMPORTANCE_LOW
+        )
 
-            // Adds NotificationChannel to system. Attempting to create an
-            // existing notification channel with its original values performs
-            // no operation, so it's safe to perform the below sequence.
-            notificationManager.createNotificationChannel(notificationChannel)
-        }
+        // Adds NotificationChannel to system. Attempting to create an
+        // existing notification channel with its original values performs
+        // no operation, so it's safe to perform the below sequence.
+        notificationManager.createNotificationChannel(notificationChannel)
     }
 
     /*

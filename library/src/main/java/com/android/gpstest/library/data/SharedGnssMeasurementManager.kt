@@ -22,11 +22,7 @@ import android.content.SharedPreferences
 import android.location.GnssMeasurementRequest
 import android.location.GnssMeasurementsEvent
 import android.location.LocationManager
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.android.gpstest.library.R
 import com.android.gpstest.library.util.PreferenceUtil.saveMeasurementCapabilities
@@ -65,10 +61,7 @@ class SharedGnssMeasurementManager constructor(
     @SuppressLint("MissingPermission")
     private val _measurementUpdates = callbackFlow {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        // Check explicit support on Android S and higher here - Android R and lower are checked in status callbacks
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            checkMeasurementSupport(context, locationManager, prefs)
-        }
+        checkMeasurementSupport(context, locationManager, prefs)
         val callback: GnssMeasurementsEvent.Callback =
             object : GnssMeasurementsEvent.Callback() {
                 override fun onGnssMeasurementsReceived(event: GnssMeasurementsEvent) {
@@ -77,15 +70,6 @@ class SharedGnssMeasurementManager constructor(
                     //Log.d(TAG, "New measurement: $event")
                     // Send the new measurement to the Flow observers
                     trySend(event)
-                }
-
-                @Deprecated("Deprecated in Java")
-                override fun onStatusChanged(status: Int) {
-                    // These status messages are deprecated on Android S and higher and should not be used
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        return
-                    }
-                    handleLegacyMeasurementStatus(context, status, prefs)
                 }
             }
 
@@ -97,35 +81,19 @@ class SharedGnssMeasurementManager constructor(
         _receivingMeasurementUpdates.value = true
 
         try {
-            if (SatelliteUtils.isForceFullGnssMeasurementsSupported()) {
-                val forceFullMeasurements = prefs
-                    .getBoolean(
-                        context.getString(R.string.pref_key_force_full_gnss_measurements),
-                        true)
-                Log.d(TAG, "Force full GNSS measurements = $forceFullMeasurements")
-                // Request "force full GNSS measurements" explicitly (on <= Android R this is a manual developer setting)
-                val request = GnssMeasurementRequest.Builder()
-                    .setFullTracking(forceFullMeasurements)
-                    .build()
-                locationManager.registerGnssMeasurementsCallback(
-                    request,
-                    ContextCompat.getMainExecutor(context),
-                    callback
-                )
-            } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    locationManager.registerGnssMeasurementsCallback(
-                        ContextCompat.getMainExecutor(
-                            context
-                        ), callback
-                    )
-                } else {
-                    locationManager.registerGnssMeasurementsCallback(
-                        callback,
-                        Handler(Looper.getMainLooper())
-                    )
-                }
-            }
+            val forceFullMeasurements = prefs
+                .getBoolean(
+                    context.getString(R.string.pref_key_force_full_gnss_measurements),
+                    true)
+            Log.d(TAG, "Force full GNSS measurements = $forceFullMeasurements")
+            val request = GnssMeasurementRequest.Builder()
+                .setFullTracking(forceFullMeasurements)
+                .build()
+            locationManager.registerGnssMeasurementsCallback(
+                request,
+                ContextCompat.getMainExecutor(context),
+                callback
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Exception in location flow: $e")
             close(e) // in case of exception, close the Flow
@@ -148,58 +116,6 @@ class SharedGnssMeasurementManager constructor(
     }
 }
 
-private fun handleLegacyMeasurementStatus(context: Context, status: Int, prefs: SharedPreferences) {
-    // TODO - surface this state message in UI somewhere, like when user returned from Settings like before? For now just disable logging option in Settings, will surface in Dashboard later
-    val uiStatusMessage: String
-    when (status) {
-        GnssMeasurementsEvent.Callback.STATUS_LOCATION_DISABLED -> {
-            uiStatusMessage =
-                context.getString(R.string.gnss_measurement_status_loc_disabled)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_raw_measurements),
-                PreferenceUtils.CAPABILITY_LOCATION_DISABLED,
-                prefs
-            )
-        }
-        GnssMeasurementsEvent.Callback.STATUS_NOT_SUPPORTED -> {
-            uiStatusMessage =
-                context.getString(R.string.gnss_measurement_status_not_supported)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_raw_measurements),
-                PreferenceUtils.CAPABILITY_NOT_SUPPORTED,
-                prefs
-            )
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_measurement_automatic_gain_control),
-                PreferenceUtils.CAPABILITY_NOT_SUPPORTED,
-                prefs
-            )
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_measurement_delta_range),
-                PreferenceUtils.CAPABILITY_NOT_SUPPORTED,
-                prefs
-            )
-        }
-        GnssMeasurementsEvent.Callback.STATUS_READY -> {
-            uiStatusMessage = context.getString(R.string.gnss_measurement_status_ready)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_raw_measurements),
-                PreferenceUtils.CAPABILITY_SUPPORTED,
-                prefs
-            )
-        }
-        else -> {
-            uiStatusMessage = context.getString(R.string.gnss_status_unknown)
-            PreferenceUtils.saveInt(
-                context.getString(R.string.capability_key_raw_measurements),
-                PreferenceUtils.CAPABILITY_UNKNOWN,
-                prefs
-            )
-        }
-    }
-}
-
-@RequiresApi(api = Build.VERSION_CODES.S)
 private fun checkMeasurementSupport(context: Context, lm: LocationManager, prefs: SharedPreferences) {
     // TODO - surface this state message in UI somewhere, like when user returned from Settings like before?  For now just disable logging option in Settings, will surface in Dashboard later
     val uiStatusMessage: String = if (SatelliteUtils.isMeasurementsSupported(lm)) {
