@@ -34,8 +34,9 @@ class DateTimeUtils {
          * is valid, and false if it is not
          */
         fun isTimeValid(time: Long): Boolean {
-            // If the GPS time is less than five days different than system clock time, consider it valid
-            return Duration.between(Instant.ofEpochMilli(time), Instant.now()).toDays() < NUM_DAYS_TIME_VALID
+            // If the GPS time is less than five days different than system clock time (in the past
+            // or in the future), consider it valid
+            return abs(Duration.between(Instant.ofEpochMilli(time), Instant.now()).toDays()) < NUM_DAYS_TIME_VALID
         }
 
         @VisibleForTesting
