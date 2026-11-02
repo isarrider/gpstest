@@ -60,9 +60,11 @@ class SignalTable(val columns: List<SignalColumn>, val rows: List<SignalTableRow
  */
 fun signalTable(
     group: SatelliteGroup,
-    labeler: SignalLabeler = ::defaultSignalLabel
+    labeler: SignalLabeler = ::defaultSignalLabel,
+    knownColumns: List<SignalColumn> = emptyList()
 ): SignalTable {
     val frequencyByLabel = LinkedHashMap<String, Double>()
+    knownColumns.forEach { frequencyByLabel[it.label] = it.frequencyHz }
     group.satellites.forEach { satellite ->
         satellite.signals.forEach { status ->
             val label = labeler(status)
@@ -81,6 +83,26 @@ fun signalTable(
         )
     }
     return SignalTable(columns, rows)
+}
+
+/**
+ * Remembers the bands seen in a constellation, so the bar chart and the band table keep one fixed
+ * slot per band. Without it, a satellite gaining or losing its second band changes the layout and
+ * every satellite after it moves.
+ */
+class SeenBands {
+    private val frequencyByLabel = LinkedHashMap<String, Double>()
+
+    /** Adds the bands of [group] and returns all bands seen so far, highest frequency first */
+    fun update(group: SatelliteGroup, labeler: SignalLabeler = ::defaultSignalLabel): List<SignalColumn> {
+        signalTable(group, labeler).columns.forEach { column ->
+            frequencyByLabel[column.label] =
+                maxOf(frequencyByLabel[column.label] ?: column.frequencyHz, column.frequencyHz)
+        }
+        return frequencyByLabel
+            .map { (label, frequency) -> SignalColumn(label, frequency) }
+            .sortedByDescending { it.frequencyHz }
+    }
 }
 
 /** Counts shown at the top of the Signals screen */
