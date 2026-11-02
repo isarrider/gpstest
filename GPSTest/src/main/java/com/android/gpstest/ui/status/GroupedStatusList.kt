@@ -37,6 +37,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -71,6 +72,8 @@ import com.android.gpstest.library.osnma.OsnmaMark
 import com.android.gpstest.library.util.CarrierFreqUtils
 import com.android.gpstest.library.util.LibUIUtils
 import com.android.gpstest.library.util.MathUtils
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * Adds the grouped satellite list to the Status screen's lazy column: one row per satellite (its
@@ -185,7 +188,8 @@ private fun GroupSurface(shape: Shape, content: @Composable () -> Unit) {
 /**
  * What the user opened or collapsed in the grouped list. It lives as long as the Status screen
  * (see [rememberGroupedListState]), so after the app is restarted all groups are expanded and no
- * signal details are open.
+ * signal details are open. Open signal details are also closed whenever the user switches to
+ * another screen (see [StatusDetails]); collapsed groups stay collapsed.
  */
 class GroupedListState {
     /** Keys of the satellites whose signal details the user opened by tapping them */
@@ -196,7 +200,26 @@ class GroupedListState {
 }
 
 @Composable
-fun rememberGroupedListState(): GroupedListState = remember { GroupedListState() }
+fun rememberGroupedListState(): GroupedListState {
+    val state = remember { GroupedListState() }
+    LaunchedEffect(state) {
+        StatusDetails.closeRequests.collect { state.satellitesWithDetails.clear() }
+    }
+    return state
+}
+
+/**
+ * Closes the open signal details of the Status list, e.g. when the user switches to another
+ * screen. The Status screen is only hidden then, so its state would otherwise survive.
+ */
+object StatusDetails {
+    private val _closeRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val closeRequests: SharedFlow<Unit> = _closeRequests
+
+    fun closeAll() {
+        _closeRequests.tryEmit(Unit)
+    }
+}
 
 @Composable
 private fun GroupHeader(
