@@ -20,6 +20,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -32,6 +33,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.text.format.DateUtils
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
@@ -45,7 +47,7 @@ import androidx.lifecycle.lifecycleScope
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.io.CsvFileLogger
-import com.android.gpstest.io.GpxFileLogger
+import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.JsonFileLogger
 import com.android.gpstest.library.data.LocationRepository
 import com.android.gpstest.library.model.SatelliteGroup
@@ -60,12 +62,10 @@ import com.android.gpstest.library.util.IOUtils.writeNmeaToAndroidStudio
 import com.android.gpstest.library.util.LibUIUtils.toNotificationSummary
 import com.android.gpstest.library.util.PreferenceUtil
 import com.android.gpstest.library.util.PreferenceUtil.isCsvLoggingEnabled
-import com.android.gpstest.library.util.PreferenceUtil.isGpxLoggingEnabled
 import com.android.gpstest.library.util.PreferenceUtil.isJsonLoggingEnabled
 import com.android.gpstest.library.util.PreferenceUtil.writeAntennaInfoToFileCsv
 import com.android.gpstest.library.util.PreferenceUtil.writeAntennaInfoToFileJson
 import com.android.gpstest.library.util.PreferenceUtil.writeLocationToFile
-import com.android.gpstest.library.util.PreferenceUtil.writeLocationToGpxFile
 import com.android.gpstest.library.util.PreferenceUtil.writeMeasurementToLogcat
 import com.android.gpstest.library.util.PreferenceUtil.writeMeasurementsToFile
 import com.android.gpstest.library.util.PreferenceUtil.writeNavMessageToFile
@@ -85,6 +85,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -134,7 +135,8 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
     lateinit var csvFileLogger: CsvFileLogger
     lateinit var jsonFileLogger: JsonFileLogger
-    lateinit var gpxFileLogger: GpxFileLogger
+    lateinit var gpxTrackRecorder: GpxTrackRecorder
+    private var gpxTickJob: Job? = null
 
     // Preference listener that will init the loggers if the user changes Settings while Service is running
     private val loggingSettingListener: SharedPreferences.OnSharedPreferenceChangeListener =
@@ -149,7 +151,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
         csvFileLogger = CsvFileLogger(applicationContext)
         jsonFileLogger = JsonFileLogger(applicationContext)
-        gpxFileLogger = GpxFileLogger(applicationContext)
+        gpxTrackRecorder = GpxTrackRecorder(applicationContext, prefs)
 
         // Observe logging setting changes
         Application.prefs.registerOnSharedPreferenceChangeListener(loggingSettingListener)
@@ -160,6 +162,15 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
         val cancelLocationTrackingFromNotification =
             intent?.getBooleanExtra(EXTRA_CANCEL_LOCATION_TRACKING_FROM_NOTIFICATION, false)
+
+        if (intent?.getBooleanExtra(EXTRA_STOP_GPX_RECORDING_FROM_NOTIFICATION, false) == true) {
+            stopGpxRecording()
+            if (!isStarted) {
+                // Service was only started by this action, nothing else to do
+                stopSelf()
+            }
+            return super.onStartCommand(intent, flags, START_NOT_STICKY)
+        }
 
         if (cancelLocationTrackingFromNotification == true) {
             unsubscribeToLocationUpdates()
@@ -233,8 +244,64 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy()")
+        stopGpxRecording()
         stopLogging()
         super.onDestroy()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Write buffered track points when the system is short on memory and might kill us.
+        // UI_HIDDEN just means the app went to the background, which is no reason to write early.
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+        ) {
+            gpxTrackRecorder.flush()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        gpxTrackRecorder.flush()
+    }
+
+    /**
+     * Starts recording a new GPX track. Location updates must already be running.
+     * @return false if the track file could not be created
+     */
+    fun startGpxRecording(): Boolean {
+        if (!gpxTrackRecorder.start()) {
+            return false
+        }
+        gpxTickJob?.cancel()
+        gpxTickJob = lifecycleScope.launch {
+            // Writes buffered points on schedule even when no fixes arrive
+            while (isActive) {
+                delay(GPX_TICK_MILLIS)
+                gpxTrackRecorder.tick()
+            }
+        }
+        refreshNotification()
+        return true
+    }
+
+    /**
+     * Writes buffered points and ends the current GPX track, if one is being recorded
+     */
+    fun stopGpxRecording() {
+        gpxTickJob?.cancel()
+        gpxTickJob = null
+        if (gpxTrackRecorder.isRecording) {
+            gpxTrackRecorder.stop()
+            refreshNotification()
+        }
+    }
+
+    private fun refreshNotification() {
+        if (isForeground) {
+            notificationManager.notify(NOTIFICATION_ID, buildNotification(currentLocation, currentSatellites))
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -257,6 +324,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         Log.d(TAG, "unsubscribeToLocationUpdates()")
 
         try {
+            stopGpxRecording()
             cancelFlows()
             stopSelf()
             stopLogging()
@@ -308,6 +376,8 @@ class ForegroundOnlyLocationService : LifecycleService() {
                 //Log.d(TAG, "Service location: ${it.toNotificationTitle()}")
                 currentLocation = it
 
+                gpxTrackRecorder.onLocation(it)
+
                 // Show location in notification
                 notificationManager.notify(
                     NOTIFICATION_ID,
@@ -318,10 +388,6 @@ class ForegroundOnlyLocationService : LifecycleService() {
                     if (writeLocationToFile(app, prefs)) {
                         initLogging()
                         csvFileLogger.onLocationChanged(it)
-                    }
-                    if (writeLocationToGpxFile(app, prefs)) {
-                        initLogging()
-                        gpxFileLogger.onLocationChanged(it)
                     }
                 }
             }
@@ -533,7 +599,17 @@ class ForegroundOnlyLocationService : LifecycleService() {
      */
     private fun buildNotification(location: Location?, satellites: SatelliteGroup): Notification {
         val titleText = satellites.toNotificationTitle(app)
-        val summaryText = location?.toNotificationSummary(app, prefs) ?: getString(R.string.no_location_text)
+        val locationText = location?.toNotificationSummary(app, prefs) ?: getString(R.string.no_location_text)
+        val recording = GpxTrackRecorder.state.value
+        val summaryText = if (recording.isRecording) {
+            getString(
+                R.string.gpx_recording_notification,
+                DateUtils.formatElapsedTime((System.currentTimeMillis() - recording.startTime) / 1000),
+                recording.pointCount
+            ) + "\n" + locationText
+        } else {
+            locationText
+        }
 
         // 2. Build the BIG_TEXT_STYLE.
         val bigTextStyle = NotificationCompat.BigTextStyle()
@@ -572,7 +648,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         val notificationCompatBuilder =
             NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL)
 
-        return notificationCompatBuilder
+        val builder = notificationCompatBuilder
             .setStyle(bigTextStyle)
             .setContentTitle(titleText)
             .setContentText(summaryText)
@@ -592,7 +668,25 @@ class ForegroundOnlyLocationService : LifecycleService() {
                 getString(R.string.stop),
                 stopServicePendingIntent
             )
-            .build()
+
+        if (recording.isRecording) {
+            val stopRecordingIntent = Intent(this, ForegroundOnlyLocationService::class.java).apply {
+                putExtra(EXTRA_STOP_GPX_RECORDING_FROM_NOTIFICATION, true)
+            }
+            val stopRecordingPendingIntent = PendingIntentCompat.getService(
+                applicationContext,
+                REQUEST_CODE_STOP_GPX_RECORDING,
+                stopRecordingIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT,
+                false
+            )
+            builder.addAction(
+                R.drawable.ic_baseline_stop_24,
+                getString(R.string.gpx_record_stop),
+                stopRecordingPendingIntent
+            )
+        }
+        return builder.build()
     }
 
     private fun removeOngoingActivityNotification() {
@@ -625,10 +719,6 @@ class ForegroundOnlyLocationService : LifecycleService() {
         if (!jsonFileLogger.isStarted && isJsonLoggingEnabled(app, prefs)) {
             jsonFileLogger.startLog(null, date)
         }
-
-        if (!gpxFileLogger.isStarted && isGpxLoggingEnabled(app, prefs)) {
-            gpxFileLogger.startLog(null, date)
-        }
         maybeDeleteFiles()
     }
 
@@ -652,12 +742,13 @@ class ForegroundOnlyLocationService : LifecycleService() {
             // If we've already deleted files on this application execution, don't do it again
             return
         }
-        if (csvFileLogger.isStarted || jsonFileLogger.isStarted || gpxFileLogger.isStarted) {
-            // Base directories are the same, so we only need one of them (whichever is logging) to clear old files
-            val baseDirectory: File = csvFileLogger.baseDirectory
-                ?: jsonFileLogger.baseDirectory
-                ?: gpxFileLogger.baseDirectory
-            deleteOldFiles(baseDirectory, csvFileLogger.file, jsonFileLogger.file, gpxFileLogger.file)
+        if (csvFileLogger.isStarted || jsonFileLogger.isStarted) {
+            // Base directories should be the same, so we only need one of the two (whichever is logging) to clear old files
+            var baseDirectory: File = csvFileLogger.baseDirectory
+            if (baseDirectory == null) {
+                baseDirectory = jsonFileLogger.baseDirectory
+            }
+            deleteOldFiles(baseDirectory, csvFileLogger.file, jsonFileLogger.file)
             deletedFiles = true
         }
     }
@@ -665,7 +756,6 @@ class ForegroundOnlyLocationService : LifecycleService() {
     private fun stopLogging() {
         csvFileLogger.close()
         jsonFileLogger.close()
-        gpxFileLogger.close()
     }
 
     /**
@@ -684,6 +774,13 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
         private const val EXTRA_CANCEL_LOCATION_TRACKING_FROM_NOTIFICATION =
             "$PACKAGE_NAME.extra.CANCEL_LOCATION_TRACKING_FROM_NOTIFICATION"
+
+        private const val EXTRA_STOP_GPX_RECORDING_FROM_NOTIFICATION =
+            "$PACKAGE_NAME.extra.STOP_GPX_RECORDING_FROM_NOTIFICATION"
+
+        private const val REQUEST_CODE_STOP_GPX_RECORDING = 4711
+
+        private const val GPX_TICK_MILLIS = 15_000L
 
         private const val NOTIFICATION_ID = 12345678
 

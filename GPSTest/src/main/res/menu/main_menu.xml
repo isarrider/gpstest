@@ -25,6 +25,13 @@
             app:showAsAction="ifRoom"
             android:contentDescription="@string/menu_option_filter_content_description" />
         <item
+            android:id="@+id/record_track"
+            android:title="@string/gpx_record_start"
+            android:icon="@drawable/ic_baseline_fiber_manual_record_24"
+            android:orderInCategory="9"
+            app:showAsAction="ifRoom"
+            android:contentDescription="@string/gpx_record_start" />
+        <item
             android:id="@+id/share"
             android:title="@string/share"
             android:icon="@drawable/social_share"

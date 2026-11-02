@@ -141,6 +141,38 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
                 }
             }
 
+        // GPX track recording: whole minutes >= 0 (0 = every fix), whole seconds > 0
+        val txtGpxInterval =
+            findPreference(getString(R.string.pref_key_gpx_write_interval)) as EditTextPreference?
+        txtGpxInterval?.editText?.inputType = InputType.TYPE_CLASS_NUMBER
+        txtGpxInterval?.onPreferenceChangeListener =
+            OnPreferenceChangeListener { _, newValue ->
+                val ok = (newValue as? String)?.trim()?.toLongOrNull()?.let { it >= 0 } == true
+                if (!ok) {
+                    Toast.makeText(
+                        this@Preferences,
+                        getString(R.string.pref_gpx_write_interval_invalid_entry),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                ok
+            }
+        val txtGpxGap =
+            findPreference(getString(R.string.pref_key_gpx_segment_gap)) as EditTextPreference?
+        txtGpxGap?.editText?.inputType = InputType.TYPE_CLASS_NUMBER
+        txtGpxGap?.onPreferenceChangeListener =
+            OnPreferenceChangeListener { _, newValue ->
+                val ok = (newValue as? String)?.trim()?.toLongOrNull()?.let { it > 0 } == true
+                if (!ok) {
+                    Toast.makeText(
+                        this@Preferences,
+                        getString(R.string.pref_gpx_segment_gap_invalid_entry),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                ok
+            }
+
         // Check Dark Theme
         chkDarkTheme = findPreference(getString(R.string.pref_key_dark_theme)) as CheckBoxPreference
         chkDarkTheme?.onPreferenceChangeListener =

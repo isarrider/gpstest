@@ -50,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.Application
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
@@ -80,6 +81,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -193,6 +196,13 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         val serviceIntent = Intent(this, ForegroundOnlyLocationService::class.java)
         bindService(serviceIntent, foregroundOnlyServiceConnection, BIND_AUTO_CREATE)
 
+        // Keep the record button in sync, also when recording is stopped from the notification
+        GpxTrackRecorder.state
+            .map { it.isRecording }
+            .distinctUntilChanged()
+            .onEach { invalidateOptionsMenu() }
+            .launchIn(lifecycleScope)
+
         val backPressedCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 if (binding.navDrawerLeftPane.isDrawerVisible(GravityCompat.START)) {
@@ -279,7 +289,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 shareDialogOpen = true
                 UIUtils.showShareFragmentDialog(
                     this, location, isFileLoggingEnabled(app, prefs),
-                    service!!.csvFileLogger, service!!.jsonFileLogger, service!!.gpxFileLogger, uri
+                    service!!.csvFileLogger, service!!.jsonFileLogger, uri
                 )
             }
         } else {
@@ -871,6 +881,12 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         if (item != null) {
             item.isVisible = lastLocation != null || isFileLoggingEnabled(app, prefs) == true
         }
+        val record = menu.findItem(R.id.record_track)
+        if (record != null) {
+            val recording = GpxTrackRecorder.state.value.isRecording
+            record.setIcon(if (recording) R.drawable.ic_baseline_stop_24 else R.drawable.ic_baseline_fiber_manual_record_24)
+            record.title = getString(if (recording) R.string.gpx_record_stop else R.string.gpx_record_start)
+        }
         return true
     }
 
@@ -884,6 +900,10 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 share()
                 return true
             }
+            R.id.record_track -> {
+                toggleGpxRecording()
+                return true
+            }
             R.id.filter_sats -> {
                 UIUtils.showFilterDialog(this)
             }
@@ -891,12 +911,45 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         return super.onOptionsItemSelected(item)
     }
 
+    /**
+     * Starts a new GPX track (starting GNSS first if needed), or stops the current one
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun toggleGpxRecording() {
+        val s = service
+        if (s == null) {
+            Toast.makeText(this, R.string.gpx_recording_not_ready, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val current = GpxTrackRecorder.state.value
+        if (current.isRecording) {
+            s.stopGpxRecording()
+            Toast.makeText(
+                this, getString(R.string.gpx_recording_stopped, current.location), Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        if (!isTrackingStarted(prefs)) {
+            gpsStart()
+            switch?.isChecked = true
+        }
+        if (s.startGpxRecording()) {
+            Toast.makeText(
+                this,
+                getString(R.string.gpx_recording_started, GpxTrackRecorder.state.value.location),
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, R.string.gpx_recording_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun share() {
         val location = lastLocation
         shareDialogOpen = true
         UIUtils.showShareFragmentDialog(
             this, location, isFileLoggingEnabled(app, prefs),
-            service!!.csvFileLogger, service!!.jsonFileLogger, service!!.gpxFileLogger, null
+            service!!.csvFileLogger, service!!.jsonFileLogger, null
         )
     }
 

@@ -369,8 +369,20 @@
     </string>
     <string name="pref_file_location_output_title">Location</string>
     <string name="pref_file_location_output_summary">Logs location fix details to the CSV file</string>
-    <string name="pref_file_location_output_gpx_title">Location track (GPX)</string>
-    <string name="pref_file_location_output_gpx_summary">Records GPS fixes as a GPX track (elevation, speed, course and accuracy) that can be opened in mapping apps</string>
+    <string name="pref_gpx_category_title">GPX track recording</string>
+    <string name="pref_gpx_write_interval_title">Write to file every (minutes)</string>
+    <string name="pref_gpx_write_interval_summary">Track points are kept in memory and written in one batch to save flash wear. 0 writes every fix. If the app is killed, points since the last write are lost.</string>
+    <string name="pref_gpx_write_interval_invalid_entry">Enter a whole number of minutes (0 or more)</string>
+    <string name="pref_gpx_segment_gap_title">New segment after gap (seconds)</string>
+    <string name="pref_gpx_segment_gap_summary">If no fix arrives for this long (e.g. in a tunnel), the track continues in a new segment instead of drawing a straight line across the gap</string>
+    <string name="pref_gpx_segment_gap_invalid_entry">Enter a whole number of seconds (1 or more)</string>
+    <string name="gpx_record_start">Record GPX track</string>
+    <string name="gpx_record_stop">Stop GPX recording</string>
+    <string name="gpx_recording_started">Recording track to %1$s</string>
+    <string name="gpx_recording_stopped">Track saved to %1$s</string>
+    <string name="gpx_recording_failed">Unable to create the track file</string>
+    <string name="gpx_recording_not_ready">Location service not ready yet, try again in a moment</string>
+    <string name="gpx_recording_notification">● Recording track · %1$s · %2$d points</string>
     <string name="pref_file_antenna_output_csv_title">Antenna Info (CSV)</string>
     <string name="pref_file_antenna_output_csv_summary">Logs GNSS antenna details to the CSV file. (Android 11 and up, and only available on some devices)</string>
     <string name="pref_file_antenna_output_json_title">Antenna Info (JSON)</string>
