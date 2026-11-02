@@ -119,4 +119,28 @@ class Cn0HistoryTest {
             Cn0History.key(signal())
         )
     }
+
+    @Test
+    fun allReturnsEverySignalWithItsIdentity() {
+        val history = Cn0History(windowMillis = 10_000)
+        history.add(listOf(signal(svid = 6, cn0 = 40f), signal(svid = 6, cn0 = 33f, frequencyHz = 1176.45e6)), 1_000)
+        history.add(listOf(signal(svid = 6, cn0 = 41f)), 2_000)
+        val all = history.all().sortedByDescending { it.carrierFrequencyHz }
+        assertEquals(2, all.size)
+        assertEquals(GnssType.GALILEO, all[0].gnssType)
+        assertEquals(6, all[0].svid)
+        assertEquals(listOf(1_000L, 2_000L), all[0].timesMillis.toList())
+        assertEquals(listOf(40f, 41f), all[0].cn0DbHz.toList())
+        assertEquals(listOf(33f), all[1].cn0DbHz.toList())
+    }
+
+    @Test
+    fun allKeepsSignalsNoLongerInViewUntilTheyLeaveTheWindow() {
+        val history = Cn0History(windowMillis = 10_000)
+        history.add(listOf(signal(svid = 6)), 1_000)
+        history.add(listOf(signal(svid = 7)), 5_000)
+        assertEquals(setOf(6, 7), history.all().map { it.svid }.toSet())
+        history.add(listOf(signal(svid = 7)), 12_000)
+        assertEquals(setOf(7), history.all().map { it.svid }.toSet())
+    }
 }

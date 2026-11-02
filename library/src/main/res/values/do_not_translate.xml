@@ -98,7 +98,7 @@
     <string name="pref_key_classic_status_list">classic_status_list</string>
     <string name="pref_key_grouped_sat_sort">grouped_sat_sort</string>
     <string name="pref_key_gnss_order">gnss_order</string>
-    <string name="pref_key_signals_table">signals_table</string>
+    <string name="pref_key_signals_view">signals_view</string>
 
     <string name="pref_key_as_android_monitor_category">android_monitor_category</string>
     <string name="pref_key_as_nmea_output">nmea_output</string>

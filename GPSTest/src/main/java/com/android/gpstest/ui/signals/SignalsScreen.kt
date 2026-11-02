@@ -112,10 +112,11 @@ fun SignalsScreen(viewModel: SignalInfoViewModel) {
     val savedGnssOrder: String? by preferenceState(R.string.pref_key_gnss_order) { p, key ->
         p.getString(key, null)
     }
-    val tableView: Boolean by preferenceState(R.string.pref_key_signals_table) { p, key ->
-        p.getBoolean(key, false)
+    val viewIndex: Int by preferenceState(R.string.pref_key_signals_view) { p, key ->
+        p.getInt(key, 0)
     }
-    val tableKey = stringResource(R.string.pref_key_signals_table)
+    val view = SignalsView.fromIndex(viewIndex)
+    val viewKey = stringResource(R.string.pref_key_signals_view)
 
     val sortOrder = GroupedSortOrder.fromIndex(groupedSortIndex)
     val gnssOrder = remember(savedGnssOrder) { parseGnssOrder(savedGnssOrder) }
@@ -131,8 +132,8 @@ fun SignalsScreen(viewModel: SignalInfoViewModel) {
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item(key = "summary") {
-            SummaryCard(summary, bandAverages, tableView) { table ->
-                PreferenceUtils.saveBoolean(tableKey, table, prefs)
+            SummaryCard(summary, bandAverages, view) { selected ->
+                PreferenceUtils.saveInt(viewKey, selected.ordinal, prefs)
             }
         }
         if (gnssFilter(app, prefs).isNotEmpty()) {
@@ -140,7 +141,12 @@ fun SignalsScreen(viewModel: SignalInfoViewModel) {
                 Filter(allStatuses.size, satelliteMetadata) { PreferenceUtils.clearGnssFilter(app, prefs) }
             }
         }
-        if (groups.isEmpty()) {
+        if (view == SignalsView.HISTORY) {
+            item(key = "history") {
+                val shownTypes = gnssFilter(app, prefs)
+                SignalHistoryCard(viewModel.cn0History, gnssStatuses, gnssOrder, shownTypes)
+            }
+        } else if (groups.isEmpty()) {
             item(key = "empty") {
                 Text(
                     text = stringResource(R.string.signals_no_signals),
@@ -153,8 +159,10 @@ fun SignalsScreen(viewModel: SignalInfoViewModel) {
                 )
             }
         }
-        items(groups, key = { it.key }) { group ->
-            GroupCard(group, tableView)
+        if (view != SignalsView.HISTORY) {
+            items(groups, key = { it.key }) { group ->
+                GroupCard(group, view == SignalsView.TABLE)
+            }
         }
     }
 }
@@ -163,8 +171,8 @@ fun SignalsScreen(viewModel: SignalInfoViewModel) {
 private fun SummaryCard(
     summary: SignalSummary,
     bandAverages: List<Pair<String, Float>>,
-    tableView: Boolean,
-    onViewChange: (Boolean) -> Unit,
+    view: SignalsView,
+    onViewChange: (SignalsView) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -185,7 +193,7 @@ private fun SummaryCard(
                     fontSize = 13.sp,
                     modifier = Modifier.weight(1f)
                 )
-                ViewToggle(tableView, onViewChange)
+                ViewToggle(view, onViewChange)
             }
             if (bandAverages.isNotEmpty()) {
                 val description = stringResource(R.string.signals_a11y_band_averages) + ": " +
@@ -235,9 +243,20 @@ private fun BandAverageChip(label: String, cn0: Float) {
     }
 }
 
-/** Bars | Table switch */
+/** What the Signals screen shows; the ordinal is saved in the preferences */
+enum class SignalsView {
+    BARS,
+    TABLE,
+    HISTORY;
+
+    companion object {
+        fun fromIndex(index: Int): SignalsView = values().getOrElse(index) { BARS }
+    }
+}
+
+/** Bars | Table | History switch */
 @Composable
-private fun ViewToggle(tableView: Boolean, onViewChange: (Boolean) -> Unit) {
+private fun ViewToggle(view: SignalsView, onViewChange: (SignalsView) -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -246,13 +265,18 @@ private fun ViewToggle(tableView: Boolean, onViewChange: (Boolean) -> Unit) {
         ToggleOption(
             text = stringResource(R.string.signals_view_bars),
             description = stringResource(R.string.signals_a11y_view_bars),
-            selected = !tableView
-        ) { onViewChange(false) }
+            selected = view == SignalsView.BARS
+        ) { onViewChange(SignalsView.BARS) }
         ToggleOption(
             text = stringResource(R.string.signals_view_table),
             description = stringResource(R.string.signals_a11y_view_table),
-            selected = tableView
-        ) { onViewChange(true) }
+            selected = view == SignalsView.TABLE
+        ) { onViewChange(SignalsView.TABLE) }
+        ToggleOption(
+            text = stringResource(R.string.signals_view_history),
+            description = stringResource(R.string.signals_a11y_view_history),
+            selected = view == SignalsView.HISTORY
+        ) { onViewChange(SignalsView.HISTORY) }
     }
 }
 

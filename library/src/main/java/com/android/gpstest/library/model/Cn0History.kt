@@ -31,6 +31,22 @@ class Cn0History(
 ) {
     data class Sample(val timeMillis: Long, val cn0DbHz: Float)
 
+    /**
+     * All samples of one signal, oldest first, as primitive arrays so that copying every signal
+     * for the combined chart stays cheap
+     */
+    class Series(
+        val gnssType: GnssType,
+        val sbasType: SbasType,
+        val svid: Int,
+        val hasCarrierFrequency: Boolean,
+        val carrierFrequencyHz: Double,
+        val timesMillis: LongArray,
+        val cn0DbHz: FloatArray,
+    ) {
+        val size: Int get() = timesMillis.size
+    }
+
     private val signals = HashMap<String, SignalBuffer>()
 
     /** Adds the C/N0 of all [statuses] at [nowMillis] and drops samples older than the window */
@@ -38,7 +54,7 @@ class Cn0History(
     fun add(statuses: List<SatelliteStatus>, nowMillis: Long) {
         statuses.forEach { status ->
             if (status.cn0DbHz == SatelliteStatus.NO_DATA) return@forEach
-            signals.getOrPut(key(status)) { SignalBuffer() }.add(nowMillis, status.cn0DbHz)
+            signals.getOrPut(key(status)) { SignalBuffer(status) }.add(nowMillis, status.cn0DbHz)
         }
         val oldest = nowMillis - windowMillis
         val iterator = signals.values.iterator()
@@ -56,13 +72,25 @@ class Cn0History(
         return List(buffer.size) { Sample(buffer.timeAt(it), buffer.valueAt(it)) }
     }
 
+    /**
+     * Samples of every signal still in the window, including signals that are no longer in view
+     */
+    @Synchronized
+    fun all(): List<Series> = signals.values.map { it.toSeries() }
+
     @Synchronized
     fun clear() {
         signals.clear()
     }
 
     /** Growable ring buffer of (time, C/N0) pairs, oldest first */
-    private class SignalBuffer {
+    private class SignalBuffer(status: SatelliteStatus) {
+        private val gnssType = status.gnssType
+        private val sbasType = status.sbasType
+        private val svid = status.svid
+        private val hasCarrierFrequency = status.hasCarrierFrequency
+        private val carrierFrequencyHz = status.carrierFrequencyHz
+
         private var times = LongArray(INITIAL_CAPACITY)
         private var values = FloatArray(INITIAL_CAPACITY)
         private var start = 0
@@ -87,6 +115,16 @@ class Cn0History(
         fun timeAt(i: Int): Long = times[(start + i) % times.size]
 
         fun valueAt(i: Int): Float = values[(start + i) % values.size]
+
+        fun toSeries(): Series = Series(
+            gnssType,
+            sbasType,
+            svid,
+            hasCarrierFrequency,
+            carrierFrequencyHz,
+            LongArray(size) { timeAt(it) },
+            FloatArray(size) { valueAt(it) },
+        )
 
         private fun grow() {
             val newTimes = LongArray(times.size * 2)
