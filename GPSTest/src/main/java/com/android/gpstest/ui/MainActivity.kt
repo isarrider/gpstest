@@ -73,6 +73,7 @@ import com.android.gpstest.map.MapConstants
 import com.android.gpstest.ui.NavigationDrawerFragment.NavigationDrawerCallbacks
 import com.android.gpstest.ui.sky.SkyFragment
 import com.android.gpstest.ui.status.StatusFragment
+import com.android.gpstest.ui.track.TrackFragment
 import com.android.gpstest.util.BuildUtils
 import com.android.gpstest.util.UIUtils
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -109,6 +110,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private var mapFragment: MapFragment? = null
     private var skyFragment: SkyFragment? = null
     private var accuracyFragment: MapFragment? = null
+    private var trackFragment: TrackFragment? = null
 
     // Main signal view model
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -470,6 +472,10 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 showAccuracyFragment()
                 currentNavDrawerPosition = item
             }
+            NavigationDrawerFragment.NAVDRAWER_ITEM_TRACK -> if (currentNavDrawerPosition != NavigationDrawerFragment.NAVDRAWER_ITEM_TRACK) {
+                showTrackFragment()
+                currentNavDrawerPosition = item
+            }
             NavigationDrawerFragment.NAVDRAWER_ITEM_INJECT_PSDS_DATA -> forcePsdsInjection()
             NavigationDrawerFragment.NAVDRAWER_ITEM_INJECT_TIME_DATA -> forceTimeInjection()
             NavigationDrawerFragment.NAVDRAWER_ITEM_CLEAR_AIDING_DATA -> {
@@ -515,6 +521,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideMapFragment()
         hideSkyFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -550,6 +557,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideStatusFragment()
         hideSkyFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -588,6 +596,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideStatusFragment()
         hideMapFragment()
         hideAccuracyFragment()
+        hideTrackFragment()
         if (benchmarkController != null) {
             benchmarkController!!.hide()
         }
@@ -622,6 +631,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         hideStatusFragment()
         hideMapFragment()
         hideSkyFragment()
+        hideTrackFragment()
         // Show fragment (we use show instead of replace to keep the map state)
         if (accuracyFragment == null) {
             // First check to see if an instance of fragment already exists
@@ -642,6 +652,37 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         title = resources.getString(R.string.gps_accuracy_title)
         if (benchmarkController != null) {
             initAccuracy()
+        }
+    }
+
+    private fun showTrackFragment() {
+        val fm = supportFragmentManager
+        hideStatusFragment()
+        hideMapFragment()
+        hideSkyFragment()
+        hideAccuracyFragment()
+        if (benchmarkController != null) {
+            benchmarkController!!.hide()
+        }
+        if (trackFragment == null) {
+            trackFragment = fm.findFragmentByTag(TrackFragment.TAG) as TrackFragment?
+            if (trackFragment == null) {
+                Log.d(TAG, "Creating new TrackFragment")
+                trackFragment = TrackFragment()
+                fm.beginTransaction()
+                    .add(R.id.fragment_container, trackFragment!!, TrackFragment.TAG)
+                    .commit()
+            }
+        }
+        supportFragmentManager.beginTransaction().show(trackFragment!!).commit()
+        title = resources.getString(R.string.gps_track_title)
+    }
+
+    private fun hideTrackFragment() {
+        val fm = supportFragmentManager
+        trackFragment = fm.findFragmentByTag(TrackFragment.TAG) as TrackFragment?
+        if (trackFragment != null && !trackFragment!!.isHidden) {
+            fm.beginTransaction().hide(trackFragment!!).commit()
         }
     }
 

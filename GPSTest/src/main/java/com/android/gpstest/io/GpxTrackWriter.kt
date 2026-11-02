@@ -202,7 +202,7 @@ class GpxTrackWriter(
         // Elevation above mean sea level: Android 14+ Location, else the chip's NMEA GGA, else WGS84
         val locationMsl = mslAltitude(l)
         val msl = locationMsl ?: fix.mslAltitude
-        val ele = msl ?: if (l.hasAltitude()) l.altitude else null
+        val ele = elevationOf(l, fix)
         if (ele != null) {
             sb.append("        <ele>").append(fmt(ele, 2)).append("</ele>\n")
         }
@@ -352,16 +352,26 @@ class GpxTrackWriter(
         }
     }
 
-    private fun mslAltitude(l: Location): Double? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && l.hasMslAltitude()) {
-            l.mslAltitudeMeters
-        } else {
-            null
-        }
-    }
 
     companion object {
         private const val TAG = "GpxTrackWriter"
+
+        /** MSL altitude from the Location (Android 14+), or null */
+        fun mslAltitude(l: Location): Double? {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && l.hasMslAltitude()) {
+                l.mslAltitudeMeters
+            } else {
+                null
+            }
+        }
+
+        /**
+         * Elevation as written to the GPX file: MSL from the Location (Android 14+), else MSL from the
+         * chip's NMEA GGA, else the WGS84 altitude. Null if the fix has no altitude.
+         */
+        fun elevationOf(l: Location, fix: GpxFixContext): Double? {
+            return mslAltitude(l) ?: fix.mslAltitude ?: if (l.hasAltitude()) l.altitude else null
+        }
         const val DIRECTORY = "GPSTest"
         private const val MIME_TYPE = "application/gpx+xml"
 

@@ -22,6 +22,8 @@ import android.util.Log
 import com.android.gpstest.library.util.PreferenceUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.json.JSONObject
+import java.io.File
 import java.util.Date
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -46,7 +48,11 @@ class GpxTrackRecorder(
         val startTime: Long = 0L,
         val pointCount: Int = 0,
         /** Where the file is, for display */
-        val location: String = ""
+        val location: String = "",
+        /** Wall clock time of the last write to the file, 0 if none yet */
+        val lastWriteTime: Long = 0L,
+        /** Points kept in memory, not yet written to the file */
+        val pendingPoints: Int = 0
     )
 
     private val lock = Any()
@@ -57,6 +63,8 @@ class GpxTrackRecorder(
     private var lastFixTime = Long.MIN_VALUE
     private var lastFlushElapsed = 0L
     private var pointCount = 0
+    private var stats: GpxTrackStatsAccumulator? = null
+    private var lastStatsSaveElapsed = 0L
 
     val isRecording: Boolean
         get() = state.value.isRecording
@@ -78,6 +86,10 @@ class GpxTrackRecorder(
             lastFixTime = Long.MIN_VALUE
             lastFlushElapsed = SystemClock.elapsedRealtime()
             pointCount = 0
+            val acc = GpxTrackStatsAccumulator(w.displayLocation(), now.time)
+            stats = acc
+            _stats.value = acc.snapshot()
+            lastStatsSaveElapsed = 0L
             _state.value = State(true, now.time, 0, w.displayLocation())
             Log.d(TAG, "Recording GPX track to ${w.displayLocation()}")
             return true
@@ -92,6 +104,8 @@ class GpxTrackRecorder(
             if (writer == null) return
             // The final batch is queued on the single IO thread and written after any earlier ones
             flushLocked()
+            stats?.let { saveStatsLocked(it.snapshot()) }
+            stats = null
             val w = writer
             writer = null
             Log.d(TAG, "Stopped GPX track ${w?.displayLocation()}")
@@ -112,8 +126,12 @@ class GpxTrackRecorder(
             lastFixTime = time
             buffer.add(GpxTrackWriter.Point(Location(location), fix, newSegment))
             pointCount++
-            _state.value = _state.value.copy(pointCount = pointCount)
+            stats?.let {
+                it.add(location, fix, newSegment)
+                _stats.value = it.snapshot()
+            }
             maybeFlushLocked()
+            _state.value = _state.value.copy(pointCount = pointCount, pendingPoints = buffer.size)
         }
     }
 
@@ -146,14 +164,45 @@ class GpxTrackRecorder(
         if (buffer.isEmpty()) return
         val batch = ArrayList(buffer)
         buffer.clear()
+        _state.value = _state.value.copy(pendingPoints = 0)
         io.execute {
             try {
                 w.append(batch)
+                synchronized(lock) {
+                    if (writer === w) {
+                        _state.value = _state.value.copy(lastWriteTime = System.currentTimeMillis())
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Unable to write GPX points, keeping them for the next write", e)
                 synchronized(lock) {
-                    if (writer === w) buffer.addAll(0, batch)
+                    if (writer === w) {
+                        buffer.addAll(0, batch)
+                        _state.value = _state.value.copy(pendingPoints = buffer.size)
+                    }
                 }
+            }
+        }
+        // Keep the "last track" summary reasonably fresh, but don't write it more than once a minute
+        val acc = stats
+        if (acc != null && SystemClock.elapsedRealtime() - lastStatsSaveElapsed >= STATS_SAVE_INTERVAL_MS) {
+            saveStatsLocked(acc.snapshot())
+        }
+    }
+
+    private fun saveStatsLocked(snapshot: GpxTrackStats) {
+        lastStatsSaveElapsed = SystemClock.elapsedRealtime()
+        val file = lastTrackFile(context)
+        io.execute {
+            try {
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(snapshot.toJson().toString())
+                if (!tmp.renameTo(file)) {
+                    file.writeText(snapshot.toJson().toString())
+                    tmp.delete()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to save track summary", e)
             }
         }
     }
@@ -165,5 +214,32 @@ class GpxTrackRecorder(
 
         /** Recording state, observed by the UI and the notification */
         val state: StateFlow<State> = _state
+
+        private const val STATS_SAVE_INTERVAL_MS = 60_000L
+        private const val LAST_TRACK_FILE = "gpx_last_track.json"
+
+        private val _stats = MutableStateFlow<GpxTrackStats?>(null)
+
+        /** Statistics of the track being recorded, or of the last recorded track; null if none */
+        val stats: StateFlow<GpxTrackStats?> = _stats
+
+        private fun lastTrackFile(context: Context) = File(context.filesDir, LAST_TRACK_FILE)
+
+        /**
+         * Loads the summary of the last recorded track (e.g. after an app restart), unless a
+         * track is already known in memory.
+         */
+        fun loadLastTrack(context: Context) {
+            if (_stats.value != null) return
+            try {
+                val f = lastTrackFile(context)
+                if (f.exists()) {
+                    val loaded = GpxTrackStats.fromJson(JSONObject(f.readText()))
+                    if (_stats.value == null) _stats.value = loaded
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to load last track summary", e)
+            }
+        }
     }
 }
