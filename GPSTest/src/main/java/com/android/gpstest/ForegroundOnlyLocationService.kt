@@ -140,6 +140,10 @@ class ForegroundOnlyLocationService : LifecycleService() {
     private val gpxFixContext = GpxFixContextCollector()
     private var gpxTickJob: Job? = null
 
+    // True while the app's screen is in the foreground
+    @Volatile
+    private var uiVisible = false
+
     // Preference listener that will init the loggers if the user changes Settings while Service is running
     private val loggingSettingListener: SharedPreferences.OnSharedPreferenceChangeListener =
         PreferenceUtil.newFileLoggingListener(app, { initLogging() }, prefs)
@@ -246,7 +250,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy()")
-        stopGpxRecording()
+        stopGpxRecording(stopGnssIfIdle = false)
         stopLogging()
         super.onDestroy()
     }
@@ -289,15 +293,25 @@ class ForegroundOnlyLocationService : LifecycleService() {
     }
 
     /**
-     * Writes buffered points and ends the current GPX track, if one is being recorded
+     * Writes buffered points and ends the current GPX track, if one is being recorded. If the app
+     * isn't open and GNSS isn't set to run in the background, GNSS is stopped as well
+     * ([stopGnssIfIdle]); it only kept running for the recording.
      */
-    fun stopGpxRecording() {
+    fun stopGpxRecording(stopGnssIfIdle: Boolean = true) {
         gpxTickJob?.cancel()
         gpxTickJob = null
         if (gpxTrackRecorder.isRecording) {
             gpxTrackRecorder.stop()
             refreshNotification()
+            if (stopGnssIfIdle && !uiVisible && !PreferenceUtil.runInBackground(app, prefs)) {
+                unsubscribeToLocationUpdates()
+            }
         }
+    }
+
+    /** Called by the activity when it comes to the foreground (true) or leaves it (false) */
+    fun setUiVisible(visible: Boolean) {
+        uiVisible = visible
     }
 
     private fun refreshNotification() {
@@ -326,7 +340,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         Log.d(TAG, "unsubscribeToLocationUpdates()")
 
         try {
-            stopGpxRecording()
+            stopGpxRecording(stopGnssIfIdle = false)
             cancelFlows()
             stopSelf()
             stopLogging()

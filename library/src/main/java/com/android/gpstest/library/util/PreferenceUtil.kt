@@ -150,7 +150,7 @@ object PreferenceUtil {
         return prefs.getBoolean(context.getString(R.string.pref_key_gnss_background), false)
     }
 
-    private fun saveRunInBackground(context: Context, prefs: SharedPreferences, value: Boolean) {
+    fun saveRunInBackground(context: Context, prefs: SharedPreferences, value: Boolean) {
         PreferenceUtils.saveBoolean(context.getString(R.string.pref_key_gnss_background),
                                     value,
                                     prefs)

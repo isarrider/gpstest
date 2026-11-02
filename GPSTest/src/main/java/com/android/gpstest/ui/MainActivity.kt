@@ -72,6 +72,7 @@ import com.android.gpstest.library.util.PreferenceUtil.isFileLoggingEnabled
 import com.android.gpstest.library.util.PreferenceUtil.minDistance
 import com.android.gpstest.library.util.PreferenceUtil.minTimeMillis
 import com.android.gpstest.library.util.PreferenceUtil.runInBackground
+import com.android.gpstest.library.util.PreferenceUtil.saveRunInBackground
 import com.android.gpstest.library.util.PreferenceUtils.isTrackingStarted
 import com.android.gpstest.map.MapConstants
 import com.android.gpstest.ui.NavigationDrawerFragment.NavigationDrawerCallbacks
@@ -141,6 +142,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
             val binder = iBinder as LocalBinder
             service = binder.service
             isServiceBound = true
+            service?.setUiVisible(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
             if (locationFlow?.isActive == true) {
                 // Activity started location updates but service wasn't bound yet - tell service to start now
                 service?.subscribeToLocationUpdates()
@@ -290,6 +292,9 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
 
     override fun onResume() {
         super.onResume()
+        service?.setUiVisible(true)
+        // The background setting may have changed in Settings (e.g. enabled by file logging)
+        invalidateOptionsMenu()
         shareDialogOpen = false
         if (!userDeniedPermission) {
             requestPermissionAndInit(this)
@@ -414,6 +419,13 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         requestCode: Int, permissions: Array<String>, grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == BACKGROUND_NOTIFICATION_REQUEST) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                switch?.isChecked = true
+                onBackgroundSwitchChanged(true)
+            }
+            return
+        }
         if (requestCode == PermissionUtils.LOCATION_PERMISSION_REQUEST) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 userDeniedPermission = false
@@ -451,8 +463,12 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     }
 
     override fun onPause() {
-        // Stop GNSS if this isn't a configuration change and the user hasn't opted to run in background
-        if (!isChangingConfigurations && !runInBackground(app, prefs)) {
+        service?.setUiVisible(false)
+        // Stop GNSS when leaving the app, unless the toolbar switch keeps it running in the
+        // background or a GPX track is being recorded
+        if (!isChangingConfigurations && !runInBackground(app, prefs) &&
+            !GpxTrackRecorder.state.value.isRecording
+        ) {
             service?.unsubscribeToLocationUpdates()
         }
         super.onPause()
@@ -460,14 +476,9 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun setupStartState(savedInstanceState: Bundle?) {
-        // Use "Auto-start GNSS" setting, or existing tracking state (e.g., if service is running)
-        if (prefs.getBoolean(
-                getString(R.string.pref_key_auto_start_gps),
-                true
-            ) || isTrackingStarted(prefs)
-        ) {
-            gpsStart()
-        }
+        // GNSS always runs while the app is open; the toolbar switch only decides whether it keeps
+        // running after leaving the app
+        gpsStart()
     }
 
     override fun onNavigationDrawerItemSelected(position: Int) {
@@ -920,23 +931,34 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         if (item != null) {
             switch = MenuItemCompat.getActionView(item).findViewById(R.id.gps_switch)
             if (switch != null) {
-                // Initialize state of GPS switch before we set the listener, so we don't double-trigger start or stop
-                switch!!.isChecked = isTrackingStarted(prefs)
-
-                // Set up listener for GPS on/off switch
-                switch!!.setOnClickListener {
-                    // Turn GPS on or off
-                    if (!switch!!.isChecked && isTrackingStarted(prefs)) {
-                        gpsStop()
-                        service?.unsubscribeToLocationUpdates()
-                    } else {
-                        if (switch!!.isChecked && !isTrackingStarted(prefs)) {
-                            gpsStart()
-                        }
-                    }
-                }
+                // The switch keeps GNSS running in the background after leaving the app (the
+                // "Run GNSS in background" setting). Initialize it before setting the listener.
+                switch!!.isChecked = runInBackground(app, prefs)
+                switch!!.setOnClickListener { onBackgroundSwitchChanged(switch!!.isChecked) }
             }
         }
+    }
+
+    private fun onBackgroundSwitchChanged(on: Boolean) {
+        if (on && !PermissionUtils.hasGrantedNotificationPermissions(this)) {
+            // Running in the background needs the ongoing notification
+            switch?.isChecked = false
+            Toast.makeText(this, R.string.gnss_background_needs_notification, Toast.LENGTH_LONG).show()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(PermissionUtils.getNotificationPermission()),
+                    BACKGROUND_NOTIFICATION_REQUEST
+                )
+            }
+            return
+        }
+        saveRunInBackground(app, prefs, on)
+        Toast.makeText(
+            this,
+            if (on) R.string.gnss_background_on else R.string.gnss_background_off,
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
@@ -1013,7 +1035,6 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         }
         if (!isTrackingStarted(prefs)) {
             gpsStart()
-            switch?.isChecked = true
         }
         if (s.startGpxRecording()) {
             Toast.makeText(
@@ -1075,6 +1096,9 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     }
 
     companion object {
+        /** Request code for the notification permission needed to run GNSS in the background */
+        private const val BACKGROUND_NOTIFICATION_REQUEST = 4712
+
         private const val TAG = "GpsTestActivity"
         private const val SECONDS_TO_MILLISECONDS = 1000
     }
