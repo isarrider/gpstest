@@ -41,8 +41,12 @@ import com.google.zxing.integration.android.IntentIntegrator;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class IOUtils {
 
@@ -263,6 +267,21 @@ public class IOUtils {
             locationString += "," + altitude;
         }
         return locationString;
+    }
+
+    /**
+     * Returns the provided epoch-millisecond timestamp formatted as
+     * "yyyy-MM-dd HH:mm:ss &lt;time zone&gt;",
+     * in the device's default time zone.
+     *
+     * @param timeMillis the epoch-millisecond timestamp to format
+     * @return the formatted timestamp string
+     */
+    public static String formatLocationTimestamp(long timeMillis) {
+        // Use an ISO timestamp for the output, plus time zone
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.US);
+        format.setTimeZone(TimeZone.getDefault());
+        return format.format(new Date(timeMillis));
     }
 
     /**
