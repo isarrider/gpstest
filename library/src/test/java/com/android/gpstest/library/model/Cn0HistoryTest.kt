@@ -73,6 +73,27 @@ class Cn0HistoryTest {
     }
 
     @Test
+    fun ringBufferKeepsOrderWhileGrowingAndWrapping() {
+        // One sample per second for 10 minutes with a 100 s window: the buffer grows past its
+        // initial capacity and wraps around many times
+        val history = Cn0History(windowMillis = 100_000)
+        for (second in 0..600) {
+            history.add(listOf(signal(cn0 = (second % 40).toFloat() + 10f)), second * 1_000L)
+        }
+        val samples = history.get(signal())
+        assertEquals(101, samples.size)
+        assertEquals(500_000L, samples.first().timeMillis)
+        assertEquals(600_000L, samples.last().timeMillis)
+        assertEquals((500 % 40).toFloat() + 10f, samples.first().cn0DbHz)
+        assertTrue(samples.zipWithNext().all { (a, b) -> b.timeMillis - a.timeMillis == 1_000L })
+    }
+
+    @Test
+    fun defaultWindowIsOneHour() {
+        assertEquals(3_600_000L, Cn0History().windowMillis)
+    }
+
+    @Test
     fun skipsSamplesWithoutCn0() {
         val history = Cn0History()
         history.add(listOf(signal(cn0 = SatelliteStatus.NO_DATA)), 1_000)
