@@ -71,7 +71,7 @@ import java.util.Locale
 private const val HISTORY_MIN_CN0 = 10f
 private const val HISTORY_MAX_CN0 = 50f
 private val HISTORY_GRID = listOf(10f, 20f, 30f, 40f, 50f)
-private val HISTORY_HEIGHT = 220.dp
+private val HISTORY_HEIGHT = 660.dp
 private val HISTORY_AXIS_WIDTH = 22.dp
 
 /** Samples further apart than this aren't connected, e.g. while a satellite was blocked */
