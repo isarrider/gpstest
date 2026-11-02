@@ -312,7 +312,7 @@ The "Track" screen shows the track being recorded, or the last recorded track wh
 * GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections
 * Battery: charge at the start and now (or at the end), percentage points used, and use per hour for tracks of 10 minutes or longer. If the phone was charging during the track, no use is calculated.
 * File: points, segments, file location, and while recording, the time of the last write and the points still waiting in memory
-* Charts of elevation over distance, and speed, satellites used and battery over time
+* Charts of distance over time, elevation over distance, and speed, satellites used and battery over time
 
 Distance only counts movement larger than the fix accuracy (at least 3 m), so standing still doesn't add distance, and ascent/descent ignore changes smaller than 3 m. Units follow the distance and speed unit settings.
 

@@ -157,6 +157,11 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
         }
 
         if (s.samples.size >= 2) {
+            ChartCard(
+                stringResource(R.string.track_chart_distance, units.distanceAxisUnit),
+                stringResource(R.string.track_chart_axis_minutes),
+                s.samples.map { Entry(it.seconds / 60f, units.distanceAxis(it.distanceMeters)) }
+            )
             val elevation = s.samples.mapNotNull { p -> p.elevation?.let { Entry(units.distanceAxis(p.distanceMeters), units.heightValue(it)) } }
             if (elevation.size >= 2) {
                 ChartCard(
