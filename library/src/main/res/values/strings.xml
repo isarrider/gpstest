@@ -424,6 +424,7 @@
     <string name="track_not_yet">not yet</string>
     <string name="track_pending">Points waiting in memory</string>
     <string name="track_file">Saved to</string>
+    <string name="track_chart_distance">Distance (%1$s)</string>
     <string name="track_chart_elevation">Elevation (%1$s)</string>
     <string name="track_chart_speed">Speed (%1$s)</string>
     <string name="track_chart_satellites">Satellites used</string>
