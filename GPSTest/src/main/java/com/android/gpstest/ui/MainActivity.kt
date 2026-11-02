@@ -279,7 +279,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 shareDialogOpen = true
                 UIUtils.showShareFragmentDialog(
                     this, location, isFileLoggingEnabled(app, prefs),
-                    service!!.csvFileLogger, service!!.jsonFileLogger, uri
+                    service!!.csvFileLogger, service!!.jsonFileLogger, service!!.gpxFileLogger, uri
                 )
             }
         } else {
@@ -896,7 +896,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         shareDialogOpen = true
         UIUtils.showShareFragmentDialog(
             this, location, isFileLoggingEnabled(app, prefs),
-            service!!.csvFileLogger, service!!.jsonFileLogger, null
+            service!!.csvFileLogger, service!!.jsonFileLogger, service!!.gpxFileLogger, null
         )
     }
 

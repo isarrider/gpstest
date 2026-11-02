@@ -34,6 +34,7 @@ import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.CsvFileLogger
+import com.android.gpstest.io.GpxFileLogger
 import com.android.gpstest.io.JsonFileLogger
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.util.IOUtils
@@ -140,20 +141,25 @@ internal object UIUtils {
      * @param location
      * @param loggingEnabled true if logging is enabled, false if it is not
      * @param csvFileLogger the file logger being used to log files
+     * @param jsonFileLogger the JSON file logger
+     * @param gpxFileLogger the GPX track logger
      * @param alternateFileUri The URI for a file if a file other than the one current used by the FileLogger should be used (e.g., one previously picked from the folder browse button), or null if no alternate file is chosen and the file from the file logger should be shared.
      * @return a dialog for sharing location and files
      */
     fun showShareFragmentDialog(
         activity: AppCompatActivity, location: Location?,
         loggingEnabled: Boolean, csvFileLogger: CsvFileLogger?,
-        jsonFileLogger: JsonFileLogger?, alternateFileUri: Uri?
+        jsonFileLogger: JsonFileLogger?, gpxFileLogger: GpxFileLogger?, alternateFileUri: Uri?
     ) {
-        val files = ArrayList<File>(2)
+        val files = ArrayList<File>(3)
         if (csvFileLogger != null && csvFileLogger.file != null) {
             files.add(csvFileLogger.file)
         }
         if (jsonFileLogger != null && jsonFileLogger.file != null) {
             files.add(jsonFileLogger.file)
+        }
+        if (gpxFileLogger != null && gpxFileLogger.file != null) {
+            files.add(gpxFileLogger.file)
         }
         val fm = activity.supportFragmentManager
         val dialog = ShareDialogFragment()
@@ -161,6 +167,7 @@ internal object UIUtils {
             override fun onLogFileSent() {
                 csvFileLogger?.close()
                 jsonFileLogger?.close()
+                gpxFileLogger?.close()
             }
 
             override fun onFileBrowse() {

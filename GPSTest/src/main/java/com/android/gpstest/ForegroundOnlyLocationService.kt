@@ -45,6 +45,7 @@ import androidx.lifecycle.lifecycleScope
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.io.CsvFileLogger
+import com.android.gpstest.io.GpxFileLogger
 import com.android.gpstest.io.JsonFileLogger
 import com.android.gpstest.library.data.LocationRepository
 import com.android.gpstest.library.model.SatelliteGroup
@@ -59,10 +60,12 @@ import com.android.gpstest.library.util.IOUtils.writeNmeaToAndroidStudio
 import com.android.gpstest.library.util.LibUIUtils.toNotificationSummary
 import com.android.gpstest.library.util.PreferenceUtil
 import com.android.gpstest.library.util.PreferenceUtil.isCsvLoggingEnabled
+import com.android.gpstest.library.util.PreferenceUtil.isGpxLoggingEnabled
 import com.android.gpstest.library.util.PreferenceUtil.isJsonLoggingEnabled
 import com.android.gpstest.library.util.PreferenceUtil.writeAntennaInfoToFileCsv
 import com.android.gpstest.library.util.PreferenceUtil.writeAntennaInfoToFileJson
 import com.android.gpstest.library.util.PreferenceUtil.writeLocationToFile
+import com.android.gpstest.library.util.PreferenceUtil.writeLocationToGpxFile
 import com.android.gpstest.library.util.PreferenceUtil.writeMeasurementToLogcat
 import com.android.gpstest.library.util.PreferenceUtil.writeMeasurementsToFile
 import com.android.gpstest.library.util.PreferenceUtil.writeNavMessageToFile
@@ -131,6 +134,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
     lateinit var csvFileLogger: CsvFileLogger
     lateinit var jsonFileLogger: JsonFileLogger
+    lateinit var gpxFileLogger: GpxFileLogger
 
     // Preference listener that will init the loggers if the user changes Settings while Service is running
     private val loggingSettingListener: SharedPreferences.OnSharedPreferenceChangeListener =
@@ -145,6 +149,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
         csvFileLogger = CsvFileLogger(applicationContext)
         jsonFileLogger = JsonFileLogger(applicationContext)
+        gpxFileLogger = GpxFileLogger(applicationContext)
 
         // Observe logging setting changes
         Application.prefs.registerOnSharedPreferenceChangeListener(loggingSettingListener)
@@ -313,6 +318,10 @@ class ForegroundOnlyLocationService : LifecycleService() {
                     if (writeLocationToFile(app, prefs)) {
                         initLogging()
                         csvFileLogger.onLocationChanged(it)
+                    }
+                    if (writeLocationToGpxFile(app, prefs)) {
+                        initLogging()
+                        gpxFileLogger.onLocationChanged(it)
                     }
                 }
             }
@@ -616,6 +625,10 @@ class ForegroundOnlyLocationService : LifecycleService() {
         if (!jsonFileLogger.isStarted && isJsonLoggingEnabled(app, prefs)) {
             jsonFileLogger.startLog(null, date)
         }
+
+        if (!gpxFileLogger.isStarted && isGpxLoggingEnabled(app, prefs)) {
+            gpxFileLogger.startLog(null, date)
+        }
         maybeDeleteFiles()
     }
 
@@ -639,13 +652,12 @@ class ForegroundOnlyLocationService : LifecycleService() {
             // If we've already deleted files on this application execution, don't do it again
             return
         }
-        if (csvFileLogger.isStarted || jsonFileLogger.isStarted) {
-            // Base directories should be the same, so we only need one of the two (whichever is logging) to clear old files
-            var baseDirectory: File = csvFileLogger.baseDirectory
-            if (baseDirectory == null) {
-                baseDirectory = jsonFileLogger.baseDirectory
-            }
-            deleteOldFiles(baseDirectory, csvFileLogger.file, jsonFileLogger.file)
+        if (csvFileLogger.isStarted || jsonFileLogger.isStarted || gpxFileLogger.isStarted) {
+            // Base directories are the same, so we only need one of them (whichever is logging) to clear old files
+            val baseDirectory: File = csvFileLogger.baseDirectory
+                ?: jsonFileLogger.baseDirectory
+                ?: gpxFileLogger.baseDirectory
+            deleteOldFiles(baseDirectory, csvFileLogger.file, jsonFileLogger.file, gpxFileLogger.file)
             deletedFiles = true
         }
     }
@@ -653,6 +665,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
     private fun stopLogging() {
         csvFileLogger.close()
         jsonFileLogger.close()
+        gpxFileLogger.close()
     }
 
     /**

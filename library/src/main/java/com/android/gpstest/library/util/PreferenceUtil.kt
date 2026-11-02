@@ -41,6 +41,10 @@ object PreferenceUtil {
         return prefs.getBoolean(context.getString(R.string.pref_key_file_location_output), false)
     }
 
+    fun writeLocationToGpxFile(context: Context, prefs: SharedPreferences): Boolean {
+        return prefs.getBoolean(context.getString(R.string.pref_key_file_location_output_gpx), false)
+    }
+
     fun writeMeasurementToLogcat(context: Context, prefs: SharedPreferences): Boolean {
         return prefs.getBoolean(context.getString(R.string.pref_key_as_measurement_output), false)
     }
@@ -94,11 +98,15 @@ object PreferenceUtil {
     }
 
     fun isFileLoggingEnabled(context: Context, prefs: SharedPreferences): Boolean {
-        return isCsvLoggingEnabled(context, prefs) || isJsonLoggingEnabled(context, prefs)
+        return isCsvLoggingEnabled(context, prefs) || isJsonLoggingEnabled(context, prefs) || isGpxLoggingEnabled(context, prefs)
     }
 
     fun isCsvLoggingEnabled(context: Context, prefs: SharedPreferences): Boolean {
         return writeNmeaToFile(context, prefs) || writeMeasurementsToFile(context, prefs) || writeNavMessageToFile(context, prefs) || writeLocationToFile(context, prefs) || writeAntennaInfoToFileCsv(context, prefs) || writeStatusToFile(context, prefs) || writeOrientationToFile(context, prefs)
+    }
+
+    fun isGpxLoggingEnabled(context: Context, prefs: SharedPreferences): Boolean {
+        return writeLocationToGpxFile(context, prefs)
     }
 
     fun isJsonLoggingEnabled(context: Context, prefs: SharedPreferences): Boolean {
@@ -238,13 +246,14 @@ object PreferenceUtil {
                 key == context.getString(R.string.pref_key_file_nmea_output) ||
                 key == context.getString(R.string.pref_key_file_navigation_message_output) ||
                 key == context.getString(R.string.pref_key_file_antenna_output_csv) ||
-                key == context.getString(R.string.pref_key_file_antenna_output_json)) {
+                key == context.getString(R.string.pref_key_file_antenna_output_json) ||
+                key == context.getString(R.string.pref_key_file_location_output_gpx)) {
 
                 // Enable background execution for file logging
                 saveRunInBackground(context, prefs, true)
 
                 // Count number of file logging preferences that are enabled
-                val loggingEnabled = arrayOf(writeLocationToFile(context, prefs), writeMeasurementsToFile(context, prefs), writeNmeaToFile(context, prefs), writeNavMessageToFile(context, prefs), writeAntennaInfoToFileCsv(context, prefs), writeAntennaInfoToFileJson(context, prefs))
+                val loggingEnabled = arrayOf(writeLocationToFile(context, prefs), writeMeasurementsToFile(context, prefs), writeNmeaToFile(context, prefs), writeNavMessageToFile(context, prefs), writeAntennaInfoToFileCsv(context, prefs), writeAntennaInfoToFileJson(context, prefs), writeLocationToGpxFile(context, prefs))
                 val enabledCount = loggingEnabled.count { it }
 
                 if (enabledCount == 1) {
@@ -282,6 +291,12 @@ object PreferenceUtil {
                         writeAntennaInfoToFileJson(context,prefs)
                     ) {
                         // Antenna JSON file logging was just enabled
+                        initLogging()
+                    }
+                    if (key == context.getString(R.string.pref_key_file_location_output_gpx) &&
+                        writeLocationToGpxFile(context, prefs)
+                    ) {
+                        // GPX track recording was just enabled
                         initLogging()
                     }
                 }

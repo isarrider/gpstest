@@ -369,6 +369,8 @@
     </string>
     <string name="pref_file_location_output_title">Location</string>
     <string name="pref_file_location_output_summary">Logs location fix details to the CSV file</string>
+    <string name="pref_file_location_output_gpx_title">Location track (GPX)</string>
+    <string name="pref_file_location_output_gpx_summary">Records GPS fixes as a GPX track (elevation, speed, course and accuracy) that can be opened in mapping apps</string>
     <string name="pref_file_antenna_output_csv_title">Antenna Info (CSV)</string>
     <string name="pref_file_antenna_output_csv_summary">Logs GNSS antenna details to the CSV file. (Android 11 and up, and only available on some devices)</string>
     <string name="pref_file_antenna_output_json_title">Antenna Info (JSON)</string>
