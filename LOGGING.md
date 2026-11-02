@@ -309,7 +309,7 @@ The "Track" screen shows the track being recorded, or the last recorded track wh
 * Elevation: current, lowest, highest, total ascent and descent
 * GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections
 * File: points, segments, file location, and while recording, the time of the last write and the points still waiting in memory
-* Charts of elevation over distance, and speed and satellites used over time
+* Charts of distance over time, elevation over distance, and speed and satellites used over time
 
 Distance only counts movement larger than the fix accuracy (at least 3 m), so standing still doesn't add distance, and ascent/descent ignore changes smaller than 3 m. Units follow the distance and speed unit settings.
 
