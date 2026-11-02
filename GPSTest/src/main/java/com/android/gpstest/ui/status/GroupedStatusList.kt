@@ -38,6 +38,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -81,6 +82,7 @@ fun LazyListScope.groupedStatusItems(
     isGnss: Boolean,
     osnmaMarks: Map<Int, OsnmaMark>,
     cn0History: Cn0History?,
+    state: GroupedListState,
 ) {
     if (groups.isEmpty()) {
         // Like the classic table, nothing is shown for SBAS if there are no SBAS satellites
@@ -99,7 +101,7 @@ fun LazyListScope.groupedStatusItems(
         return
     }
     groups.forEach { group ->
-        val expanded = group.key !in collapsedGroups
+        val expanded = group.key !in state.collapsedGroups
         stickyHeader(key = "header_" + group.key) {
             GroupSurface(
                 shape = if (expanded) {
@@ -109,7 +111,11 @@ fun LazyListScope.groupedStatusItems(
                 }
             ) {
                 GroupHeader(group, groupName(group), expanded) {
-                    if (expanded) collapsedGroups.add(group.key) else collapsedGroups.remove(group.key)
+                    if (expanded) {
+                        state.collapsedGroups.add(group.key)
+                    } else {
+                        state.collapsedGroups.remove(group.key)
+                    }
                 }
             }
         }
@@ -130,12 +136,12 @@ fun LazyListScope.groupedStatusItems(
                         } else {
                             null
                         }
-                        val showDetails = satellite.key in satellitesWithDetails
+                        val showDetails = satellite.key in state.satellitesWithDetails
                         SatelliteRow(satellite, mark, groupName(group), showDetails) {
                             if (showDetails) {
-                                satellitesWithDetails.remove(satellite.key)
+                                state.satellitesWithDetails.remove(satellite.key)
                             } else {
-                                satellitesWithDetails.add(satellite.key)
+                                state.satellitesWithDetails.add(satellite.key)
                             }
                         }
                         if (showDetails) SatelliteDetails(satellite, cn0History)
@@ -168,11 +174,21 @@ private fun GroupSurface(shape: Shape, content: @Composable () -> Unit) {
     )
 }
 
-/** Keys of the satellites whose signal details the user opened by tapping them */
-private val satellitesWithDetails = mutableStateListOf<String>()
+/**
+ * What the user opened or collapsed in the grouped list. It lives as long as the Status screen
+ * (see [rememberGroupedListState]), so after the app is restarted all groups are expanded and no
+ * signal details are open.
+ */
+class GroupedListState {
+    /** Keys of the satellites whose signal details the user opened by tapping them */
+    val satellitesWithDetails = mutableStateListOf<String>()
 
-/** Keys of the groups the user collapsed, kept while the app runs. Groups are expanded by default. */
-private val collapsedGroups = mutableStateListOf<String>()
+    /** Keys of the groups the user collapsed. Groups are expanded by default. */
+    val collapsedGroups = mutableStateListOf<String>()
+}
+
+@Composable
+fun rememberGroupedListState(): GroupedListState = remember { GroupedListState() }
 
 @Composable
 private fun GroupHeader(
@@ -620,6 +636,9 @@ private const val CHART_GAP_MILLIS = 3_000L
  * C/N0 of a signal over time, from 10 to 50 dB-Hz with grid lines at 20, 30 and 40 dB-Hz. The right
  * edge is [newestMillis], the left edge [windowMillis] earlier. The line uses the sky view color of
  * the latest C/N0.
+ *
+ * With an hour of history there are more samples than pixels, so the samples are averaged per pixel
+ * column and the line connects the columns.
  */
 @Composable
 private fun Cn0Chart(
@@ -640,34 +659,45 @@ private fun Cn0Chart(
             return size.height * (1f - (clamped - CHART_MIN_CN0) / (CHART_MAX_CN0 - CHART_MIN_CN0))
         }
 
-        fun x(timeMillis: Long): Float {
-            return size.width * (1f - (newestMillis - timeMillis).toFloat() / windowMillis)
-        }
-
         listOf(20f, 30f, 40f).forEach {
             drawLine(gridColor, Offset(0f, y(it)), Offset(size.width, y(it)), strokeWidth = 1f)
         }
-        val stroke = 2.dp.toPx()
-        var previous: Cn0History.Sample? = null
+
+        val columns = size.width.toInt().coerceAtLeast(1)
+        val columnMillis = windowMillis.toFloat() / columns
+        val sums = FloatArray(columns)
+        val counts = IntArray(columns)
         samples.forEach { sample ->
-            val p = previous
-            if (p != null && sample.timeMillis - p.timeMillis <= CHART_GAP_MILLIS) {
+            val age = newestMillis - sample.timeMillis
+            if (age < 0 || age > windowMillis) return@forEach
+            val column = (columns - 1 - (age / columnMillis).toInt()).coerceIn(0, columns - 1)
+            sums[column] += sample.cn0DbHz
+            counts[column]++
+        }
+        // Columns further apart than the gap (and at least one column) aren't connected
+        val maxColumnGap = maxOf(1, (CHART_GAP_MILLIS / columnMillis).toInt() + 1)
+
+        val stroke = 2.dp.toPx()
+        var previousColumn = -1
+        var previousY = 0f
+        for (column in 0 until columns) {
+            if (counts[column] == 0) continue
+            val x = column + 0.5f
+            val yValue = y(sums[column] / counts[column])
+            if (previousColumn >= 0 && column - previousColumn <= maxColumnGap) {
                 drawLine(
                     lineColor,
-                    Offset(x(p.timeMillis), y(p.cn0DbHz)),
-                    Offset(x(sample.timeMillis), y(sample.cn0DbHz)),
+                    Offset(previousColumn + 0.5f, previousY),
+                    Offset(x, yValue),
                     strokeWidth = stroke,
                     cap = StrokeCap.Round
                 )
             } else {
                 // Start of the line or after a gap: a dot, so single samples are visible too
-                drawCircle(
-                    lineColor,
-                    radius = stroke / 2,
-                    center = Offset(x(sample.timeMillis), y(sample.cn0DbHz))
-                )
+                drawCircle(lineColor, radius = stroke / 2, center = Offset(x, yValue))
             }
-            previous = sample
+            previousColumn = column
+            previousY = yValue
         }
     }
 }

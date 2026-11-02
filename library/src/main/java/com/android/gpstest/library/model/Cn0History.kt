@@ -21,6 +21,9 @@ import kotlin.math.roundToLong
  * Keeps the C/N0 of each signal (satellite and carrier frequency) for the last [windowMillis], so
  * the Status screen can show how a signal's strength changed.
  *
+ * Samples are stored per signal in primitive ring buffers (12 bytes per sample) instead of objects,
+ * so an hour at one sample per second stays at about 4 MB for 80 signals in view.
+ *
  * Times are in milliseconds of a monotonic clock, passed in by the caller.
  */
 class Cn0History(
@@ -28,44 +31,84 @@ class Cn0History(
 ) {
     data class Sample(val timeMillis: Long, val cn0DbHz: Float)
 
-    private val samples = HashMap<String, ArrayDeque<Sample>>()
+    private val signals = HashMap<String, SignalBuffer>()
 
     /** Adds the C/N0 of all [statuses] at [nowMillis] and drops samples older than the window */
     @Synchronized
     fun add(statuses: List<SatelliteStatus>, nowMillis: Long) {
         statuses.forEach { status ->
             if (status.cn0DbHz == SatelliteStatus.NO_DATA) return@forEach
-            samples.getOrPut(key(status)) { ArrayDeque() }
-                .addLast(Sample(nowMillis, status.cn0DbHz))
+            signals.getOrPut(key(status)) { SignalBuffer() }.add(nowMillis, status.cn0DbHz)
         }
         val oldest = nowMillis - windowMillis
-        val iterator = samples.values.iterator()
+        val iterator = signals.values.iterator()
         while (iterator.hasNext()) {
-            val deque = iterator.next()
-            while (deque.isNotEmpty() && deque.first().timeMillis < oldest) {
-                deque.removeFirst()
-            }
-            if (deque.isEmpty()) iterator.remove()
+            val buffer = iterator.next()
+            buffer.dropOlderThan(oldest)
+            if (buffer.size == 0) iterator.remove()
         }
     }
 
     /** Samples of the signal of [status], oldest first */
     @Synchronized
     fun get(status: SatelliteStatus): List<Sample> {
-        return samples[key(status)]?.toList() ?: emptyList()
+        val buffer = signals[key(status)] ?: return emptyList()
+        return List(buffer.size) { Sample(buffer.timeAt(it), buffer.valueAt(it)) }
     }
 
     @Synchronized
     fun clear() {
-        samples.clear()
+        signals.clear()
+    }
+
+    /** Growable ring buffer of (time, C/N0) pairs, oldest first */
+    private class SignalBuffer {
+        private var times = LongArray(INITIAL_CAPACITY)
+        private var values = FloatArray(INITIAL_CAPACITY)
+        private var start = 0
+        var size = 0
+            private set
+
+        fun add(timeMillis: Long, cn0: Float) {
+            if (size == times.size) grow()
+            val index = (start + size) % times.size
+            times[index] = timeMillis
+            values[index] = cn0
+            size++
+        }
+
+        fun dropOlderThan(oldestMillis: Long) {
+            while (size > 0 && times[start] < oldestMillis) {
+                start = (start + 1) % times.size
+                size--
+            }
+        }
+
+        fun timeAt(i: Int): Long = times[(start + i) % times.size]
+
+        fun valueAt(i: Int): Float = values[(start + i) % values.size]
+
+        private fun grow() {
+            val newTimes = LongArray(times.size * 2)
+            val newValues = FloatArray(values.size * 2)
+            for (i in 0 until size) {
+                newTimes[i] = timeAt(i)
+                newValues[i] = valueAt(i)
+            }
+            times = newTimes
+            values = newValues
+            start = 0
+        }
     }
 
     companion object {
         /**
-         * 15 minutes. At one sample per second that's 900 samples per signal, roughly 3 MB for
+         * One hour. At one sample per second that's 3600 samples per signal, about 4 MB for
          * 80 signals in view.
          */
-        const val DEFAULT_WINDOW_MILLIS = 15 * 60_000L
+        const val DEFAULT_WINDOW_MILLIS = 60 * 60_000L
+
+        private const val INITIAL_CAPACITY = 64
 
         /**
          * Identifies a signal: constellation, SBAS system, satellite ID and carrier frequency,

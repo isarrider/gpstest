@@ -113,6 +113,7 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
         groupSatellites(sbasStatuses, false, sortOrder)
     }
     val osnmaMarks = osnma.status?.takeIf { osnma.enabled }?.marks() ?: emptyMap()
+    val groupedListState = rememberGroupedListState()
 
     // A lazy column, so that the group headers of the grouped list can stay at the top while
     // scrolling
@@ -142,8 +143,8 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
                 }
             }
         } else {
-            groupedStatusItems(gnssGroups, true, osnmaMarks, viewModel.cn0History)
-            groupedStatusItems(sbasGroups, false, emptyMap(), viewModel.cn0History)
+            groupedStatusItems(gnssGroups, true, osnmaMarks, viewModel.cn0History, groupedListState)
+            groupedStatusItems(sbasGroups, false, emptyMap(), viewModel.cn0History, groupedListState)
         }
     }
 }
