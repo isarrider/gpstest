@@ -184,4 +184,39 @@ class SignalOverviewTest {
         assertEquals(SignalSummary(0, 0, 0, 0), signalSummary(emptyList(), labeler))
         assertTrue(averageCn0ByBand(emptyList(), labeler).isEmpty())
     }
+
+    @Test
+    fun seenBandsKeepASlotForABandThatDisappears() {
+        val seen = SeenBands()
+        // GPS 3 on L1 and L5, GPS 7 on L1 only
+        val both = group(
+            signal(GnssType.NAVSTAR, 3, frequencyHz = l1),
+            signal(GnssType.NAVSTAR, 3, frequencyHz = l5),
+            signal(GnssType.NAVSTAR, 7, frequencyHz = l1),
+        )
+        assertEquals(listOf("L1", "L5"), seen.update(both, labeler).map { it.label })
+
+        // L5 is lost: the L5 slot stays, so the bars don't move
+        val l1Only = group(
+            signal(GnssType.NAVSTAR, 3, frequencyHz = l1),
+            signal(GnssType.NAVSTAR, 7, frequencyHz = l1),
+        )
+        val columns = seen.update(l1Only, labeler)
+        assertEquals(listOf("L1", "L5"), columns.map { it.label })
+
+        val table = signalTable(l1Only, labeler, columns)
+        assertEquals(listOf("L1", "L5"), table.columns.map { it.label })
+        table.rows.forEach { row ->
+            assertEquals(2, row.cells.size)
+            assertNull(row.cells[1])
+        }
+    }
+
+    @Test
+    fun seenBandsAddNewBandsInFrequencyOrder() {
+        val seen = SeenBands()
+        seen.update(group(signal(GnssType.NAVSTAR, 3, frequencyHz = l5)), labeler)
+        val columns = seen.update(group(signal(GnssType.NAVSTAR, 3, frequencyHz = l1)), labeler)
+        assertEquals(listOf("L1", "L5"), columns.map { it.label })
+    }
 }
