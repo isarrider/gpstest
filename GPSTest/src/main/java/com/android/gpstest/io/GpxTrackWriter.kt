@@ -276,6 +276,10 @@ class GpxTrackWriter(
         fix.heading?.let {
             sb.append("          <gpstest:heading>").append(fmt(it, 1)).append("</gpstest:heading>\n")
         }
+        fix.batteryPercent?.let {
+            sb.append("          <gpstest:battery level=\"").append(it)
+                .append("\" charging=\"").append(fix.batteryCharging == true).append("\"/>\n")
+        }
 
         if (fix.satellites.isEmpty()) return
 

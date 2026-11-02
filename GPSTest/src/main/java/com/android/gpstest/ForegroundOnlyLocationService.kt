@@ -20,15 +20,18 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
 import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.location.Location
 import android.location.LocationManager
+import android.os.BatteryManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -138,6 +141,13 @@ class ForegroundOnlyLocationService : LifecycleService() {
     lateinit var jsonFileLogger: JsonFileLogger
     lateinit var gpxTrackRecorder: GpxTrackRecorder
     private val gpxFixContext = GpxFixContextCollector()
+
+    // Battery state for GPX track points; the system sends this whenever the level changes
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            onBatteryChanged(intent)
+        }
+    }
     private var gpxTickJob: Job? = null
 
     // Preference listener that will init the loggers if the user changes Settings while Service is running
@@ -157,6 +167,14 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
         // Observe logging setting changes
         Application.prefs.registerOnSharedPreferenceChangeListener(loggingSettingListener)
+
+        // The broadcast is sticky, so registering also returns the current state right away
+        ContextCompat.registerReceiver(
+            this,
+            batteryReceiver,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )?.let { onBatteryChanged(it) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -246,6 +264,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy()")
+        unregisterReceiver(batteryReceiver)
         stopGpxRecording()
         stopLogging()
         super.onDestroy()
@@ -298,6 +317,16 @@ class ForegroundOnlyLocationService : LifecycleService() {
             gpxTrackRecorder.stop()
             refreshNotification()
         }
+    }
+
+    private fun onBatteryChanged(intent: Intent) {
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        if (level < 0 || scale <= 0) return
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == BatteryManager.BATTERY_STATUS_FULL
+        gpxFixContext.onBattery(level * 100 / scale, charging)
     }
 
     private fun refreshNotification() {
