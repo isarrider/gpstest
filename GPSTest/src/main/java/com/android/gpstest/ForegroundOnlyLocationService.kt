@@ -570,6 +570,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         }
         osnmaFlow = osnmaRepository.state
             .onEach { state ->
+                gpxFixContext.onOsnma(state)
                 val status = if (state.enabled) state.status else null
                 val failed = osnmaFailureMonitor.check(status, SystemClock.elapsedRealtime())
                 if (failed.isNotEmpty()) notifyOsnmaFailure(failed)

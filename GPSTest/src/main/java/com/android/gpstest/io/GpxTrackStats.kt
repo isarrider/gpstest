@@ -52,6 +52,12 @@ data class GpxTrackStats(
     val batteryLast: Int? = null,
     /** True if the phone was charging at any point of the track */
     val batteryCharged: Boolean = false,
+    /** Points with OSNMA data and at least one Galileo satellite used in the fix */
+    val osnmaPoints: Int = 0,
+    /** Of [osnmaPoints], those where every Galileo satellite used was authenticated */
+    val osnmaAllAuthenticated: Int = 0,
+    /** Points with at least one Galileo satellite used whose OSNMA tags failed */
+    val osnmaFailedPoints: Int = 0,
     /** Downsampled time series for the charts */
     val samples: List<Sample>
 ) {
@@ -108,6 +114,9 @@ data class GpxTrackStats(
         o.putOpt("battStart", batteryStart)
         o.putOpt("battLast", batteryLast)
         o.put("battCharged", batteryCharged)
+        o.put("osnmaPts", osnmaPoints)
+        o.put("osnmaAll", osnmaAllAuthenticated)
+        o.put("osnmaFail", osnmaFailedPoints)
         val a = JSONArray()
         for (s in samples) {
             val r = JSONArray()
@@ -167,6 +176,9 @@ data class GpxTrackStats(
                 batteryStart = optD("battStart")?.toInt(),
                 batteryLast = optD("battLast")?.toInt(),
                 batteryCharged = o.optBoolean("battCharged", false),
+                osnmaPoints = o.optInt("osnmaPts", 0),
+                osnmaAllAuthenticated = o.optInt("osnmaAll", 0),
+                osnmaFailedPoints = o.optInt("osnmaFail", 0),
                 samples = samples
             )
         }
@@ -212,6 +224,9 @@ class GpxTrackStatsAccumulator(
     private var batteryStart: Int? = null
     private var batteryLast: Int? = null
     private var batteryCharged = false
+    private var osnmaPoints = 0
+    private var osnmaAll = 0
+    private var osnmaFailedPoints = 0
 
     private var anchor: Location? = null
     private var previousTime: Long? = null
@@ -290,6 +305,13 @@ class GpxTrackStatsAccumulator(
         }
         if (fix.batteryCharging == true) batteryCharged = true
 
+        // OSNMA
+        if (fix.osnma != null && fix.galileoUsed.isNotEmpty()) {
+            osnmaPoints++
+            if (fix.osnmaAuthenticated == fix.galileoUsed.size) osnmaAll++
+        }
+        if (fix.osnmaFailed > 0) osnmaFailedPoints++
+
         // Chart samples
         sinceLastSample++
         if (samples.isEmpty() || sinceLastSample >= sampleStride) {
@@ -337,6 +359,9 @@ class GpxTrackStatsAccumulator(
         batteryStart = batteryStart,
         batteryLast = batteryLast,
         batteryCharged = batteryCharged,
+        osnmaPoints = osnmaPoints,
+        osnmaAllAuthenticated = osnmaAll,
+        osnmaFailedPoints = osnmaFailedPoints,
         samples = ArrayList(samples)
     )
 

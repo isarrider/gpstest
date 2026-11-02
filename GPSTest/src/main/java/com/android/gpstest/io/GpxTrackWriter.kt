@@ -316,6 +316,17 @@ class GpxTrackWriter(
         }
         sb.append("/>\n")
 
+        // Galileo OSNMA: how many of the Galileo satellites used in the fix had authenticated
+        // navigation data. This vouches for the data, not for the position (see LOGGING.md).
+        fix.osnma?.let {
+            sb.append("          <gpstest:osnma phase=\"").append(it.phase)
+                .append("\" auth=\"").append(fix.osnmaAuthenticated)
+                .append("\" failed=\"").append(fix.osnmaFailed)
+                .append("\" galileo=\"").append(fix.galileoUsed.size)
+                .append("\" time=\"").append(if (it.timeNetwork) "network" else "device")
+                .append("\"/>\n")
+        }
+
         if (includeSatellites) {
             sb.append("          <gpstest:sats>\n")
             for (s in fix.satellites) {
