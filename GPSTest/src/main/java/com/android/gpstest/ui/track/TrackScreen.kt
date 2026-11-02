@@ -47,6 +47,7 @@ import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
+import com.android.gpstest.library.util.LibUIUtils
 import com.android.gpstest.library.util.PreferenceUtil
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
@@ -268,9 +269,11 @@ private fun percent(share: Double) = String.format(Locale.getDefault(), "%.0f %%
 private class Units(private val metric: Boolean, private val speedPref: String) {
     val heightUnit = if (metric) "m" else "ft"
     val distanceAxisUnit = if (metric) "km" else "mi"
+    // Same unit labels as the speed on the Status screen
     val speedUnit = when (speedPref) {
         PreferenceUtil.KILOMETERS_PER_HOUR -> "km/h"
-        MILES_PER_HOUR -> "mph"
+        PreferenceUtil.MILES_PER_HOUR -> "mph"
+        PreferenceUtil.KNOTS -> "kt"
         else -> "m/s"
     }
 
@@ -290,14 +293,14 @@ private class Units(private val metric: Boolean, private val speedPref: String) 
     }
 
     fun speedValue(mps: Float): Float = when (speedPref) {
-        PreferenceUtil.KILOMETERS_PER_HOUR -> mps * 3.6f
-        MILES_PER_HOUR -> mps * 3600f / METERS_PER_MILE
+        PreferenceUtil.KILOMETERS_PER_HOUR -> LibUIUtils.toKilometersPerHour(mps)
+        PreferenceUtil.MILES_PER_HOUR -> LibUIUtils.toMilesPerHour(mps)
+        PreferenceUtil.KNOTS -> LibUIUtils.toKnots(mps)
         else -> mps
     }
     fun speed(mps: Double): String = String.format(Locale.getDefault(), "%.1f %s", speedValue(mps.toFloat()), speedUnit)
 
     companion object {
-        private const val MILES_PER_HOUR = "3"
         private const val FEET_PER_METER = 3.28084f
         private const val METERS_PER_MILE = 1609.344f
 
