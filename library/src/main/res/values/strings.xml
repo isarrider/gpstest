@@ -56,6 +56,7 @@
     <string name="log_error">Something went wrong with file logging. Did you allow file/storage permissions? Try re-enabling a file logging option in Settings and tap "Allow" when prompted.</string>
     <string name="no_location">Try sharing your location after getting a GNSS fix…</string>
     <string name="include_altitude">Include altitude</string>
+    <string name="include_timestamp">Include timestamp</string>
     <string name="set_fix_frequency">Set Fix Frequency</string>
     <string name="force_time_injection_success">Submitted time injection request.</string>
     <string name="force_time_injection_failure">Device does not support injecting time data.
@@ -405,6 +406,7 @@
     <string name="preferences_preferred_speed_units_option_meters_per_second">Meters per second</string>
     <string name="preferences_preferred_speed_units_option_kilometers_per_hour">Kilometers per hour</string>
     <string name="preferences_preferred_speed_units_option_miles_per_hour">Miles per hour</string>
+    <string name="preferences_preferred_speed_units_option_knots">Knots</string>
 
     <string name="pref_language_title">Language</string>
     <string name="pref_language_summary">Manually sets the language shown in the app</string>
