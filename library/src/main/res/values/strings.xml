@@ -663,4 +663,16 @@
     <string name="status_a11y_collapse">collapse</string>
     <string name="status_details_position">Elevation %1$.1f\u00B0, azimuth %2$.1f\u00B0</string>
     <string name="status_group_sbas_unknown">Other SBAS</string>
+    <!-- Signals screen: C/N0 of every received signal -->
+    <string name="gps_signals_title">Signals</string>
+    <string name="signals_view_bars">Bars</string>
+    <string name="signals_view_table">Table</string>
+    <string name="signals_summary">%1$d satellites \u00B7 %2$d signals \u00B7 %3$d used in fix \u00B7 %4$d on 2+ bands</string>
+    <string name="signals_band_average">%1$s \u2300 %2$.0f</string>
+    <string name="signals_no_signals">No signals yet. Start GNSS to see the C/N0 of every received signal.</string>
+    <string name="signals_legend">C/N0 in dB-Hz \u00B7 faded: not used in fix</string>
+    <string name="signals_table_id">ID</string>
+    <string name="signals_a11y_view_bars">Show as bar chart</string>
+    <string name="signals_a11y_view_table">Show as band table</string>
+    <string name="signals_a11y_band_averages">Average C/N0 per band</string>
 </resources>

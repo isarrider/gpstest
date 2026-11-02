@@ -162,7 +162,7 @@ fun StatusScreen(viewModel: SignalInfoViewModel, osnmaState: StateFlow<OsnmaUiSt
 
 /** The value of a preference, updated when it changes (e.g. in Settings or the sort dialog) */
 @Composable
-private fun <T> preferenceState(
+internal fun <T> preferenceState(
     @StringRes keyId: Int,
     read: (SharedPreferences, String) -> T
 ): State<T> {

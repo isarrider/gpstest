@@ -70,6 +70,7 @@ import com.android.gpstest.library.util.PreferenceUtil.runInBackground
 import com.android.gpstest.library.util.PreferenceUtils.isTrackingStarted
 import com.android.gpstest.map.MapConstants
 import com.android.gpstest.ui.NavigationDrawerFragment.NavigationDrawerCallbacks
+import com.android.gpstest.ui.signals.SignalsFragment
 import com.android.gpstest.ui.sky.SkyFragment
 import com.android.gpstest.ui.status.StatusFragment
 import com.android.gpstest.util.BuildUtils
@@ -106,6 +107,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private var mapFragment: MapFragment? = null
     private var skyFragment: SkyFragment? = null
     private var accuracyFragment: MapFragment? = null
+    private var signalsFragment: SignalsFragment? = null
 
     // Main signal view model
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -456,6 +458,10 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 showSkyFragment()
                 currentNavDrawerPosition = item
             }
+            NavigationDrawerFragment.NAVDRAWER_ITEM_SIGNALS -> if (currentNavDrawerPosition != NavigationDrawerFragment.NAVDRAWER_ITEM_SIGNALS) {
+                showSignalsFragment()
+                currentNavDrawerPosition = item
+            }
             NavigationDrawerFragment.NAVDRAWER_ITEM_ACCURACY -> if (currentNavDrawerPosition != NavigationDrawerFragment.NAVDRAWER_ITEM_ACCURACY) {
                 showAccuracyFragment()
                 currentNavDrawerPosition = item
@@ -502,6 +508,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private fun showStatusFragment() {
         val fm = supportFragmentManager
         // Hide everything that shouldn't be shown
+        hideSignalsFragment()
         hideMapFragment()
         hideSkyFragment()
         hideAccuracyFragment()
@@ -537,6 +544,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private fun showMapFragment() {
         val fm = supportFragmentManager
         // Hide everything that shouldn't be shown
+        hideSignalsFragment()
         hideStatusFragment()
         hideSkyFragment()
         hideAccuracyFragment()
@@ -575,6 +583,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private fun showSkyFragment() {
         val fm = supportFragmentManager
         // Hide everything that shouldn't be shown
+        hideSignalsFragment()
         hideStatusFragment()
         hideMapFragment()
         hideAccuracyFragment()
@@ -609,6 +618,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
     private fun showAccuracyFragment() {
         val fm = supportFragmentManager
         // Hide everything that shouldn't be shown
+        hideSignalsFragment()
         hideStatusFragment()
         hideMapFragment()
         hideSkyFragment()
@@ -640,6 +650,39 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
         accuracyFragment = fm.findFragmentByTag(MapConstants.MODE_ACCURACY) as MapFragment?
         if (accuracyFragment != null && !accuracyFragment!!.isHidden) {
             fm.beginTransaction().hide(accuracyFragment!!).commit()
+        }
+    }
+
+    private fun showSignalsFragment() {
+        val fm = supportFragmentManager
+        // Hide everything that shouldn't be shown
+        hideStatusFragment()
+        hideMapFragment()
+        hideSkyFragment()
+        hideAccuracyFragment()
+        if (benchmarkController != null) {
+            benchmarkController!!.hide()
+        }
+        if (signalsFragment == null) {
+            // First check to see if an instance of fragment already exists
+            signalsFragment = fm.findFragmentByTag(SignalsFragment.TAG) as SignalsFragment?
+            if (signalsFragment == null) {
+                Log.d(TAG, "Creating new SignalsFragment")
+                signalsFragment = SignalsFragment()
+                fm.beginTransaction()
+                    .add(R.id.fragment_container, signalsFragment!!, SignalsFragment.TAG)
+                    .commit()
+            }
+        }
+        supportFragmentManager.beginTransaction().show(signalsFragment!!).commit()
+        title = resources.getString(R.string.gps_signals_title)
+    }
+
+    private fun hideSignalsFragment() {
+        val fm = supportFragmentManager
+        signalsFragment = fm.findFragmentByTag(SignalsFragment.TAG) as SignalsFragment?
+        if (signalsFragment != null && !signalsFragment!!.isHidden) {
+            fm.beginTransaction().hide(signalsFragment!!).commit()
         }
     }
 

@@ -249,7 +249,7 @@ private fun GroupHeader(
 }
 
 @Composable
-private fun groupName(group: SatelliteGroup): String {
+internal fun groupName(group: SatelliteGroup): String {
     if (group.gnssType == GnssType.SBAS) {
         return stringResource(
             when (group.sbasType) {
@@ -279,7 +279,7 @@ private fun groupName(group: SatelliteGroup): String {
 }
 
 /** Satellite ID with the usual one-letter constellation prefix, e.g. "E06" */
-private fun satelliteId(satellite: GroupedSatellite): String {
+internal fun satelliteId(satellite: GroupedSatellite): String {
     val prefix = when (satellite.gnssType) {
         GnssType.NAVSTAR -> "G"
         GnssType.GLONASS -> "R"
@@ -436,7 +436,7 @@ private fun cn0Fraction(cn0: Float): Float {
 
 /** Same thresholds and colours as GpsSkyView.getSatelliteColor() */
 @Composable
-private fun cn0Color(cn0: Float): Color {
+internal fun cn0Color(cn0: Float): Color {
     val thresholds = floatArrayOf(
         LibUIUtils.MIN_VALUE_CN0,
         21.67f,

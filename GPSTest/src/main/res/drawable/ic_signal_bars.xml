@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drawer icon of the Signals screen: bars of different heights in groups of two -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3,21h18v-1.5H3z
+            M4,18.5h2.5V9H4z M7,18.5h2.5v-5.5H7z
+            M11,18.5h2.5V5h-2.5z M14,18.5h2.5v-8H14z
+            M18,18.5h2.5V12H18z" />
+</vector>
