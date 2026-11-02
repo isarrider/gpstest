@@ -16,9 +16,7 @@
 package com.android.gpstest.library.util;
 
 import android.location.GnssAntennaInfo;
-import android.os.Build;
 
-import androidx.annotation.RequiresApi;
 
 import com.android.gpstest.library.model.SatelliteStatus;
 
@@ -254,7 +252,6 @@ public class CarrierFreqUtils {
      * @return the carrier frequency label (e.g. "L1") for the provided GNSS antenna's
      * carrier frequency
      */
-    @RequiresApi(api = Build.VERSION_CODES.R)
     public static String getCarrierFrequencyLabel(GnssAntennaInfo gnssAntennaInfo) {
         String label;
         double cfMHz = gnssAntennaInfo.getCarrierFrequencyMHz();

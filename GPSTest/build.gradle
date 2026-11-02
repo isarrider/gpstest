@@ -8,11 +8,11 @@ android {
     compileSdkVersion 36
 
     defaultConfig {
-        minSdkVersion 24
+        minSdkVersion 35
         targetSdkVersion 36
         multiDexEnabled true
         // versionCode scheme - first two digits are minSdkVersion, last three digits are build number
-        versionCode 24100
+        versionCode 35100
         versionName "3.10.6"
 
         vectorDrawables.useSupportLibrary = true

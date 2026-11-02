@@ -21,9 +21,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.location.GnssAntennaInfo
 import android.location.LocationManager
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import com.android.gpstest.library.R
 import com.android.gpstest.library.util.CarrierFreqUtils
 import com.android.gpstest.library.util.IOUtils
@@ -50,7 +48,6 @@ class SharedAntennaManager constructor(
     externalScope: CoroutineScope,
     prefs: SharedPreferences
 ) {
-    @RequiresApi(Build.VERSION_CODES.R)
     @ExperimentalCoroutinesApi
     @SuppressLint("MissingPermission")
     private val _antennaUpdates = callbackFlow {
@@ -103,7 +100,6 @@ class SharedAntennaManager constructor(
         started = SharingStarted.WhileSubscribed()
     )
 
-    @RequiresApi(Build.VERSION_CODES.R)
     @ExperimentalCoroutinesApi
     fun antennaFlow(): Flow<List<GnssAntennaInfo>> {
         return _antennaUpdates

@@ -1,7 +1,5 @@
 package com.android.gpstest.library.data
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -70,7 +68,6 @@ class LocationRepository @Inject constructor(
     /**
      * Observable flow for GNSS antenna info
      */
-    @RequiresApi(Build.VERSION_CODES.R)
     @ExperimentalCoroutinesApi
     fun getAntennas() = sharedAntennaManager.antennaFlow()
 }

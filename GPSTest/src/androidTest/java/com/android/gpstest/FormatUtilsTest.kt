@@ -17,8 +17,6 @@ package com.android.gpstest
 
 import android.location.GnssAntennaInfo
 import android.location.Location
-import android.os.Build
-import androidx.test.filters.SdkSuppress
 import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.Orientation
@@ -46,26 +44,17 @@ class FormatUtilsTest {
         l.accuracy = 98.7f
         l.bearing = 100.1f
         l.time = 12345
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            l.speedAccuracyMetersPerSecond = 382.7f
-            l.bearingAccuracyDegrees = 284.1f
-            l.verticalAccuracyMeters = 583.4f
-        }
+        l.speedAccuracyMetersPerSecond = 382.7f
+        l.bearingAccuracyDegrees = 284.1f
+        l.verticalAccuracyMeters = 583.4f
         l.elapsedRealtimeNanos = 123456789
 
         // Fix,Provider,LatitudeDegrees,LongitudeDegrees,AltitudeMeters,SpeedMps,AccuracyMeters,BearingDegrees,UnixTimeMillis,SpeedAccuracyMps,BearingAccuracyDegrees,elapsedRealtimeNanos,VerticalAccuracyMeters,MockLocation
         if (l.isSpeedAccuracySupported() && l.isBearingAccuracySupported() && l.isVerticalAccuracySupported()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                assertEquals(
-                    "Fix,test,45.34567899,12.45678901,56.2,19.2,98.7,100.1,12345,382.7,284.1,123456789,583.4,0",
-                    l.toLog()
-                )
-            } else {
-                assertEquals(
-                    "Fix,test,45.34567899,12.45678901,56.2,19.2,98.7,100.1,12345,382.7,284.1,123456789,583.4,",
-                    l.toLog()
-                )
-            }
+            assertEquals(
+                "Fix,test,45.34567899,12.45678901,56.2,19.2,98.7,100.1,12345,382.7,284.1,123456789,583.4,0",
+                l.toLog()
+            )
         } else {
             assertEquals(
                 "Fix,test,45.34567899,12.45678901,56.2,19.2,98.7,100.1,12345,,,123456789,,",
@@ -84,26 +73,17 @@ class FormatUtilsTest {
         l.accuracy = 0.00000000000000000001f
         l.bearing = 0.00000000000000000001f
         l.time = 12345
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            l.speedAccuracyMetersPerSecond = 0.00000000000000000001f
-            l.bearingAccuracyDegrees = 0.00000000000000000001f
-            l.verticalAccuracyMeters = 0.00000000000000000001f
-        }
+        l.speedAccuracyMetersPerSecond = 0.00000000000000000001f
+        l.bearingAccuracyDegrees = 0.00000000000000000001f
+        l.verticalAccuracyMeters = 0.00000000000000000001f
         l.elapsedRealtimeNanos = 123456789
 
         // Fix,Provider,LatitudeDegrees,LongitudeDegrees,AltitudeMeters,SpeedMps,AccuracyMeters,BearingDegrees,UnixTimeMillis,SpeedAccuracyMps,BearingAccuracyDegrees,elapsedRealtimeNanos,VerticalAccuracyMeters
         if (l.isSpeedAccuracySupported() && l.isBearingAccuracySupported() && l.isVerticalAccuracySupported()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                assertEquals(
-                    "Fix,test,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,12345,0.000000000000000000010,0.000000000000000000010,123456789,0.000000000000000000010,0",
-                    l.toLog()
-                )
-            } else {
-                assertEquals(
-                    "Fix,test,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,12345,0.000000000000000000010,0.000000000000000000010,123456789,0.000000000000000000010,",
-                    l.toLog()
-                )
-            }
+            assertEquals(
+                "Fix,test,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,12345,0.000000000000000000010,0.000000000000000000010,123456789,0.000000000000000000010,0",
+                l.toLog()
+            )
         } else {
             assertEquals(
                 "Fix,test,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,0.000000000000000000010,12345,,,123456789,,",
@@ -118,29 +98,19 @@ class FormatUtilsTest {
         l.latitude = 45.34567899
         l.longitude = 12.45678901
         l.time = 12345
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            l.isMock = true
-        }
+        l.isMock = true
 
         // Fix,Provider,LatitudeDegrees,LongitudeDegrees,AltitudeMeters,SpeedMps,AccuracyMeters,BearingDegrees,UnixTimeMillis,SpeedAccuracyMps,BearingAccuracyDegrees,elapsedRealtimeNanos,VerticalAccuracyMeters,MockLocation
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            assertEquals(
-                "Fix,test,45.34567899,12.45678901,0.0,0.0,0.0,0.0,12345,,,0,,1",
-                l.toLog()
-            )
-        } else {
-            assertEquals(
-                "Fix,test,45.34567899,12.45678901,0.0,0.0,0.0,0.0,12345,,,0,,",
-                l.toLog()
-            )
-        }
+        assertEquals(
+            "Fix,test,45.34567899,12.45678901,0.0,0.0,0.0,0.0,12345,,,0,,1",
+            l.toLog()
+        )
     }
 
     /**
      * Test writing GnssAntennaInfo to CSV format (only runs on Android R or higher)
      */
     @Test
-    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.R)
     fun testSerializeGnssAntennaInfo() {
         val builder = GnssAntennaInfo.Builder()
         builder.setCarrierFrequencyMHz(1575.42)

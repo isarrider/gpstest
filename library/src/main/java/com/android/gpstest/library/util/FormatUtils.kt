@@ -6,8 +6,6 @@ import android.location.GnssAntennaInfo
 import android.location.GnssClock
 import android.location.GnssMeasurement
 import android.location.Location
-import android.os.Build
-import androidx.annotation.RequiresApi
 import com.android.gpstest.library.R
 import com.android.gpstest.library.model.CoordinateType
 import com.android.gpstest.library.model.DilutionOfPrecision
@@ -301,7 +299,7 @@ object FormatUtils {
                 "${if (isBearingAccuracySupported()) bearingAccuracyDegrees.toLog() else ""}," +
                 "$elapsedRealtimeNanos," +
                 "${if (isVerticalAccuracySupported()) verticalAccuracyMeters.toLog() else ""}," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) isMock.toLog() else ""}"
+                "${isMock.toLog()}"
     }
 
     /**
@@ -376,14 +374,14 @@ object FormatUtils {
                 "$multipathIndicator," +
                 "${if (hasSnrInDb()) snrInDb.toLog() else ""}," +
                 "$constellationType," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && hasAutomaticGainControlLevelDb()) automaticGainControlLevelDb.toLog() else ""}," +
+                "${if (hasAutomaticGainControlLevelDb()) automaticGainControlLevelDb.toLog() else ""}," +
                 // BasebandCn0DbHz,FullInterSignalBiasNanos,FullInterSignalBiasUncertaintyNanos,SatelliteInterSignalBiasNanos,SatelliteInterSignalBiasUncertaintyNanos,CodeType,ChipsetElapsedRealtimeNanos
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasBasebandCn0DbHz()) basebandCn0DbHz.toLog() else ""}," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasFullInterSignalBiasNanos()) fullInterSignalBiasNanos.toLog() else ""}," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasFullInterSignalBiasUncertaintyNanos()) fullInterSignalBiasUncertaintyNanos.toLog() else ""}," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasSatelliteInterSignalBiasNanos()) satelliteInterSignalBiasNanos.toLog() else ""}," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasSatelliteInterSignalBiasUncertaintyNanos()) satelliteInterSignalBiasUncertaintyNanos.toLog() else ""}," +
-                "${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasCodeType()) codeType else ""}," +
+                "${if (hasBasebandCn0DbHz()) basebandCn0DbHz.toLog() else ""}," +
+                "${if (hasFullInterSignalBiasNanos()) fullInterSignalBiasNanos.toLog() else ""}," +
+                "${if (hasFullInterSignalBiasUncertaintyNanos()) fullInterSignalBiasUncertaintyNanos.toLog() else ""}," +
+                "${if (hasSatelliteInterSignalBiasNanos()) satelliteInterSignalBiasNanos.toLog() else ""}," +
+                "${if (hasSatelliteInterSignalBiasUncertaintyNanos()) satelliteInterSignalBiasUncertaintyNanos.toLog() else ""}," +
+                "${if (hasCodeType()) codeType else ""}," +
                 "$elapsedRealtimeNanos"
     }
 
@@ -391,7 +389,6 @@ object FormatUtils {
      * Returns a CSV representation of the data as:
      * GnssAntennaInfo,CarrierFrequencyMHz,PhaseCenterOffsetXOffsetMm,PhaseCenterOffsetXOffsetUncertaintyMm,PhaseCenterOffsetYOffsetMm,PhaseCenterOffsetYOffsetUncertaintyMm,PhaseCenterOffsetZOffsetMm,PhaseCenterOffsetZOffsetUncertaintyMm,PhaseCenterVariationCorrectionsArray,PhaseCenterVariationCorrectionUncertaintiesArray,PhaseCenterVariationCorrectionsDeltaPhi,PhaseCenterVariationCorrectionsDeltaTheta,SignalGainCorrectionsArray,SignalGainCorrectionUncertaintiesArray,SignalGainCorrectionsDeltaPhi,SignalGainCorrectionsDeltaTheta
      */
-    @RequiresApi(api = Build.VERSION_CODES.R)
     @JvmStatic
     fun GnssAntennaInfo.toLog(): String {
         return "GnssAntennaInfo,${carrierFrequencyMHz.toLog()},${phaseCenterOffset.xOffsetMm.toLog()}," +

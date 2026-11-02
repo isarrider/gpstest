@@ -5,8 +5,6 @@
 
 package com.android.gpstest.lang;
 
-import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
-import static android.os.Build.VERSION_CODES.N;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -17,7 +15,6 @@ import android.preference.PreferenceManager;
 
 import com.android.gpstest.Application;
 import com.android.gpstest.R;
-import com.android.gpstest.library.util.LocaleUtils;
 
 import java.util.Locale;
 
@@ -63,18 +60,12 @@ public class LocaleManager {
 
         Resources res = context.getResources();
         Configuration config = new Configuration(res.getConfiguration());
-        if (LocaleUtils.isAtLeastVersion(JELLY_BEAN_MR1)) {
-            config.setLocale(locale);
-            context = context.createConfigurationContext(config);
-        } else {
-            config.locale = locale;
-            res.updateConfiguration(config, res.getDisplayMetrics());
-        }
-        return context;
+        config.setLocale(locale);
+        return context.createConfigurationContext(config);
     }
 
     public static Locale getLocale(Resources res) {
         Configuration config = res.getConfiguration();
-        return LocaleUtils.isAtLeastVersion(N) ? config.getLocales().get(0) : config.locale;
+        return config.getLocales().get(0);
     }
 }

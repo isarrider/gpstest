@@ -21,7 +21,6 @@ import android.location.GnssMeasurement.ADR_STATE_HALF_CYCLE_RESOLVED
 import android.location.GnssMeasurement.ADR_STATE_RESET
 import android.location.GnssMeasurement.ADR_STATE_UNKNOWN
 import android.location.GnssMeasurement.ADR_STATE_VALID
-import android.os.Build
 import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
@@ -151,11 +150,7 @@ class SatelliteUtilsTest {
         gpsL1.carrierFrequencyHz = 1575420000.0
 
         val gpsL1key = SatelliteUtils.createGnssStatusKey(gpsL1)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals("1 NAVSTAR L1", gpsL1key)
-        } else {
-            assertEquals("1 NAVSTAR unsupported", gpsL1key)
-        }
+        assertEquals("1 NAVSTAR L1", gpsL1key)
 
         // GPS L1 - with CF
         val gpsL1NoCf = SatelliteStatus(1,
@@ -183,11 +178,7 @@ class SatelliteUtilsTest {
         gpsBadCf.carrierFrequencyHz = 9999999.0
 
         val gpsBadCfKey = SatelliteUtils.createGnssStatusKey(gpsBadCf)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            assertEquals("1 NAVSTAR unknown", gpsBadCfKey)
-        } else {
-            assertEquals("1 NAVSTAR unsupported", gpsBadCfKey)
-        }
+        assertEquals("1 NAVSTAR unknown", gpsBadCfKey)
     }
 
     /**

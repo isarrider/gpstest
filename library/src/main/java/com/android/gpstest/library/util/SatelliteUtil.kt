@@ -217,7 +217,7 @@ object SatelliteUtil {
      * @return true if the speed accuracy is supported for this location, false if it does not
      */
     fun Location.isSpeedAccuracySupported(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && hasSpeedAccuracy()
+        return hasSpeedAccuracy()
     }
 
     /**
@@ -226,7 +226,7 @@ object SatelliteUtil {
      * @return true if the bearing accuracy is supported for this location, false if it does not
      */
     fun Location.isBearingAccuracySupported(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && hasBearingAccuracy()
+        return hasBearingAccuracy()
     }
 
     /**
@@ -237,7 +237,7 @@ object SatelliteUtil {
      * has vertical accuracy information, false if it does not
      */
     fun Location.isVerticalAccuracySupported(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && hasVerticalAccuracy()
+        return hasVerticalAccuracy()
     }
 
     /**
@@ -248,7 +248,7 @@ object SatelliteUtil {
      * provided [index] has basebandCn0DbHz information, false if it does not
      */
     fun GnssStatus.isBasebandCn0DbHzSupported(index: Int): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && hasBasebandCn0DbHz(index)
+        return hasBasebandCn0DbHz(index)
     }
 
     /**

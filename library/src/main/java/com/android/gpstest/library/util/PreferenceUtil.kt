@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.location.GnssMeasurementsEvent
 import android.location.LocationManager
-import android.os.Build
 import com.android.gpstest.library.R
 
 /**
@@ -175,16 +174,8 @@ object PreferenceUtil {
      * false if they should be disabled
      */
     fun enableMeasurementsPref(context: Context, prefs: SharedPreferences): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            return SatelliteUtils.isMeasurementsSupported(manager)
-        }
-        // Legacy versions before Android S
-        val capabilityMeasurementsInt = prefs.getInt(
-            context.getString(R.string.capability_key_raw_measurements),
-            PreferenceUtils.CAPABILITY_UNKNOWN
-        )
-        return capabilityMeasurementsInt != PreferenceUtils.CAPABILITY_NOT_SUPPORTED
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return SatelliteUtils.isMeasurementsSupported(manager)
     }
 
     /**
@@ -192,16 +183,8 @@ object PreferenceUtil {
      * false if they should be disabled
      */
     fun enableNavMessagesPref(context: Context, prefs: SharedPreferences): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            return SatelliteUtils.isNavMessagesSupported(manager)
-        }
-        // Legacy versions before Android S
-        val capabilityNavMessagesInt = prefs.getInt(
-            context.getString(R.string.capability_key_nav_messages),
-            PreferenceUtils.CAPABILITY_UNKNOWN
-        )
-        return capabilityNavMessagesInt != PreferenceUtils.CAPABILITY_NOT_SUPPORTED
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return SatelliteUtils.isNavMessagesSupported(manager)
     }
 
     /**

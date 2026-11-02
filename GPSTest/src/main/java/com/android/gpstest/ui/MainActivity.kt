@@ -24,7 +24,6 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.preference.PreferenceManager
@@ -270,11 +269,7 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
      */
     private fun saveInstanceState(savedInstanceState: Bundle?) {
         if (savedInstanceState != null) {
-            lastSavedInstanceState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                savedInstanceState.deepCopy()
-            } else {
-                savedInstanceState
-            }
+            lastSavedInstanceState = savedInstanceState.deepCopy()
         }
     }
 

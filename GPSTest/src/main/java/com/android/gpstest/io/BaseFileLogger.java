@@ -4,14 +4,12 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Downloads;
 import android.util.Log;
 import android.widget.Toast;
 
-import androidx.annotation.RequiresApi;
 
 import com.android.gpstest.Application;
 import com.android.gpstest.R;
@@ -190,7 +188,7 @@ public abstract class BaseFileLogger implements FileLogger {
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && file != null) {
+        if (file != null) {
             copyFileToDownloads(file);
         }
     }
@@ -205,7 +203,6 @@ public abstract class BaseFileLogger implements FileLogger {
         Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show();
     }
 
-    @RequiresApi(Build.VERSION_CODES.R)
     protected void copyFileToDownloads(File fileToCopy) {
         ContentResolver contentResolver = context.getContentResolver();
         ContentValues contentValues = new ContentValues();

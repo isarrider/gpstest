@@ -16,7 +16,6 @@
 package com.android.gpstest.ui
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Dialog
 import android.content.ActivityNotFoundException
@@ -45,7 +44,6 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
@@ -420,21 +418,9 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
      * Initializes the dialog for notification permissions, which is required for
      * notifications, background execution and logging.
      */
-    @SuppressLint("NewApi")
     private fun initNotificationPermissionDialog() {
         chkShowNotification =
             findPreference(getString(R.string.pref_key_show_notification)) as CheckBoxPreference
-        if (VERSION.SDK_INT < VERSION_CODES.TIRAMISU) {
-            // Notifications are always shown on Android 12 and lower
-            chkShowNotification?.isEnabled = false
-            PreferenceUtils.saveBoolean(
-                getString(R.string.pref_key_show_notification),
-                true,
-                prefs
-            )
-            return
-        }
-
         // Permissions for notifications are used in place of a user-defined setting. This workflow
         // supports users that have installed an update, who will already have permissions granted.
         // Additionally, revoking notification permissions seems to be the only way to disable
@@ -506,7 +492,6 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         }
     }
 
-    @RequiresApi(VERSION_CODES.TIRAMISU)
     fun createNotificationPermissionDialog(activity: Activity): Dialog {
         val view = activity.layoutInflater.inflate(R.layout.notification_permissions_dialog, null)
         val textView = view.findViewById<TextView>(R.id.notification_permission_instructions)
@@ -522,7 +507,6 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         return builder.create()
     }
 
-    @RequiresApi(VERSION_CODES.TIRAMISU)
     fun createCanNotDisableSettingDialog(activity: Activity): Dialog {
         val view = activity.layoutInflater.inflate(R.layout.notification_permissions_dialog, null)
         val textView = view.findViewById<TextView>(R.id.notification_permission_instructions)
@@ -537,7 +521,6 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         return builder.create()
     }
 
-    @RequiresApi(VERSION_CODES.TIRAMISU)
     fun createRestartApplicationDialog(activity: Activity): Dialog {
         val view = activity.layoutInflater.inflate(R.layout.notification_permissions_dialog, null)
         val textView = view.findViewById<TextView>(R.id.notification_permission_instructions)
@@ -553,7 +536,6 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         return builder.create()
     }
 
-    @RequiresApi(api = VERSION_CODES.TIRAMISU)
     private fun requestNotificationPermission() {
         ActivityCompat.requestPermissions(
             this,
@@ -562,7 +544,6 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         )
     }
 
-    @SuppressLint("NewApi")
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults: IntArray,
     ) {
@@ -584,7 +565,6 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         }
     }
 
-    @RequiresApi(VERSION_CODES.TIRAMISU)
     private fun Context.revokeNotificationPermissionAndRestartApplication() {
         revokeSelfPermissionOnKill(Manifest.permission.POST_NOTIFICATIONS)
         PreferenceUtils.saveBoolean(getString(R.string.pref_key_show_notification), false, prefs)

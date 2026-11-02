@@ -23,9 +23,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.location.GnssMeasurement;
 import android.location.LocationManager;
-import android.os.Build;
 
-import androidx.annotation.RequiresApi;
 
 import com.android.gpstest.library.model.GnssType;
 import com.android.gpstest.library.model.SatelliteName;
@@ -121,7 +119,7 @@ public class SatelliteUtils {
      * @return true if the platform supports providing carrier frequencies for each satellite, false if it does not
      */
     public static boolean isCfSupported() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+        return true;
     }
 
     /**
@@ -130,7 +128,7 @@ public class SatelliteUtils {
      * @return true if automatic gain control is supported for this GNSS measurement, false if it is not
      */
     public static boolean isAutomaticGainControlSupported(GnssMeasurement gnssMeasurement) {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && gnssMeasurement.hasAutomaticGainControlLevelDb();
+        return gnssMeasurement.hasAutomaticGainControlLevelDb();
     }
 
     /**
@@ -167,11 +165,7 @@ public class SatelliteUtils {
         if (manager == null) {
             return false;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return manager.getGnssCapabilities().hasAntennaInfo();
-        } else {
-            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && manager.getGnssCapabilities().hasGnssAntennaInfo();
-        }
+        return manager.getGnssCapabilities().hasAntennaInfo();
     }
 
     /**
@@ -179,14 +173,13 @@ public class SatelliteUtils {
      * @return true if "force full GNSS measurements" can be programmatically invoked, and false if not
      */
     public static boolean isForceFullGnssMeasurementsSupported() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        return true;
     }
 
     /**
      * Returns true if the platform supports GNSS measurements, false if it does not.
      * @return true if the platform supports GNSS measurements, false if it does not
      */
-    @RequiresApi(api = Build.VERSION_CODES.S)
     public static boolean isMeasurementsSupported(LocationManager manager) {
         return manager != null && manager.getGnssCapabilities().hasMeasurements();
     }
@@ -195,7 +188,6 @@ public class SatelliteUtils {
      * Returns true if the platform supports navigation messages, false if it does not.
      * @return true if the platform supports navigation messages, false if it does not
      */
-    @RequiresApi(api = Build.VERSION_CODES.S)
     public static boolean isNavMessagesSupported(LocationManager manager) {
         return manager != null && manager.getGnssCapabilities().hasNavigationMessages();
     }
