@@ -217,7 +217,8 @@ GPSTest can record your GPS fixes as a [GPX 1.1](https://www.topografix.com/GPX/
 
 Steps to record a track:
 1. Tap the record button (●) in the top action bar. If GNSS is off, it is switched on. The button turns into a stop button (■), and a red "● REC" timer appears under the screen title.
-1. Tap the stop button again, or "Stop GPX recording" in the notification, to end the track. Switching GNSS off also ends the recording.
+1. Tap the stop button again, or "Stop GPX recording" in the notification, to end the track. Stopping GNSS with "Stop" in the notification also ends the recording.
+1. While a track is recording, GNSS keeps running after you leave the app, even if the switch in the top action bar (keep GNSS running in the background) is off. If it is off and you end the recording while the app is closed, GNSS stops too.
 1. Open the "Track" screen in the navigation drawer to see details and charts, or share the file via the "Share" button (Log tab).
 
 Each tap on record starts a new file, which holds exactly one track. A recording is not resumed after the app has been closed by the system or the phone restarted - tap record again to start a new track. The file is complete up to its last write (see below).

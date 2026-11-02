@@ -44,8 +44,11 @@
     <string name="delete_aiding_data_success">Submitted delete assist data request.</string>
     <string name="delete_aiding_data_failure">Device does not support deleting assist data.
     </string>
-    <string name="gps_switch">Off/On</string>
-    <string name="gps_switch_content_description">GNSS Off/On</string>
+    <string name="gps_switch">Background</string>
+    <string name="gps_switch_content_description">Keep GNSS running in the background</string>
+    <string name="gnss_background_on">GNSS keeps running when you leave the app</string>
+    <string name="gnss_background_off">GNSS stops when you leave the app, unless a track is recording</string>
+    <string name="gnss_background_needs_notification">Allow notifications so GNSS can keep running in the background</string>
     <string name="share">Share</string>
     <string name="copied_to_clipboard">Location copied to clipboard</string>
     <string name="send_log">"Send log…"</string>
