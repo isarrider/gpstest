@@ -65,6 +65,14 @@ class StatusFragment : Fragment() {
         }
     }
 
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (hidden) {
+            // The user switched to another screen - close the signal details
+            StatusDetails.closeAll()
+        }
+    }
+
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.status_menu, menu)
     }
