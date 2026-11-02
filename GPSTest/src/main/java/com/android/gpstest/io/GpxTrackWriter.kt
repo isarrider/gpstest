@@ -22,6 +22,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import com.android.gpstest.BuildConfig
+import com.android.gpstest.library.model.GnssType
+import com.android.gpstest.library.util.CarrierFreqUtils
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -44,10 +46,14 @@ import java.util.TimeZone
  * no private working copy. On older versions it goes to the app's external files directory, which
  * file managers can reach there without any storage permission.
  */
-class GpxTrackWriter(private val context: Context) {
+class GpxTrackWriter(
+    private val context: Context,
+    /** Write the full list of satellite signals for every point (large files) */
+    private val includeSatellites: Boolean
+) {
 
     /** A point to write; [newSegment] starts a new trkseg before this point */
-    data class Point(val location: Location, val newSegment: Boolean)
+    data class Point(val location: Location, val fix: GpxFixContext, val newSegment: Boolean)
 
     var displayName: String = ""
         private set
@@ -110,7 +116,7 @@ class GpxTrackWriter(private val context: Context) {
                 sb.append(SEG_OPEN)
                 segmentOpen = true
             }
-            appendTrackPoint(sb, p.location)
+            appendTrackPoint(sb, p.location, p.fix)
         }
         try {
             writeAt(sb.toString().toByteArray(Charsets.UTF_8))
@@ -186,52 +192,156 @@ class GpxTrackWriter(private val context: Context) {
         }
     }
 
-    private fun appendTrackPoint(sb: StringBuilder, l: Location) {
+    private fun appendTrackPoint(sb: StringBuilder, l: Location, fix: GpxFixContext) {
         sb.append("      <trkpt lat=\"").append(fmt(l.latitude, 8))
             .append("\" lon=\"").append(fmt(l.longitude, 8)).append("\">\n")
 
-        // Child order follows the GPX 1.1 schema (wptType sequence)
-        val msl = mslAltitude(l)
-        if (msl != null) {
-            sb.append("        <ele>").append(fmt(msl, 2)).append("</ele>\n")
-        } else if (l.hasAltitude()) {
-            sb.append("        <ele>").append(fmt(l.altitude, 2)).append("</ele>\n")
+        // Child order follows the GPX 1.1 schema (wptType sequence):
+        // ele, time, magvar, geoidheight, ..., fix, sat, hdop, vdop, pdop, ageofdgpsdata, dgpsid, extensions
+
+        // Elevation above mean sea level: Android 14+ Location, else the chip's NMEA GGA, else WGS84
+        val locationMsl = mslAltitude(l)
+        val msl = locationMsl ?: fix.mslAltitude
+        val ele = msl ?: if (l.hasAltitude()) l.altitude else null
+        if (ele != null) {
+            sb.append("        <ele>").append(fmt(ele, 2)).append("</ele>\n")
         }
         sb.append("        <time>").append(iso.format(Date(l.time))).append("</time>\n")
-        if (msl != null && l.hasAltitude()) {
-            // Height of the geoid above the WGS84 ellipsoid
-            sb.append("        <geoidheight>").append(fmt(l.altitude - msl, 2)).append("</geoidheight>\n")
+        val geoid = if (locationMsl != null && l.hasAltitude()) l.altitude - locationMsl else fix.geoidSeparation
+        if (msl != null && geoid != null) {
+            sb.append("        <geoidheight>").append(fmt(geoid, 2)).append("</geoidheight>\n")
         }
-        sb.append("        <fix>").append(if (l.hasAltitude()) "3d" else "2d").append("</fix>\n")
-        val sats = l.extras?.getInt("satellites", 0) ?: 0
+
+        sb.append("        <fix>").append(fixType(l, fix)).append("</fix>\n")
+        val sats = if (fix.satellitesUsed > 0) fix.satellitesUsed else l.extras?.getInt("satellites", 0) ?: 0
         if (sats > 0) {
             sb.append("        <sat>").append(sats).append("</sat>\n")
         }
-
-        val vAcc = verticalAccuracy(l)
-        val hasVAcc = vAcc != null
-        val hasTpx = l.hasSpeed() || l.hasBearing()
-        if (hasTpx || l.hasAccuracy() || hasVAcc) {
-            sb.append("        <extensions>\n")
-            if (hasTpx) {
-                sb.append("          <gpxtpx:TrackPointExtension>\n")
-                if (l.hasSpeed()) {
-                    sb.append("            <gpxtpx:speed>").append(fmt(l.speed.toDouble(), 2)).append("</gpxtpx:speed>\n")
-                }
-                if (l.hasBearing()) {
-                    sb.append("            <gpxtpx:course>").append(fmt(l.bearing.toDouble(), 1)).append("</gpxtpx:course>\n")
-                }
-                sb.append("          </gpxtpx:TrackPointExtension>\n")
-            }
-            if (l.hasAccuracy()) {
-                sb.append("          <gpstest:hacc>").append(fmt(l.accuracy.toDouble(), 1)).append("</gpstest:hacc>\n")
-            }
-            if (hasVAcc) {
-                sb.append("          <gpstest:vacc>").append(fmt(vAcc!!.toDouble(), 1)).append("</gpstest:vacc>\n")
-            }
-            sb.append("        </extensions>\n")
+        fix.dop?.let {
+            sb.append("        <hdop>").append(fmt(it.horizontalDop, 1)).append("</hdop>\n")
+            sb.append("        <vdop>").append(fmt(it.verticalDop, 1)).append("</vdop>\n")
+            sb.append("        <pdop>").append(fmt(it.positionDop, 1)).append("</pdop>\n")
         }
+        fix.ageOfDgpsData?.let {
+            sb.append("        <ageofdgpsdata>").append(fmt(it, 1)).append("</ageofdgpsdata>\n")
+        }
+        fix.dgpsId?.takeIf { it in 0..1023 }?.let {
+            sb.append("        <dgpsid>").append(it).append("</dgpsid>\n")
+        }
+
+        sb.append("        <extensions>\n")
+        if (l.hasSpeed() || l.hasBearing()) {
+            sb.append("          <gpxtpx:TrackPointExtension>\n")
+            if (l.hasSpeed()) {
+                sb.append("            <gpxtpx:speed>").append(fmt(l.speed.toDouble(), 2)).append("</gpxtpx:speed>\n")
+            }
+            if (l.hasBearing()) {
+                sb.append("            <gpxtpx:course>").append(fmt(l.bearing.toDouble(), 1)).append("</gpxtpx:course>\n")
+            }
+            sb.append("          </gpxtpx:TrackPointExtension>\n")
+        }
+        appendGpsTestExtensions(sb, l, fix)
+        sb.append("        </extensions>\n")
         sb.append("      </trkpt>\n")
+    }
+
+    /** GPX "fix": dgps when corrections are applied (GGA quality or an SBAS satellite in use) */
+    private fun fixType(l: Location, fix: GpxFixContext): String {
+        return when {
+            fix.ggaQuality == 3 -> "pps"
+            fix.ggaQuality == 2 || fix.ggaQuality == 4 || fix.ggaQuality == 5 || fix.sbasUsed -> "dgps"
+            l.hasAltitude() -> "3d"
+            else -> "2d"
+        }
+    }
+
+    private fun appendGpsTestExtensions(sb: StringBuilder, l: Location, fix: GpxFixContext) {
+        // Accuracy (meters, m/s, degrees)
+        if (l.hasAccuracy()) {
+            sb.append("          <gpstest:hacc>").append(fmt(l.accuracy.toDouble(), 1)).append("</gpstest:hacc>\n")
+        }
+        verticalAccuracy(l)?.let {
+            sb.append("          <gpstest:vacc>").append(fmt(it.toDouble(), 1)).append("</gpstest:vacc>\n")
+        }
+        speedAccuracy(l)?.let {
+            sb.append("          <gpstest:sacc>").append(fmt(it.toDouble(), 2)).append("</gpstest:sacc>\n")
+        }
+        bearingAccuracy(l)?.let {
+            sb.append("          <gpstest:bacc>").append(fmt(it.toDouble(), 1)).append("</gpstest:bacc>\n")
+        }
+        fix.heading?.let {
+            sb.append("          <gpstest:heading>").append(fmt(it, 1)).append("</gpstest:heading>\n")
+        }
+
+        if (fix.satellites.isEmpty()) return
+
+        // Satellites used / in view per constellation (distinct satellites, not signals)
+        val byType = fix.satellites.groupBy { it.gnssType }
+        sb.append("          <gpstest:constellations>\n")
+        for ((type, signals) in byType.toSortedMap(compareBy { it.ordinal })) {
+            val inView = signals.map { it.svid }.toSet().size
+            val used = signals.filter { it.usedInFix }.map { it.svid }.toSet().size
+            sb.append("            <gpstest:c sys=\"").append(type.name)
+                .append("\" used=\"").append(used).append("\" view=\"").append(inView).append("\"/>\n")
+        }
+        sb.append("          </gpstest:constellations>\n")
+
+        // C/N0 over the signals used in the fix
+        val cn0 = fix.usedSignals.map { it.cn0DbHz }.filter { it > 0f }
+        if (cn0.isNotEmpty()) {
+            sb.append("          <gpstest:cn0 avg=\"").append(fmt(cn0.average(), 1))
+                .append("\" max=\"").append(fmt(cn0.maxOrNull()!!.toDouble(), 1)).append("\"/>\n")
+        }
+
+        if (fix.bandsUsed.isNotEmpty()) {
+            sb.append("          <gpstest:bands dual=\"").append(fix.dualFrequency).append("\">")
+                .append(escape(fix.bandsUsed.joinToString(","))).append("</gpstest:bands>\n")
+        }
+
+        // SBAS corrections (e.g. EGNOS)
+        sb.append("          <gpstest:sbas used=\"").append(fix.sbasUsed).append("\"")
+        if (fix.sbasUsed) {
+            fix.sbasSystem?.let { sb.append(" system=\"").append(it.name).append("\"") }
+            val prns = fix.usedSignals.filter { it.gnssType == GnssType.SBAS }
+                .map { it.svid }.toSortedSet()
+            sb.append(" prn=\"").append(prns.joinToString(",")).append("\"")
+        }
+        sb.append("/>\n")
+
+        if (includeSatellites) {
+            sb.append("          <gpstest:sats>\n")
+            for (s in fix.satellites) {
+                val band = CarrierFreqUtils.getCarrierFrequencyLabel(s)
+                sb.append("            <gpstest:s sys=\"").append(s.gnssType.name)
+                    .append("\" id=\"").append(s.svid).append("\"")
+                if (band != CarrierFreqUtils.CF_UNKNOWN &&
+                    band != CarrierFreqUtils.CF_UNSUPPORTED
+                ) {
+                    sb.append(" band=\"").append(escape(band)).append("\"")
+                }
+                sb.append(" cn0=\"").append(fmt(s.cn0DbHz.toDouble(), 1))
+                    .append("\" el=\"").append(fmt(s.elevationDegrees.toDouble(), 0))
+                    .append("\" az=\"").append(fmt(s.azimuthDegrees.toDouble(), 0))
+                    .append("\" used=\"").append(if (s.usedInFix) 1 else 0).append("\"/>\n")
+            }
+            sb.append("          </gpstest:sats>\n")
+        }
+    }
+
+    private fun speedAccuracy(l: Location): Float? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && l.hasSpeedAccuracy()) {
+            l.speedAccuracyMetersPerSecond
+        } else {
+            null
+        }
+    }
+
+    private fun bearingAccuracy(l: Location): Float? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && l.hasBearingAccuracy()) {
+            l.bearingAccuracyDegrees
+        } else {
+            null
+        }
     }
 
     private fun verticalAccuracy(l: Location): Float? {

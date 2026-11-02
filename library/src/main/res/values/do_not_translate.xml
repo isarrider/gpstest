@@ -113,6 +113,7 @@
     <string name="pref_key_gpx_category">gpx_category</string>
     <string name="pref_key_gpx_write_interval">gpx_write_interval_min</string>
     <string name="pref_key_gpx_segment_gap">gpx_segment_gap_sec</string>
+    <string name="pref_key_gpx_include_satellites">gpx_include_satellites</string>
     <string name="pref_gpx_write_interval_default_min">5</string>
     <string name="pref_gpx_segment_gap_default_sec">30</string>
     <string name="pref_key_file_gnss_status_output">file_gnss_status_output</string>

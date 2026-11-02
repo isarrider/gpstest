@@ -69,7 +69,7 @@ class GpxTrackRecorder(
         synchronized(lock) {
             if (writer != null) return true
             val now = Date()
-            val w = GpxTrackWriter(context)
+            val w = GpxTrackWriter(context, PreferenceUtil.gpxIncludeSatellites(context, prefs))
             if (!w.create(now)) {
                 return false
             }
@@ -100,9 +100,9 @@ class GpxTrackRecorder(
     }
 
     /**
-     * Adds a fix to the track. Only GPS_PROVIDER fixes are recorded.
+     * Adds a fix to the track, with the GNSS context at that moment. Only GPS_PROVIDER fixes are recorded.
      */
-    fun onLocation(location: Location) {
+    fun onLocation(location: Location, fix: GpxFixContext) {
         synchronized(lock) {
             if (writer == null || LocationManager.GPS_PROVIDER != location.provider) return
             val time = location.time
@@ -110,7 +110,7 @@ class GpxTrackRecorder(
             val newSegment = lastFixTime == Long.MIN_VALUE ||
                     time - lastFixTime > PreferenceUtil.gpxSegmentGapMillis(context, prefs)
             lastFixTime = time
-            buffer.add(GpxTrackWriter.Point(Location(location), newSegment))
+            buffer.add(GpxTrackWriter.Point(Location(location), fix, newSegment))
             pointCount++
             _state.value = _state.value.copy(pointCount = pointCount)
             maybeFlushLocked()

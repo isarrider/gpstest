@@ -47,6 +47,7 @@ import androidx.lifecycle.lifecycleScope
 import com.android.gpstest.Application.Companion.app
 import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.io.CsvFileLogger
+import com.android.gpstest.io.GpxFixContextCollector
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.JsonFileLogger
 import com.android.gpstest.library.data.LocationRepository
@@ -136,6 +137,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
     lateinit var csvFileLogger: CsvFileLogger
     lateinit var jsonFileLogger: JsonFileLogger
     lateinit var gpxTrackRecorder: GpxTrackRecorder
+    private val gpxFixContext = GpxFixContextCollector()
     private var gpxTickJob: Job? = null
 
     // Preference listener that will init the loggers if the user changes Settings while Service is running
@@ -376,7 +378,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
                 //Log.d(TAG, "Service location: ${it.toNotificationTitle()}")
                 currentLocation = it
 
-                gpxTrackRecorder.onLocation(it)
+                gpxTrackRecorder.onLocation(it, gpxFixContext.snapshot())
 
                 // Show location in notification
                 notificationManager.notify(
@@ -409,6 +411,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
                 // Note - this Flow needs to be active so the Activity/Fragments get TTFF
                 // when it's created while the service is running in the background
                 currentSatellites = it.toSatelliteGroup()
+                gpxFixContext.onSatellites(it)
 
                 // Show location in notification
                 notificationManager.notify(
@@ -437,6 +440,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
             .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
             .onEach {
                 //Log.d(TAG, "Service NMEA: $it")
+                gpxFixContext.onNmea(it.message)
                 GlobalScope.launch(Dispatchers.IO) {
                     if (writeNmeaToAndroidMonitor(app, prefs)) {
                         writeNmeaToAndroidStudio(
@@ -541,6 +545,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
             .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
             .onEach {
                 //Log.d(TAG, "Service sensor: orientation ${it.values[0]}, tilt ${it.values[1]}")
+                gpxFixContext.onHeading(it.values[0])
                 GlobalScope.launch(Dispatchers.IO) {
                     if (writeOrientationToFile(app, prefs)) {
                         initLogging()

@@ -61,6 +61,10 @@ object PreferenceUtil {
         return seconds * 1_000L
     }
 
+    fun gpxIncludeSatellites(context: Context, prefs: SharedPreferences): Boolean {
+        return prefs.getBoolean(context.getString(R.string.pref_key_gpx_include_satellites), false)
+    }
+
     fun writeMeasurementToLogcat(context: Context, prefs: SharedPreferences): Boolean {
         return prefs.getBoolean(context.getString(R.string.pref_key_as_measurement_output), false)
     }
