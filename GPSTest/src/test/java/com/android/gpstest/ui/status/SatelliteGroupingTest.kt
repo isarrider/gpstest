@@ -55,6 +55,35 @@ class SatelliteGroupingTest {
     private fun List<SatelliteGroup>.ids(index: Int) = this[index].satellites.map { it.svid }
 
     @Test
+    fun countsReceivedAboveHorizonAndConstellationSize() {
+        val groups = groupSatellites(
+            listOf(
+                // Received, on two signals
+                signal(GnssType.GALILEO, 4, cn0 = 35f, used = true),
+                signal(GnssType.GALILEO, 4, cn0 = 25f, frequencyHz = l5),
+                // Received
+                signal(GnssType.GALILEO, 6, cn0 = 20f),
+                // Above the horizon, not received
+                signal(GnssType.GALILEO, 11, cn0 = SatelliteStatus.NO_DATA, elevation = 12f),
+                // Below the horizon (or no elevation), not received
+                signal(
+                    GnssType.GALILEO,
+                    19,
+                    cn0 = SatelliteStatus.NO_DATA,
+                    elevation = SatelliteStatus.NO_DATA
+                ),
+            ),
+            true
+        )
+        val galileo = groups.single()
+        assertEquals(1, galileo.numUsed)
+        assertEquals(2, galileo.numReceived)
+        assertEquals(3, galileo.numAboveHorizon)
+        assertEquals(ConstellationSizes.of(GnssType.GALILEO), galileo.constellationSize)
+        assertNull(ConstellationSizes.of(GnssType.SBAS))
+    }
+
+    @Test
     fun emptyListGivesNoGroups() {
         assertTrue(groupSatellites(emptyList(), true).isEmpty())
     }
