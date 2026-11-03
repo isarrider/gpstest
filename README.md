@@ -4,6 +4,8 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/sjbarbeau.svg?style=social&label=Follow)](https://twitter.com/sjbarbeau)
 [![GitHub](https://img.shields.io/github/license/barbeau/gpstest)](/LICENSE)
 
+> **This is the [isarrider/gpstest](https://github.com/isarrider/gpstest) fork.** See [FORK.md](FORK.md) for what the [`all-features`](https://github.com/isarrider/gpstest/tree/all-features) build adds to the original app and how to get it.
+
 The #1 open-source global navigation satellite system (GNSS) testing app.
 
 ## Install
