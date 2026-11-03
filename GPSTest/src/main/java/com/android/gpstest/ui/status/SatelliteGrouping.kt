@@ -78,6 +78,20 @@ class SatelliteGroup(
 ) {
     val numUsed: Int get() = satellites.count { it.usedInFix }
 
+    /** Satellites with a signal (C/N0 above 0) */
+    val numReceived: Int get() = satellites.count { it.maxCn0 > 0f }
+
+    /**
+     * Satellites that could be received here: those received, plus those the device lists above
+     * the horizon (from the almanac) without a signal. Equals [numReceived] on devices that only
+     * list satellites they receive. Buildings, trees or a car roof can block some of them.
+     */
+    val numAboveHorizon: Int
+        get() = satellites.count { it.maxCn0 > 0f || it.first.elevationDegrees > 0f }
+
+    /** Operational satellites of the constellation ([ConstellationSizes]), or null if unknown */
+    val constellationSize: Int? get() = ConstellationSizes.of(gnssType)
+
     /**
      * Average of each satellite's strongest C/N0 (in view, not only used in fix), or null if no
      * satellite has a C/N0. Using the strongest signal keeps weak secondary signals (e.g. L5 near the
@@ -90,6 +104,24 @@ class SatelliteGroup(
             ?.average()
             ?.toFloat()
     val representative: SatelliteStatus get() = satellites.first().first
+}
+
+/**
+ * Number of operational satellites per constellation, as of November 2026. Update these when
+ * satellites enter or leave service. Sources: official constellation status pages and
+ * https://en.wikipedia.org/wiki/List_of_Galileo_satellites (Galileo: 28 usable, September 2026).
+ */
+object ConstellationSizes {
+    fun of(gnssType: GnssType): Int? = when (gnssType) {
+        GnssType.NAVSTAR -> 31
+        GnssType.GLONASS -> 24
+        GnssType.GALILEO -> 28
+        GnssType.BEIDOU -> 45
+        GnssType.QZSS -> 5
+        GnssType.IRNSS -> 7
+        // SBAS systems are listed per system, and their sizes change often
+        else -> null
+    }
 }
 
 /** Fixed order of the constellation groups */

@@ -635,8 +635,11 @@
     <string name="osnma_import_failed">Couldn\'t import OSNMA file: %1$s</string>
     <string name="osnma_keys_cleared">OSNMA keys deleted</string>
     <!-- Status screen satellites grouped by constellation -->
-    <string name="status_group_summary">%1$d used \u00B7 %2$d in view</string>
-    <string name="status_group_summary_cn0">%1$d used \u00B7 %2$d in view \u00B7 \u2300 %3$.0f dB-Hz</string>
+    <string name="status_group_summary">%1$d used \u00B7 %2$s</string>
+    <string name="status_group_summary_cn0">%1$d used \u00B7 %2$s \u00B7 \u2300 %3$.0f dB-Hz</string>
+    <string name="status_group_in_view">%1$d in view</string>
+    <string name="status_group_in_view_possible">%1$d/%2$d in view</string>
+    <string name="status_group_of_total">%1$s of %2$d</string>
     <string name="status_group_unknown">Other</string>
     <string name="status_details_frequency">%1$.3f MHz</string>
     <string name="status_details_no_frequency">frequency unknown</string>
@@ -647,7 +650,8 @@
     <string name="status_details_used">, used in fix</string>
     <string name="status_details_not_used">, not used in fix</string>
     <!-- Screen reader texts for the grouped satellite list -->
-    <string name="status_a11y_group">%1$s, %2$d of %3$d satellites used in fix</string>
+    <string name="status_a11y_group">%1$s, %2$d satellites used in fix, %3$d received of %4$d above the horizon</string>
+    <string name="status_a11y_group_total">, %1$d in the constellation</string>
     <string name="status_a11y_group_cn0">, average C/N0 %1$.0f dB-Hz</string>
     <string name="status_a11y_satellite">%1$s %2$d</string>
     <string name="status_a11y_signal">%1$s %2$.1f dB-Hz</string>

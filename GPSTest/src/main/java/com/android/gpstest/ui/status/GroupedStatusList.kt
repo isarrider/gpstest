@@ -250,20 +250,12 @@ private fun GroupHeader(
         )
         Spacer(modifier = Modifier.weight(1f))
         val averageCn0 = group.averageCn0
+        val inView = inViewSummary(group)
         Text(
             text = if (averageCn0 != null) {
-                stringResource(
-                    R.string.status_group_summary_cn0,
-                    group.numUsed,
-                    group.satellites.size,
-                    averageCn0
-                )
+                stringResource(R.string.status_group_summary_cn0, group.numUsed, inView, averageCn0)
             } else {
-                stringResource(
-                    R.string.status_group_summary,
-                    group.numUsed,
-                    group.satellites.size
-                )
+                stringResource(R.string.status_group_summary, group.numUsed, inView)
             } + if (expanded) "  ▴" else "  ▾",
             fontSize = 12.sp,
             maxLines = 1
@@ -580,20 +572,37 @@ private fun SatelliteDetails(satellite: GroupedSatellite, cn0History: Cn0History
     }
 }
 
+/**
+ * The "in view" part of a group header: "8/12 in view of 31" (received / above the horizon /
+ * operational in the constellation). Parts the device or the constellation table doesn't provide
+ * are left out, e.g. "8 in view of 31" or "8 in view".
+ */
+@Composable
+private fun inViewSummary(group: SatelliteGroup): String {
+    val received = group.numReceived
+    val aboveHorizon = group.numAboveHorizon
+    val inView = if (aboveHorizon > received) {
+        stringResource(R.string.status_group_in_view_possible, received, aboveHorizon)
+    } else {
+        stringResource(R.string.status_group_in_view, received)
+    }
+    val total = group.constellationSize ?: return inView
+    return stringResource(R.string.status_group_of_total, inView, total)
+}
+
 /** Screen reader text for a group header */
 @Composable
 private fun groupDescription(group: SatelliteGroup, name: String): String {
     val averageCn0 = group.averageCn0
+    val total = group.constellationSize
     return stringResource(
         R.string.status_a11y_group,
         name,
         group.numUsed,
-        group.satellites.size
-    ) + if (averageCn0 != null) {
-        stringResource(R.string.status_a11y_group_cn0, averageCn0)
-    } else {
-        ""
-    }
+        group.numReceived,
+        group.numAboveHorizon
+    ) + (if (total != null) stringResource(R.string.status_a11y_group_total, total) else "") +
+        (if (averageCn0 != null) stringResource(R.string.status_a11y_group_cn0, averageCn0) else "")
 }
 
 /**
