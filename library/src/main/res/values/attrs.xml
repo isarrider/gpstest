@@ -14,6 +14,10 @@
   limitations under the License.
   -->
 <resources>
+    <!-- Background of the top app bar (and the status bar behind it): the primary color in the
+         light theme, black in the dark theme so that AMOLED screens can turn those pixels off -->
+    <attr name="appBarColor" format="reference|color"/>
+
     <declare-styleable name="ScrimInsetsView">
         <attr name="obaInsetForeground" format="reference|color"/>
     </declare-styleable>
