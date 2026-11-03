@@ -20,8 +20,9 @@ expanded while the root key is still being collected, and the collapsed one-line
 
 ![Status screen with the collapsed Galileo OSNMA card and sealed satellites (mockup)](docs/osnma-screen-dark.png)
 
-*Mockup of the Status screen: the collapsed card, and seals next to the Galileo satellites in the
-list (green: authenticated, red: a tag failed in the last 10 minutes).*
+*Mockup of the Status screen: the collapsed card with the number of authenticated and failing
+satellites, and seals next to the Galileo satellites in the list (green: authenticated, red: a
+tag failed in the last 10 minutes).*
 
 ## Requirements
 
@@ -31,30 +32,56 @@ list (green: authenticated, red: a tag failed in the last 10 minutes).*
 - Galileo satellites in view, ideally with a clear sky. Authentication starts after a few
   minutes of continuous reception.
 - The correct time: within 15 seconds for all tags, within 165 seconds for slow MAC tags only.
-  GPSTest uses Android's network time where available (Android 13 and later), otherwise the
-  device clock. See [Time check](#time-check).
+  GPSTest uses Google TrustedTime (Google Play build) or Android's network time (Android 13 and
+  later) where available, otherwise the device clock. See [Time check](#time-check).
 
 ## The Status card
 
 | Field | Meaning |
 | --- | --- |
-| Status chip | **AUTHENTICATED** (green): navigation data is being verified. **IN PROGRESS** (amber): waiting for the public key, the TESLA root key or the first tags. **NO DATA** (gray): no OSNMA data yet. **DON'T USE**, **ALERT**, **TIME NOT VERIFIED** and **FAILED TAGS** (red): see below. |
 | NMA status | Operational, Test or Don't use, as broadcast by Galileo. A ✓ means it was confirmed by a verified signature. |
 | Public key | The ECDSA public key ID (PKID), its curve and where it came from: *built in*, *from signal*, *Merkle tree file* or *imported*. |
 | TESLA chain | Chain ID, MAC function, tag size and time of the latest verified TESLA key. |
 | Authenticated | Satellites whose current ephemeris, clock and health data is authenticated. That means at least 40 bits of MAC tags were verified on the data the satellite is broadcasting right now. |
 | Failed tags | Satellites with a tag that failed verification in the last 10 minutes, with the count. |
 
-The card is a single line by default: the status chip and, while authenticating, the number of
-authenticated satellites. Tap it to expand: the fields above, tag counts by type (CED, timing,
+The card is a single line by default (plus a line of warning chips, if any): the main state
+chip, the number of authenticated satellites (green seal) and of satellites with failed tags
+(red seal), a spinner while authentication is in progress, and a chevron. Tap it to expand: a
+sentence on the current state (with how long it usually takes while in progress), the fields
+above, tag counts by type (CED, timing,
 slow MAC), page counters (received, used, without time, not nominal, CRC errors), device parity,
 subframe completeness, page timing, clock offset and the latest events. All fields are shown
 from the start, with "Not known yet", "None yet" or the root key progress until they're filled
 in, so the layout doesn't jump while authentication progresses.
 
+### States
+
+The card shows exactly one **main state** chip:
+
+| Main state | Meaning |
+| --- | --- |
+| **NO DATA** (gray) | No Galileo pages yet, or no OSNMA data in them. |
+| **IN PROGRESS** (amber) | Synchronizing with Galileo time, waiting for the public key, the TESLA root key or the first tags. A spinner shows that pages are arriving. |
+| **AUTHENTICATED** (green) | At least one satellite's navigation data is authenticated. |
+| **TIME NOT VERIFIED** (red) | The time is more than 165 s off; see below. |
+| **DON'T USE** (red) | Galileo set the OSNMA status to "don't use". |
+| **ALERT** (red) | An OSNMA alert message revoked all keys. |
+
+Below the header, a chip is added for each **warning** that applies. They can occur in any
+combination, and together with any main state:
+
+| Warning | Meaning |
+| --- | --- |
+| **FAILED TAGS** (red) | A satellite's tag failed in the last 10 minutes. |
+| **POOR RECEPTION** (amber) | Too many pages are missing, or they stopped arriving. |
+| **SLOW MAC ONLY** (amber) | The time is 15 to 165 s off, so only slow MAC tags are used. |
+
+In the code, these are `OsnmaMainState` and `OsnmaWarning` (`OsnmaCardState.kt`).
+
 ### Satellite list and sky view
 
-Galileo satellites are marked in the satellite list on the Status screen (next to the ID) and in
+Galileo satellites are marked in the satellite list on the Status screen (next to the flag) and in
 the sky view (at the upper right of the triangle):
 
 - **Green seal with a check mark**: the satellite's ephemeris, clock and health data is
@@ -70,7 +97,7 @@ satellites, at most once every 10 minutes. It has its own notification channel, 
 warnings*, so it can be turned off in Android's notification settings without affecting the
 tracking notification.
 
-### Red states
+### Red and amber states
 
 - **FAILED TAGS**: a MAC tag didn't match the received navigation data. This can be caused by
   corrupted data or timing problems, but also by spoofing. Treat data from those satellites as
@@ -78,11 +105,11 @@ tracking notification.
 - **TIME NOT VERIFIED**: the time differs from the Galileo time in the signal by more than
   165 s. OSNMA can't detect replayed or delayed signals without an independent time source, so
   no tags are used until that's fixed. Check the date and time settings. Between 15 and 165 s,
-  only slow MAC tags are used: the chip stays green and the summary says "(slow MAC)", with an
-  amber note in the details. See [Time check](#time-check).
+  only slow MAC tags are used: the main chip stays green, a **SLOW MAC ONLY** chip is added, and
+  the details have an amber note. See [Time check](#time-check).
 - **DON'T USE**: Galileo has set the OSNMA status to "don't use". Nothing is authenticated
   until that changes.
-- **Amber reception hint**: Galileo pages arrive, but fewer than half of the 30-second subframes
+- **POOR RECEPTION** (amber chip and hint in the details): Galileo pages arrive, but fewer than half of the 30-second subframes
   are complete, or the pages stopped while tracking. Each satellite's authentication data needs
   all 15 pages of a subframe, so authentication becomes slow or stops. This is usually the chip
   saving power (duty cycling) or tracking only the E1 pilot signal, which carries no data. Keep
@@ -122,8 +149,11 @@ TESLA keys are published 30 s after the tags they protect, so a spoofer that can
 signal could forge tags if the receiver relied only on the signal for the time. OSNMA therefore
 requires the receiver to know Galileo time on its own (OSNMA Receiver Guidelines, sections 2.1
 and 5.3.1). Each time a page carries its own time stamp, GPSTest compares it with a reference
-time:
+time, the first available of:
 
+- **Google TrustedTime** (Google Play build only): Google Play services' time, synchronized with
+  Google's time servers and independent of GNSS. The **Clock offset** row says "(Google
+  TrustedTime)".
 - **Network time** (Android 13 and later, when the phone has synchronized with a time server).
   It's independent of GNSS.
 - Otherwise the **device clock**. Some phones set it from GNSS, so it isn't fully independent:
@@ -208,8 +238,8 @@ OSNMA messages page by page instead of waiting for complete 30 s subframes:
   key, and the same rules as for the warm start drop it. The details then show "(built-in root
   key)". When the chain changes, the app simply falls back to the signal until the built-in
   message is updated. Each root key GPSTest verifies is written to Logcat ("Verified
-  DSM-KROOT") and, with OSNMA file logging on, to the CSV file, so it can be built into a
-  later version (`GalileoKeys.kt`).
+  DSM-KROOT") and, with OSNMA file logging on, to the CSV file (see [LOGGING.md](LOGGING.md)),
+  so it can be built into a later version (`GalileoKeys.kt`).
 - **Root key parts kept between sessions.** The parts of the TESLA root key (DSM-KROOT) and of
   public key messages received so far are saved every minute and when tracking stops. The next
   session continues collecting where the last one stopped, which matters on phones that miss
@@ -244,7 +274,8 @@ A Pixel 8 Pro (Android 17) puts the 4 unused bits at the start instead, so the w
 shifted by 4 bits. Read the documented way, almost every field is garbage: the CRC fails, most
 pages look "not nominal", and the word type and time stamps decode to nonsense (for example a
 week number of 2904 instead of 1418). Read with the 4-bit offset, every page in a recorded log
-was nominal and passed the CRC.
+was nominal and passed the CRC. Reported to Google as
+[issue 580675649](https://issuetracker.google.com/issues/580675649).
 
 `InavLayoutDetector` checks each message with both layouts and uses the one under which the
 page passes the CRC. Once a few pages pass with one layout and none with the other, that layout
@@ -263,14 +294,15 @@ consecutive messages from the same satellite, and keeps the result only if the C
 
 ### Missing pages
 
-Phones often deliver only part of the pages: the chip saves power (duty cycling) or tracks the
-E1 pilot signal, which carries no data. The Pixel 8 Pro log contained only 7 to 32 % of each
-Galileo satellite's pages. With complete subframes only, authentication couldn't complete at
-such rates; with the page-by-page processing above it can, but it takes longer, mostly until all
-parts of the TESLA root key have been received once. The **Subframes** row shows how many subframes were
-complete, and the card shows a hint when fewer than half are. Turning on **Force full GNSS
-measurements**, both in GPSTest's settings and in Android's developer options, and keeping the
-screen on can help.
+Phones often deliver only part of the pages: the chip saves power (duty cycling) or tracks the E1
+pilot signal, which carries no data. The Pixel 8 Pro log contained only 6 to 29 % of each Galileo
+satellite's pages, even with full tracking requested (reported to Google as [issue
+580885286](https://issuetracker.google.com/issues/580885286)). With complete subframes only,
+authentication couldn't complete at such rates; with the page-by-page processing above it can, but
+it takes longer, mostly until all parts of the TESLA root key have been received once. The
+**Subframes** row shows how many subframes were complete, and the card shows a hint when fewer than
+half are. Turning on **Force full GNSS measurements**, both in GPSTest's settings and in Android's
+developer options, and keeping the screen on can help.
 
 ### Time of each page
 
@@ -290,20 +322,5 @@ time read from the signal is still compared with the reference time (see [Time c
 
 ## Logging
 
-With **Settings > Logging and Output > File Output > Galileo OSNMA** turned on (off by default), GPSTest
-writes the OSNMA result to the CSV log file every 30 seconds, one record per satellite that
-sends OSNMA data:
-
-```
-OSNMA,UnixTimeMillis,GstWeek,GstTimeOfWeekSeconds,Phase,NmaStatus,ChainId,PublicKeyId,Svid,CedAuthenticated,CedAuthBits,TimingAuthenticated,TimingAuthBits,TagsOk,TagsFailed
-```
-
-A record is also written each time a root key is verified:
-
-```
-OSNMA_KROOT,UnixTimeMillis,NmaHeaderAndDsmKrootHex
-```
-
-`Phase` is the overall state (for example `WAITING_FOR_KROOT` or `AUTHENTICATING`). Before any
-satellite sends OSNMA data, a single record with empty satellite fields is written. To record
-the raw pages too, turn on **Navigation messages** in the same category.
+GPSTest can write the OSNMA result to its CSV log file (off by default). The format is described
+in [LOGGING.md](LOGGING.md).

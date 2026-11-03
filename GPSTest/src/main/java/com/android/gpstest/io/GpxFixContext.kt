@@ -15,6 +15,7 @@ package com.android.gpstest.io
 
 import android.os.SystemClock
 import com.android.gpstest.library.data.OsnmaUiState
+import com.android.gpstest.library.data.TimeSource
 import com.android.gpstest.library.model.DilutionOfPrecision
 import com.android.gpstest.library.model.GnssType
 import com.android.gpstest.library.model.SatelliteStatus
@@ -168,7 +169,12 @@ class GpxFixContextCollector {
     fun onOsnma(state: OsnmaUiState) {
         val status = if (state.enabled) state.status else null
         osnma = status?.let {
-            GpxFixContext.Osnma(it.phase.name, it.marks(), state.timeSourceNetwork)
+            GpxFixContext.Osnma(
+                it.phase.name,
+                it.marks(),
+                // Time checked against an independent source (TrustedTime or network time)
+                state.timeSource != TimeSource.DEVICE_CLOCK
+            )
         }
     }
 

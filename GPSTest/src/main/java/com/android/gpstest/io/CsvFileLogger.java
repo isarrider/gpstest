@@ -38,7 +38,6 @@ import com.android.gpstest.BuildConfig;
 import com.android.gpstest.R;
 import com.android.gpstest.library.model.Orientation;
 import com.android.gpstest.library.model.SatelliteStatus;
-import com.android.gpstest.library.osnma.OsnmaCsvLog;
 import com.android.gpstest.library.util.FormatUtils;
 import com.android.gpstest.library.util.IOUtils;
 
@@ -194,10 +193,10 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
                     + " one record per satellite every 30 s:");
             writer.newLine();
             writer.write(COMMENT_START);
-            writer.write("  " + OsnmaCsvLog.FORMAT);
+            writer.write("  OSNMA,UnixTimeMillis,GstWeek,GstTimeOfWeekSeconds,Phase,NmaStatus,ChainId,PublicKeyId,Svid,CedAuthenticated,CedAuthBits,TimingAuthenticated,TimingAuthBits,TagsOk,TagsFailed");
             writer.newLine();
             writer.write(COMMENT_START);
-            writer.write("  " + OsnmaCsvLog.KROOT_FORMAT);
+            writer.write("  OSNMA_KROOT,UnixTimeMillis,NmaHeaderAndDsmKrootHex");
             writer.newLine();
         } catch (IOException e) {
             logException(Application.Companion.getApp().getString(R.string.could_not_initialize_file, filePath), e);
@@ -330,7 +329,8 @@ public class CsvFileLogger extends BaseFileLogger implements FileLogger {
 
     /**
      * Called to log Galileo OSNMA results
-     * @param records lines formatted by {@link OsnmaCsvLog}
+     * @param records lines formatted by
+     *                {@link com.android.gpstest.library.osnma.OsnmaCsvLog}
      */
     public synchronized void onOsnmaRecords(List<String> records) {
         if (fileWriter == null) {
