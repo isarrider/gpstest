@@ -35,7 +35,7 @@ upstream `master` into one app.
 
 | Fix | Branch | Upstream |
 | --- | --- | --- |
-| GPS times more than 5 days in the future are flagged as invalid | `fix/future-gps-time` | PR open |
+| GPS times more than 5 days in the future are flagged as invalid | `fix/future-gps-time` | [PR #871](https://github.com/barbeau/gpstest/pull/871), in review |
 | Opening the app from the notification keeps its state instead of restarting it | `fix/notification-reopen` | Fork only |
 | Minimum Android version raised to 15 (API 35) | `raise-min-version` | Fork only |
 
