@@ -37,6 +37,13 @@ class DateTimeUtilsTest {
     }
 
     @Test
+    fun isTimeValidFuture() {
+        // Times in the future are only valid within 5 days of now, like times in the past
+        assertTrue(DateTimeUtils.isTimeValid(Instant.now().toEpochMilli() + TimeUnit.DAYS.toMillis(4)))
+        assertFalse(DateTimeUtils.isTimeValid(Instant.now().toEpochMilli() + TimeUnit.DAYS.toMillis(6)))
+    }
+
+    @Test
     fun isTimeValidLegacy() {
         // Valid times within 5 days of now
         assertTrue(DateTimeUtils.isTimeValidLegacy(Instant.now().toEpochMilli()))
