@@ -253,9 +253,14 @@ private fun GroupHeader(
         val inView = inViewSummary(group)
         Text(
             text = if (averageCn0 != null) {
-                stringResource(R.string.status_group_summary_cn0, group.numUsed, inView, averageCn0)
+                stringResource(
+                    R.string.status_group_summary_counts_cn0,
+                    group.numUsed,
+                    inView,
+                    averageCn0
+                )
             } else {
-                stringResource(R.string.status_group_summary, group.numUsed, inView)
+                stringResource(R.string.status_group_summary_counts, group.numUsed, inView)
             } + if (expanded) "  ▴" else "  ▾",
             fontSize = 12.sp,
             maxLines = 1
