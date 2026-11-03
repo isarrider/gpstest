@@ -18,6 +18,12 @@ object PreferenceUtil {
     val MILES_PER_HOUR = "3"
     val KNOTS = "4"
 
+    // Track distance units: automatic follows the elevation units (km for meters, mi for feet)
+    const val TRACK_DISTANCE_AUTO = "0"
+    const val TRACK_DISTANCE_KILOMETERS = "1"
+    const val TRACK_DISTANCE_MILES = "2"
+    const val TRACK_DISTANCE_NAUTICAL_MILES = "3"
+
     /**
      * Returns the minTime between location updates used for the LocationListener in milliseconds
      */
@@ -139,6 +145,13 @@ object PreferenceUtil {
 
     fun distanceUnits(context: Context, prefs: SharedPreferences): String {
         return prefs.getString(context.getString(R.string.pref_key_preferred_distance_units_v2), METERS) ?: METERS
+    }
+
+    fun trackDistanceUnits(context: Context, prefs: SharedPreferences): String {
+        return prefs.getString(
+            context.getString(R.string.pref_key_preferred_track_distance_units),
+            TRACK_DISTANCE_AUTO
+        ) ?: TRACK_DISTANCE_AUTO
     }
 
     fun speedUnits(context: Context, prefs: SharedPreferences): String {
