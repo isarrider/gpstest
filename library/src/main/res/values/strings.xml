@@ -775,8 +775,10 @@
     <string name="osnma_import_failed">Couldn\'t import OSNMA file: %1$s</string>
     <string name="osnma_keys_cleared">OSNMA keys deleted</string>
     <!-- Status screen satellites grouped by constellation -->
-    <string name="status_group_summary">%1$d used \u00B7 %2$s</string>
-    <string name="status_group_summary_cn0">%1$d used \u00B7 %2$s \u00B7 \u2300 %3$.0f dB-Hz</string>
+    <string name="status_group_summary">%1$d used \u00B7 %2$d in view</string>
+    <string name="status_group_summary_cn0">%1$d used \u00B7 %2$d in view \u00B7 \u2300 %3$.0f dB-Hz</string>
+    <string name="status_group_summary_counts">%1$d used \u00B7 %2$s</string>
+    <string name="status_group_summary_counts_cn0">%1$d used \u00B7 %2$s \u00B7 \u2300 %3$.0f dB-Hz</string>
     <string name="status_group_in_view">%1$d in view</string>
     <string name="status_group_in_view_possible">%1$d/%2$d in view</string>
     <string name="status_group_of_total">%1$s of %2$d</string>
