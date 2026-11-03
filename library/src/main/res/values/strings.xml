@@ -449,9 +449,15 @@
     <string name="preferences_coordinate_format_dms">Degrees, Minutes, Decimal Seconds</string>
     <string name="preferences_coordinate_format_ddm">Degrees, Decimal Minutes</string>
 
-    <string name="preferences_preferred_distance_units_title">Preferred distance units</string>
+    <string name="preferences_preferred_distance_units_title">Elevation and accuracy units</string>
     <string name="preferences_preferred_distance_units_option_meters">Meters</string>
     <string name="preferences_preferred_distance_units_option_feet">Feet</string>
+
+    <string name="preferences_preferred_track_distance_units_title">Track distance units</string>
+    <string name="preferences_preferred_track_distance_units_option_auto">Same as elevation units (km or mi)</string>
+    <string name="preferences_preferred_track_distance_units_option_kilometers">Kilometers</string>
+    <string name="preferences_preferred_track_distance_units_option_miles">Miles</string>
+    <string name="preferences_preferred_track_distance_units_option_nautical_miles">Nautical miles</string>
 
     <string name="preferences_preferred_speed_units_title">Preferred speed units</string>
     <string name="preferences_preferred_speed_units_option_meters_per_second">Meters per second</string>

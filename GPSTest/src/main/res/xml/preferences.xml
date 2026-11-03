@@ -41,6 +41,12 @@
             android:entryValues="@array/preferred_distance_units_values"
             android:defaultValue="1" />
         <ListPreference
+            android:key="@string/pref_key_preferred_track_distance_units"
+            android:title="@string/preferences_preferred_track_distance_units_title"
+            android:entries="@array/preferred_track_distance_units_entries"
+            android:entryValues="@array/preferred_track_distance_units_values"
+            android:defaultValue="0" />
+        <ListPreference
             android:key="@string/pref_key_preferred_speed_units_v2"
             android:title="@string/preferences_preferred_speed_units_title"
             android:entries="@array/preferred_speed_units_entries"

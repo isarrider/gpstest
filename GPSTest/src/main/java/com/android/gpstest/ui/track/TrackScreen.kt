@@ -42,13 +42,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.android.gpstest.Application.Companion.app
-import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
-import com.android.gpstest.library.util.LibUIUtils
-import com.android.gpstest.library.util.PreferenceUtil
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
@@ -96,7 +92,7 @@ fun TrackScreen() {
 
 @Composable
 private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, duration: Long) {
-    val units = Units.fromPrefs()
+    val units = TrackUnits.fromPrefs()
     Column {
 
         TrackCard(if (state.isRecording) R.string.track_title_recording else R.string.track_title_last) {
@@ -267,51 +263,3 @@ private fun ChartCard(title: String, xLabel: String, entries: List<Entry>) {
 private const val DASH = "–"
 
 private fun percent(share: Double) = String.format(Locale.getDefault(), "%.0f %%", share * 100)
-
-/**
- * Formats values using the app's distance and speed unit settings.
- */
-private class Units(private val metric: Boolean, private val speedPref: String) {
-    val heightUnit = if (metric) "m" else "ft"
-    val distanceAxisUnit = if (metric) "km" else "mi"
-    // Same unit labels as the speed on the Status screen
-    val speedUnit = when (speedPref) {
-        PreferenceUtil.KILOMETERS_PER_HOUR -> "km/h"
-        PreferenceUtil.MILES_PER_HOUR -> "mph"
-        PreferenceUtil.KNOTS -> "kt"
-        else -> "m/s"
-    }
-
-    fun heightValue(m: Float): Float = if (metric) m else m * FEET_PER_METER
-    fun height(m: Double): String = String.format(Locale.getDefault(), "%.0f %s", heightValue(m.toFloat()), heightUnit)
-
-    fun distanceAxis(m: Float): Float = if (metric) m / 1000f else m / METERS_PER_MILE
-    fun distance(m: Double): String {
-        return if (metric) {
-            if (m < 1000) String.format(Locale.getDefault(), "%.0f m", m)
-            else String.format(Locale.getDefault(), "%.2f km", m / 1000)
-        } else {
-            val miles = m / METERS_PER_MILE
-            if (miles < 0.1) String.format(Locale.getDefault(), "%.0f ft", m * FEET_PER_METER)
-            else String.format(Locale.getDefault(), "%.2f mi", miles)
-        }
-    }
-
-    fun speedValue(mps: Float): Float = when (speedPref) {
-        PreferenceUtil.KILOMETERS_PER_HOUR -> LibUIUtils.toKilometersPerHour(mps)
-        PreferenceUtil.MILES_PER_HOUR -> LibUIUtils.toMilesPerHour(mps)
-        PreferenceUtil.KNOTS -> LibUIUtils.toKnots(mps)
-        else -> mps
-    }
-    fun speed(mps: Double): String = String.format(Locale.getDefault(), "%.1f %s", speedValue(mps.toFloat()), speedUnit)
-
-    companion object {
-        private const val FEET_PER_METER = 3.28084f
-        private const val METERS_PER_MILE = 1609.344f
-
-        fun fromPrefs() = Units(
-            metric = PreferenceUtil.distanceUnits(app, prefs) == PreferenceUtil.METERS,
-            speedPref = PreferenceUtil.speedUnits(app, prefs)
-        )
-    }
-}

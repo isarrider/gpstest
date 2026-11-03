@@ -70,6 +70,7 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
     private var actionBar: Toolbar? = null
 
     var preferredDistanceUnits: ListPreference? = null
+    var preferredTrackDistanceUnits: ListPreference? = null
     var preferredSpeedUnits: ListPreference? = null
 
     var language: ListPreference? = null
@@ -184,6 +185,9 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
         preferredDistanceUnits = findPreference(
             getString(R.string.pref_key_preferred_distance_units_v2)
         ) as ListPreference
+        preferredTrackDistanceUnits = findPreference(
+            getString(R.string.pref_key_preferred_track_distance_units)
+        ) as ListPreference
         preferredSpeedUnits = findPreference(
             getString(R.string.pref_key_preferred_speed_units_v2)
         ) as ListPreference
@@ -245,6 +249,7 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
     override fun onResume() {
         super.onResume()
         changePreferenceSummary(getString(R.string.pref_key_preferred_distance_units_v2))
+        changePreferenceSummary(getString(R.string.pref_key_preferred_track_distance_units))
         changePreferenceSummary(getString(R.string.pref_key_preferred_speed_units_v2))
         changePreferenceSummary(getString(R.string.pref_key_language))
     }
@@ -255,6 +260,9 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
 
         if (key.equals(
                 getString(R.string.pref_key_preferred_distance_units_v2),
+                ignoreCase = true
+            ) || key.equals(
+                getString(R.string.pref_key_preferred_track_distance_units),
                 ignoreCase = true
             )
         ) {
@@ -324,6 +332,19 @@ class Preferences : PreferenceActivity(), OnSharedPreferenceChangeListener {
             for (i in values.indices) {
                 if (values[i] == preferredDistanceUnits!!.value) {
                     preferredDistanceUnits!!.summary = entries[i]
+                }
+            }
+        } else if (prefKey.equals(
+                getString(R.string.pref_key_preferred_track_distance_units),
+                ignoreCase = true
+            )
+        ) {
+            val res = app.resources
+            val values = res.getStringArray(R.array.preferred_track_distance_units_values)
+            val entries = res.getStringArray(R.array.preferred_track_distance_units_entries)
+            for (i in values.indices) {
+                if (values[i] == preferredTrackDistanceUnits!!.value) {
+                    preferredTrackDistanceUnits!!.summary = entries[i]
                 }
             }
         } else if (prefKey.equals(
