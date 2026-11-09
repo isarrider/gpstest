@@ -42,20 +42,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.android.gpstest.Application.Companion.app
+import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
+import com.android.gpstest.library.util.PreferenceUtil
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
-import kotlinx.coroutines.delay
 import java.text.DateFormat
+import java.text.DecimalFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.coroutines.delay
 
 @Composable
 fun TrackScreen() {
@@ -155,6 +159,7 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
         TrackCard(R.string.track_section_file) {
             StatRow(R.string.track_points, s.points.toString())
             StatRow(R.string.track_segments, s.segments.toString())
+            LogSettingsRows(units)
             if (state.isRecording) {
                 StatRow(
                     R.string.track_last_write,
@@ -217,6 +222,43 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             }
         }
     }
+}
+
+/**
+ * The settings that decide how often a point is logged and when it's written: GNSS update
+ * interval and minimum distance (every fix is recorded), write interval, segment gap and
+ * satellite details. They're read when the screen is shown, so they also tell what the next
+ * recording will use.
+ */
+@Composable
+private fun LogSettingsRows(units: TrackUnits) {
+    val seconds = DecimalFormat("0.##").format(PreferenceUtil.minTimeMillis(app, prefs) / 1000.0)
+    val minDistance = PreferenceUtil.minDistance(app, prefs)
+    StatRow(
+        R.string.track_logging,
+        if (minDistance > 0) {
+            stringResource(R.string.track_logging_every_after, seconds, units.height(minDistance.toDouble()))
+        } else {
+            stringResource(R.string.track_logging_every, seconds)
+        }
+    )
+    val writeMinutes = PreferenceUtil.gpxWriteIntervalMillis(app, prefs) / 60_000L
+    StatRow(
+        R.string.track_write_interval,
+        if (writeMinutes > 0) stringResource(R.string.track_write_every_min, writeMinutes.toInt())
+        else stringResource(R.string.track_write_every_point)
+    )
+    StatRow(
+        R.string.track_segment_gap,
+        stringResource(
+            R.string.track_segment_gap_value,
+            (PreferenceUtil.gpxSegmentGapMillis(app, prefs) / 1000L).toInt()
+        )
+    )
+    StatRow(
+        R.string.track_satellite_details,
+        stringResource(if (PreferenceUtil.gpxIncludeSatellites(app, prefs)) R.string.track_on else R.string.track_off)
+    )
 }
 
 @Composable
