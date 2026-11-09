@@ -76,6 +76,18 @@ class TrackUnits(
 
     fun distanceAxis(m: Float): Float = m / metersPerDistanceUnit
 
+    /** A value on the distance axis (see [distanceAxis]) with its unit */
+    fun distanceAxisValue(value: Float): String =
+        String.format(Locale.getDefault(), "%.2f %s", value, distanceAxisUnit)
+
+    /** A height already converted with [heightValue], with its unit */
+    fun heightValueText(value: Float): String =
+        String.format(Locale.getDefault(), "%.0f %s", value, heightUnit)
+
+    /** A speed already converted with [speedValue], with its unit */
+    fun speedValueText(value: Float): String =
+        String.format(Locale.getDefault(), "%.1f %s", value, speedUnit)
+
     /**
      * Short distances (below 1 km, or 0.1 mi or nmi) are shown in the elevation unit, so they
      * don't read as "0.00"
