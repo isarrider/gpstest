@@ -42,18 +42,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.android.gpstest.Application.Companion.app
+import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
+import com.android.gpstest.library.util.PreferenceUtil
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
-import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun TrackScreen() {
@@ -109,6 +112,12 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                 StatRow(R.string.track_direction, s.currentBearing?.let { TrackUnits.direction(it) } ?: DASH)
             }
             StatRow(R.string.track_avg_speed, s.averageMovingSpeed?.let { units.speed(it) } ?: DASH)
+            if (PreferenceUtil.trackShowPace(app, prefs)) {
+                if (state.isRecording) {
+                    StatRow(R.string.track_pace_current, s.currentSpeed?.let { units.pace(it.toDouble()) } ?: DASH)
+                }
+                StatRow(R.string.track_avg_pace, s.averageMovingSpeed?.let { units.pace(it) } ?: DASH)
+            }
             StatRow(R.string.track_avg_speed_total, s.averageSpeed?.let { units.speed(it) } ?: DASH)
             StatRow(R.string.track_max_speed, s.maxSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
         }

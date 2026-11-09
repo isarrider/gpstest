@@ -21,6 +21,7 @@ import com.android.gpstest.library.util.LibUIUtils
 import com.android.gpstest.library.util.PreferenceUtil
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Formats the values on the Track screen using the app's unit settings: elevation and accuracy
@@ -77,6 +78,19 @@ class TrackUnits(
 
     fun distanceAxis(m: Float): Float = m / metersPerDistanceUnit
 
+    /**
+     * Time per distance unit at [mps], e.g. "5:32 /km", or null below walking speed or above
+     * 100 minutes per unit, where a pace means nothing
+     */
+    fun pace(mps: Double): String? {
+        if (mps < MIN_PACE_SPEED) return null
+        val seconds = (metersPerDistanceUnit / mps).roundToLong()
+        if (seconds >= 100 * 60) return null
+        return String.format(
+            Locale.getDefault(), "%d:%02d /%s", seconds / 60, seconds % 60, distanceAxisUnit
+        )
+    }
+
     /** An accuracy in the elevation unit, with one decimal */
     fun accuracy(m: Double): String =
         String.format(Locale.getDefault(), "%.1f %s", heightValue(m.toFloat()), heightUnit)
@@ -111,6 +125,8 @@ class TrackUnits(
 
     companion object {
         private const val FEET_PER_METER = 3.28084f
+        /** Slower than this (1.8 km/h) is standing rather than walking */
+        private const val MIN_PACE_SPEED = 0.5
         private val COMPASS_POINTS = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 
         /** A direction in degrees with its compass point, e.g. "123° SE" */

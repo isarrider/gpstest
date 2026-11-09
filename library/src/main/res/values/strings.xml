@@ -392,6 +392,8 @@
     <string name="track_direction">Direction</string>
     <string name="track_avg_speed">Average (moving)</string>
     <string name="track_avg_speed_total">Average (with stops)</string>
+    <string name="track_pace_current">Current pace</string>
+    <string name="track_avg_pace">Pace (moving)</string>
     <string name="track_max_speed">Max</string>
     <string name="track_section_elevation">Elevation</string>
     <string name="track_elevation_current">Current</string>
@@ -461,6 +463,8 @@
     <string name="preferences_preferred_distance_units_option_feet">Feet</string>
 
     <string name="preferences_preferred_track_distance_units_title">Track distance units</string>
+    <string name="preferences_track_show_pace_title">Show pace on the Track screen</string>
+    <string name="preferences_track_show_pace_summary">Time per km, mi or nmi, following the track distance units</string>
     <string name="preferences_preferred_track_distance_units_option_auto">Same as elevation units (km or mi)</string>
     <string name="preferences_preferred_track_distance_units_option_kilometers">Kilometers</string>
     <string name="preferences_preferred_track_distance_units_option_miles">Miles</string>
