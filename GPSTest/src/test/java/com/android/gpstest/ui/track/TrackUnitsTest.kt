@@ -87,6 +87,21 @@ class TrackUnitsTest {
     }
 
     @Test
+    fun accuracy() {
+        assertEquals("4.7 m", units(true).accuracy(4.73))
+        assertEquals("15.5 ft", units(false).accuracy(4.73))
+    }
+
+    @Test
+    fun direction() {
+        assertEquals("0° N", TrackUnits.direction(0f))
+        assertEquals("0° N", TrackUnits.direction(359.6f))
+        assertEquals("23° NE", TrackUnits.direction(22.6f))
+        assertEquals("123° SE", TrackUnits.direction(123f))
+        assertEquals("270° W", TrackUnits.direction(-90f))
+    }
+
+    @Test
     fun elevation() {
         assertEquals("520 m", units(true).height(520.0))
         assertEquals("1706 ft", units(false).height(520.0))

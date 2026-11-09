@@ -20,6 +20,7 @@ import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.library.util.LibUIUtils
 import com.android.gpstest.library.util.PreferenceUtil
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * Formats the values on the Track screen using the app's unit settings: elevation and accuracy
@@ -88,6 +89,10 @@ class TrackUnits(
     fun speedValueText(value: Float): String =
         String.format(Locale.getDefault(), "%.1f %s", value, speedUnit)
 
+    /** An accuracy in the elevation unit, with one decimal */
+    fun accuracy(m: Double): String =
+        String.format(Locale.getDefault(), "%.1f %s", heightValue(m.toFloat()), heightUnit)
+
     /**
      * Short distances (below 1 km, or 0.1 mi or nmi) are shown in the elevation unit, so they
      * don't read as "0.00"
@@ -118,6 +123,15 @@ class TrackUnits(
 
     companion object {
         private const val FEET_PER_METER = 3.28084f
+        private val COMPASS_POINTS = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+
+        /** A direction in degrees with its compass point, e.g. "123° SE" */
+        fun direction(degrees: Float): String {
+            val d = ((degrees.roundToInt() % 360) + 360) % 360
+            val point = COMPASS_POINTS[((d + 22.5f) / 45f).toInt() % 8]
+            return String.format(Locale.getDefault(), "%d° %s", d, point)
+        }
+
         private const val METERS_PER_MILE = 1609.344f
         private const val METERS_PER_NAUTICAL_MILE = 1852f
 
