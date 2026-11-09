@@ -102,7 +102,15 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             StatRow(R.string.track_duration, DateUtils.formatElapsedTime(duration / 1000))
             StatRow(R.string.track_moving_time, DateUtils.formatElapsedTime(s.movingTimeMillis / 1000))
             StatRow(R.string.track_distance, units.distance(s.distanceMeters))
+        }
+
+        TrackCard(R.string.track_section_speed) {
+            // The current speed only means something while recording
+            if (state.isRecording) {
+                StatRow(R.string.track_speed_current, s.currentSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
+            }
             StatRow(R.string.track_avg_speed, s.averageMovingSpeed?.let { units.speed(it) } ?: DASH)
+            StatRow(R.string.track_avg_speed_total, s.averageSpeed?.let { units.speed(it) } ?: DASH)
             StatRow(R.string.track_max_speed, s.maxSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
         }
 
