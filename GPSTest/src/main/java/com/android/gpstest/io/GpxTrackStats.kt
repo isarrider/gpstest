@@ -70,6 +70,12 @@ data class GpxTrackStats(
     val osnmaFailedPoints: Int = 0,
     /** True if the elevation comes from the barometer, calibrated with GNSS */
     val elevationFromBarometer: Boolean = false,
+    /** Gradient in percent over the last stretch travelled, or null (see [GradientWindow]) */
+    val currentGradient: Double? = null,
+    /** Steepest climb in percent, or null */
+    val steepestClimb: Double? = null,
+    /** Steepest descent in percent (negative), or null */
+    val steepestDescent: Double? = null,
     /** Downsampled time series for the charts */
     val samples: List<Sample>
 ) {
@@ -139,6 +145,9 @@ data class GpxTrackStats(
         o.put("osnmaAll", osnmaAllAuthenticated)
         o.put("osnmaFail", osnmaFailedPoints)
         o.put("baro", elevationFromBarometer)
+        o.putOpt("grade", currentGradient)
+        o.putOpt("gradeUp", steepestClimb)
+        o.putOpt("gradeDown", steepestDescent)
         val a = JSONArray()
         for (s in samples) {
             val r = JSONArray()
@@ -207,6 +216,9 @@ data class GpxTrackStats(
                 osnmaAllAuthenticated = o.optInt("osnmaAll", 0),
                 osnmaFailedPoints = o.optInt("osnmaFail", 0),
                 elevationFromBarometer = o.optBoolean("baro", false),
+                currentGradient = optD("grade"),
+                steepestClimb = optD("gradeUp"),
+                steepestDescent = optD("gradeDown"),
                 samples = samples
             )
         }
@@ -248,6 +260,7 @@ class GpxTrackStatsAccumulator(
     private var eleRef: Double? = null
     private val barometer = BarometricAltitude()
     private var usingBarometer = false
+    private var gradient = GradientWindow(GNSS_GRADIENT_WINDOW_METERS)
     private var satSum = 0L
     private var satCount = 0
     private var hdopSum = 0.0
@@ -276,6 +289,7 @@ class GpxTrackStatsAccumulator(
     private var sinceLastSample = 0
 
     fun add(l: Location, fix: GpxFixContext, newSegment: Boolean) {
+        val distanceBefore = distance
         points++
         if (newSegment) segments++
 
@@ -323,6 +337,7 @@ class GpxTrackStatsAccumulator(
             eleRef = null
             minEle = null
             maxEle = null
+            gradient = GradientWindow(BAROMETER_GRADIENT_WINDOW_METERS)
         }
         // Once the barometer is used, fixes without a pressure reading have no elevation
         val ele = if (usingBarometer) baroEle else gnssEle
@@ -338,6 +353,13 @@ class GpxTrackStatsAccumulator(
             ele
         }
         val hysteresis = if (usingBarometer) BAROMETER_HYSTERESIS_METERS else ELEVATION_HYSTERESIS_METERS
+        // Gradient over the last stretch travelled, from the same altitude as ascent/descent
+        if (newSegment) gradient.restart()
+        if (climbAltitude != null && distance > distanceBefore) {
+            gradient.add(distance, climbAltitude)
+        } else if (!l.hasSpeed() || l.speed < MOVING_SPEED) {
+            gradient.stopped()
+        }
         if (climbAltitude != null) {
             val ref = eleRef
             if (ref == null) {
@@ -437,6 +459,9 @@ class GpxTrackStatsAccumulator(
         osnmaAllAuthenticated = osnmaAll,
         osnmaFailedPoints = osnmaFailedPoints,
         elevationFromBarometer = usingBarometer,
+        currentGradient = gradient.current,
+        steepestClimb = gradient.steepestClimb,
+        steepestDescent = gradient.steepestDescent,
         samples = ArrayList(samples)
     )
 
@@ -446,6 +471,10 @@ class GpxTrackStatsAccumulator(
 
         /** The barometer resolves height changes of well under a meter */
         const val BAROMETER_HYSTERESIS_METERS = 1.0
+
+        /** Distance over which the gradient is measured: the barometer needs less than GNSS */
+        const val BAROMETER_GRADIENT_WINDOW_METERS = 50.0
+        const val GNSS_GRADIENT_WINDOW_METERS = 200.0
         const val MOVING_SPEED = 0.5f
         const val MAX_SAMPLES = 1000
     }

@@ -397,6 +397,9 @@
     <string name="track_duration">Duration</string>
     <string name="track_moving_time">Moving time</string>
     <string name="track_stopped_time">Stopped time</string>
+    <string name="track_gradient_current">Gradient</string>
+    <string name="track_gradient_climb">Steepest climb</string>
+    <string name="track_gradient_descent">Steepest descent</string>
     <string name="track_elevation_source">Source</string>
     <string name="track_elevation_source_barometer">Barometer, calibrated with GNSS</string>
     <string name="track_elevation_source_gnss">GNSS</string>
