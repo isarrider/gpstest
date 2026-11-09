@@ -289,6 +289,7 @@ Extensions in `<extensions>`:
     * `sacc`, `bacc` - speed accuracy (m/s) and bearing accuracy (degrees)
     * `heading` - compass heading from the orientation sensor (degrees)
     * `battery` - battery charge in percent and whether the phone is charging, e.g. `<gpstest:battery level="87" charging="false"/>`
+    * `pressure` - air pressure from the barometer, averaged since the previous point (hPa); only on devices with a barometer
     * `constellations` - per constellation `<gpstest:c sys="GALILEO" used="7" view="9"/>`, satellites used in the fix / in view
     * `cn0` - `avg` and `max` C/N0 (dB-Hz) of the signals used in the fix
     * `bands` - bands used in the fix, e.g. `<gpstest:bands dual="true">E1,E5a,L1,L5</gpstest:bands>`
@@ -326,6 +327,7 @@ Example track point:
     <gpstest:bacc>12.0</gpstest:bacc>
     <gpstest:heading>91.0</gpstest:heading>
     <gpstest:battery level="87" charging="false"/>
+    <gpstest:pressure>955.31</gpstest:pressure>
     <gpstest:constellations>
       <gpstest:c sys="NAVSTAR" used="8" view="11"/>
       <gpstest:c sys="GALILEO" used="7" view="9"/>
@@ -344,13 +346,15 @@ Example track point:
 
 The "Track" screen shows the track being recorded, or the last recorded track when nothing is recording (also after an app restart):
 * Start time, duration, moving time, distance, average speed while moving and maximum speed
-* Elevation: current, lowest, highest, total ascent and descent
+* Elevation: current, lowest, highest, total ascent and descent, and its source
 * GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections, and with OSNMA on: share of the track where every Galileo satellite used was authenticated, and the number of points with failed OSNMA tags
 * Battery: charge at the start and now (or at the end), percentage points used, and use per hour for tracks of 10 minutes or longer. If the phone was charging during the track, no use is calculated.
 * File: points, segments, file location, and while recording, the time of the last write and the points still waiting in memory
 * Charts of distance over time, elevation over distance, and speed, satellites used and battery over time
 
-Distance only counts movement larger than the fix accuracy (at least 3 m), so standing still doesn't add distance, and ascent/descent ignore changes smaller than 3 m. Units follow the distance and speed unit settings.
+Distance only counts movement larger than the fix accuracy (at least 3 m), so standing still doesn't add distance, and ascent/descent ignore changes smaller than 3 m.
+
+On devices with a barometer, the elevation comes from it: the pressure altitude, calibrated with the GNSS altitude (the offset is the average difference over the first minute, then follows it slowly, which filters the GNSS noise and still follows weather changes). Ascent and descent then come from pressure changes alone, with a 1 m threshold. `<ele>` in the GPX file stays the GNSS altitude; the pressure is in `gpstest:pressure`. Units follow the distance and speed unit settings.
 
 ## Accessing the real-time output via Android Studio
 

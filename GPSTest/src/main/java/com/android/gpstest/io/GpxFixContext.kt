@@ -48,7 +48,9 @@ data class GpxFixContext(
     /** True if the battery is charging or full on power, null if unknown */
     val batteryCharging: Boolean? = null,
     /** OSNMA state, or null if OSNMA is turned off or hasn't seen Galileo data yet */
-    val osnma: Osnma? = null
+    val osnma: Osnma? = null,
+    /** Air pressure in hPa, averaged since the previous fix, or null without a barometer */
+    val pressureHpa: Float? = null
 ) {
     /**
      * Galileo OSNMA at the moment of the fix: [phase] is the engine state, [marks] the
@@ -184,6 +186,28 @@ class GpxFixContextCollector {
         batteryCharging = charging
     }
 
+    private var pressureSum = 0.0
+    private var pressureCount = 0
+    private var pressure: Float? = null
+    private var pressureTime = 0L
+
+    /** A barometer reading in hPa; the readings between two fixes are averaged */
+    fun onPressure(hPa: Float) {
+        pressureSum += hPa
+        pressureCount++
+    }
+
+    /** The average pressure since the last fix, or the last one if it's recent */
+    private fun takePressure(now: Long): Float? {
+        if (pressureCount > 0) {
+            pressure = (pressureSum / pressureCount).toFloat()
+            pressureTime = now
+            pressureSum = 0.0
+            pressureCount = 0
+        }
+        return if (now - pressureTime <= MAX_NMEA_AGE_MS) pressure else null
+    }
+
     fun snapshot(): GpxFixContext {
         val now = SystemClock.elapsedRealtime()
         val g = if (now - ggaTime <= MAX_NMEA_AGE_MS) gga else null
@@ -198,7 +222,8 @@ class GpxFixContextCollector {
             geoidSeparation = g?.geoidSep,
             batteryPercent = batteryPercent,
             batteryCharging = batteryCharging,
-            osnma = osnma
+            osnma = osnma,
+            pressureHpa = takePressure(now)
         )
     }
 

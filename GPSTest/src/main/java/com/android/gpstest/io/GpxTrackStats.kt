@@ -68,6 +68,8 @@ data class GpxTrackStats(
     val osnmaAllAuthenticated: Int = 0,
     /** Points with at least one Galileo satellite used whose OSNMA tags failed */
     val osnmaFailedPoints: Int = 0,
+    /** True if the elevation comes from the barometer, calibrated with GNSS */
+    val elevationFromBarometer: Boolean = false,
     /** Downsampled time series for the charts */
     val samples: List<Sample>
 ) {
@@ -136,6 +138,7 @@ data class GpxTrackStats(
         o.put("osnmaPts", osnmaPoints)
         o.put("osnmaAll", osnmaAllAuthenticated)
         o.put("osnmaFail", osnmaFailedPoints)
+        o.put("baro", elevationFromBarometer)
         val a = JSONArray()
         for (s in samples) {
             val r = JSONArray()
@@ -203,6 +206,7 @@ data class GpxTrackStats(
                 osnmaPoints = o.optInt("osnmaPts", 0),
                 osnmaAllAuthenticated = o.optInt("osnmaAll", 0),
                 osnmaFailedPoints = o.optInt("osnmaFail", 0),
+                elevationFromBarometer = o.optBoolean("baro", false),
                 samples = samples
             )
         }
@@ -216,7 +220,10 @@ data class GpxTrackStats(
  * GNSS noise is filtered so the numbers stay realistic:
  * - Distance only grows once the position has moved further from the last counted position than
  *   the fix accuracy (min. [MIN_STEP_METERS]), so standing still doesn't add distance.
- * - Ascent/descent only count changes beyond [ELEVATION_HYSTERESIS_METERS].
+ * - Ascent/descent only count changes beyond [ELEVATION_HYSTERESIS_METERS], or
+ *   [BAROMETER_HYSTERESIS_METERS] with a barometer.
+ * - With a barometer, the elevation is its altitude calibrated with GNSS ([BarometricAltitude]),
+ *   and ascent/descent come from pressure changes alone, so calibration shifts don't count.
  * - Moving time counts intervals at [MOVING_SPEED] or faster that are not a segment gap.
  */
 class GpxTrackStatsAccumulator(
@@ -239,6 +246,8 @@ class GpxTrackStatsAccumulator(
     private var ascent = 0.0
     private var descent = 0.0
     private var eleRef: Double? = null
+    private val barometer = BarometricAltitude()
+    private var usingBarometer = false
     private var satSum = 0L
     private var satCount = 0
     private var hdopSum = 0.0
@@ -303,21 +312,42 @@ class GpxTrackStatsAccumulator(
             accuracyCount++
         }
 
-        // Elevation with hysteresis for ascent/descent
-        val ele = GpxTrackWriter.elevationOf(l, fix)
+        // Elevation: from the barometer, calibrated with GNSS, if the device has one
+        val gnssEle = GpxTrackWriter.elevationOf(l, fix)
+        val vAcc = if (l.hasVerticalAccuracy()) l.verticalAccuracyMeters else null
+        val baroEle = barometer.update(fix.pressureHpa, gnssEle, vAcc)
+        if (baroEle != null && !usingBarometer) {
+            // Elevation, ascent and descent continue from the barometer from here on; the GNSS
+            // values before it (usually just the first fixes) would distort them
+            usingBarometer = true
+            eleRef = null
+            minEle = null
+            maxEle = null
+        }
+        // Once the barometer is used, fixes without a pressure reading have no elevation
+        val ele = if (usingBarometer) baroEle else gnssEle
         if (ele != null) {
             currentEle = ele
             minEle = minOf(minEle ?: ele, ele)
             maxEle = maxOf(maxEle ?: ele, ele)
+        }
+        // Ascent/descent with hysteresis; with the barometer from pressure changes only
+        val climbAltitude = if (usingBarometer) {
+            fix.pressureHpa?.let { BarometricAltitude.pressureAltitude(it) }
+        } else {
+            ele
+        }
+        val hysteresis = if (usingBarometer) BAROMETER_HYSTERESIS_METERS else ELEVATION_HYSTERESIS_METERS
+        if (climbAltitude != null) {
             val ref = eleRef
             if (ref == null) {
-                eleRef = ele
-            } else if (ele - ref >= ELEVATION_HYSTERESIS_METERS) {
-                ascent += ele - ref
-                eleRef = ele
-            } else if (ref - ele >= ELEVATION_HYSTERESIS_METERS) {
-                descent += ref - ele
-                eleRef = ele
+                eleRef = climbAltitude
+            } else if (climbAltitude - ref >= hysteresis) {
+                ascent += climbAltitude - ref
+                eleRef = climbAltitude
+            } else if (ref - climbAltitude >= hysteresis) {
+                descent += ref - climbAltitude
+                eleRef = climbAltitude
             }
         }
 
@@ -406,12 +436,16 @@ class GpxTrackStatsAccumulator(
         osnmaPoints = osnmaPoints,
         osnmaAllAuthenticated = osnmaAll,
         osnmaFailedPoints = osnmaFailedPoints,
+        elevationFromBarometer = usingBarometer,
         samples = ArrayList(samples)
     )
 
     companion object {
         const val MIN_STEP_METERS = 3f
         const val ELEVATION_HYSTERESIS_METERS = 3.0
+
+        /** The barometer resolves height changes of well under a meter */
+        const val BAROMETER_HYSTERESIS_METERS = 1.0
         const val MOVING_SPEED = 0.5f
         const val MAX_SAMPLES = 1000
     }

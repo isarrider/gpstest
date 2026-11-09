@@ -139,6 +139,13 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             StatRow(R.string.track_elevation_max, s.maxElevation?.let { units.height(it) } ?: DASH)
             StatRow(R.string.track_ascent, units.height(s.ascentMeters))
             StatRow(R.string.track_descent, units.height(s.descentMeters))
+            StatRow(
+                R.string.track_elevation_source,
+                stringResource(
+                    if (s.elevationFromBarometer) R.string.track_elevation_source_barometer
+                    else R.string.track_elevation_source_gnss
+                )
+            )
         }
 
         TrackCard(R.string.track_section_gnss) {

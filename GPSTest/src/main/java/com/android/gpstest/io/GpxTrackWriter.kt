@@ -280,6 +280,9 @@ class GpxTrackWriter(
             sb.append("          <gpstest:battery level=\"").append(it)
                 .append("\" charging=\"").append(fix.batteryCharging == true).append("\"/>\n")
         }
+        fix.pressureHpa?.let {
+            sb.append("          <gpstest:pressure>").append(fmt(it.toDouble(), 2)).append("</gpstest:pressure>\n")
+        }
 
         if (fix.satellites.isEmpty()) return
 
