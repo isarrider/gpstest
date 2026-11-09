@@ -45,17 +45,22 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
+import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.data.BarData
+import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
-import kotlinx.coroutines.delay
+import com.github.mikephil.charting.formatter.ValueFormatter
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.coroutines.delay
 
 @Composable
 fun TrackScreen() {
@@ -144,6 +149,14 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                 xText = ::elapsed,
                 yText = { units.distanceAxisValue(it) }
             )
+            val splits = TrackSplits.compute(
+                s.samples.map { it.seconds.toDouble() },
+                s.samples.map { it.distanceMeters.toDouble() },
+                units.metersPerDistanceUnit.toDouble()
+            )
+            if (splits.isNotEmpty()) {
+                SplitsCard(splits, units.distanceAxisUnit)
+            }
             val elevation = s.samples.mapNotNull { p -> p.elevation?.let { Entry(units.distanceAxis(p.distanceMeters), units.heightValue(it)) } }
             if (elevation.size >= 2) {
                 ChartCard(
@@ -285,6 +298,96 @@ private fun ChartCard(
             )
             Text(
                 text = xLabel,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * A bar per split: the time for each km (or mi, or nmi), stops included. The last, unfinished
+ * split shows the time for a full unit at its pace. Touching a bar shows its values.
+ */
+@Composable
+private fun SplitsCard(splits: List<TrackSplits.Split>, unit: String) {
+    val barColor = MaterialTheme.colors.primary.toArgb()
+    val textColor = MaterialTheme.colors.onSurface.toArgb()
+    val surfaceColor = MaterialTheme.colors.surface.toArgb()
+    val partFormat = stringResource(R.string.track_split_part)
+    val title = stringResource(R.string.track_chart_splits, unit)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(5.dp),
+        elevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.subtitle1,
+                fontWeight = FontWeight.Bold
+            )
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                factory = { context ->
+                    BarChart(context).apply {
+                        description.isEnabled = false
+                        legend.isEnabled = false
+                        setTouchEnabled(true)
+                        setPinchZoom(false)
+                        isDoubleTapToZoomEnabled = false
+                        setScaleEnabled(true)
+                        axisRight.isEnabled = false
+                        axisLeft.axisMinimum = 0f
+                        axisLeft.textColor = textColor
+                        axisLeft.valueFormatter = object : ValueFormatter() {
+                            override fun getFormattedValue(value: Float) =
+                                TrackSplits.format(value * 60.0)
+                        }
+                        xAxis.position = XAxis.XAxisPosition.BOTTOM
+                        xAxis.setDrawGridLines(false)
+                        xAxis.granularity = 1f
+                        xAxis.textColor = textColor
+                        setNoDataTextColor(textColor)
+                    }
+                },
+                update = { chart ->
+                    val selectedX = chart.highlighted?.firstOrNull()?.x
+                    val entries = splits.map {
+                        BarEntry(it.number.toFloat(), (it.secondsPerUnit / 60.0).toFloat())
+                    }
+                    val set = BarDataSet(entries, title).apply {
+                        color = barColor
+                        setDrawValues(false)
+                        highLightColor = textColor
+                        highLightAlpha = 60
+                    }
+                    fun splitAt(x: Float) = splits.firstOrNull { it.number == x.roundToInt() }
+                    chart.marker = TrackChartMarker(
+                        chart.context,
+                        xText = { x ->
+                            val split = splitAt(x)
+                            if (split != null && split.fraction < 1.0) {
+                                String.format(partFormat, unit, split.number, split.fraction)
+                            } else {
+                                "$unit ${x.roundToInt()}"
+                            }
+                        },
+                        yText = { y -> TrackSplits.format(y * 60.0) },
+                        textColor = textColor,
+                        backgroundColor = surfaceColor
+                    )
+                    chart.data = BarData(set).apply { barWidth = 0.8f }
+                    if (selectedX != null) chart.highlightValue(selectedX, 0, false)
+                    chart.invalidate()
+                }
+            )
+            Text(
+                text = stringResource(R.string.track_chart_axis_splits, unit),
                 fontSize = 12.sp,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center

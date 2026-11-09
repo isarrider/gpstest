@@ -414,6 +414,9 @@
     <string name="track_chart_axis_distance">Distance (%1$s)</string>
     <string name="track_chart_axis_minutes">Time (minutes)</string>
     <string name="track_marker_satellites">%1$d used</string>
+    <string name="track_chart_splits">Splits (time per %1$s)</string>
+    <string name="track_chart_axis_splits">Split (%1$s)</string>
+    <string name="track_split_part">%1$s %2$d (%3$.1f)</string>
     <string name="gpx_recording_indicator">● REC %1$s</string>
     <string name="gpx_record_start">Record GPX track</string>
     <string name="gpx_record_stop">Stop GPX recording</string>

@@ -63,7 +63,8 @@ class TrackUnits(
         else -> "m/s"
     }
 
-    private val metersPerDistanceUnit = when (this.distanceUnit) {
+    /** Length of one distance unit in meters (one split on the splits chart) */
+    val metersPerDistanceUnit = when (this.distanceUnit) {
         PreferenceUtil.TRACK_DISTANCE_MILES -> METERS_PER_MILE
         PreferenceUtil.TRACK_DISTANCE_NAUTICAL_MILES -> METERS_PER_NAUTICAL_MILE
         else -> 1000f
