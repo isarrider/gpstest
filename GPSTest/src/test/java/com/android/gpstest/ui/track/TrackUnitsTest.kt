@@ -87,6 +87,17 @@ class TrackUnitsTest {
     }
 
     @Test
+    fun pace() {
+        assertEquals("5:00 /km", units(true).pace(1000.0 / 300))
+        assertEquals("10:00 /mi", units(false).pace(1609.344 / 600))
+        assertEquals("2:00 /nmi", units(true, PreferenceUtil.TRACK_DISTANCE_NAUTICAL_MILES).pace(1852.0 / 120))
+        // Standing still, or too slow for a pace
+        assertEquals(null, units(true).pace(0.2))
+        assertEquals(null, units(false).pace(0.49))
+        assertEquals("53:39 /mi", units(false).pace(0.5))
+    }
+
+    @Test
     fun accuracy() {
         assertEquals("4.7 m", units(true).accuracy(4.73))
         assertEquals("15.5 ft", units(false).accuracy(4.73))

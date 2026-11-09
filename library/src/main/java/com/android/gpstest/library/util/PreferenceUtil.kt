@@ -154,6 +154,10 @@ object PreferenceUtil {
         ) ?: TRACK_DISTANCE_AUTO
     }
 
+    fun trackShowPace(context: Context, prefs: SharedPreferences): Boolean {
+        return prefs.getBoolean(context.getString(R.string.pref_key_track_show_pace), false)
+    }
+
     fun speedUnits(context: Context, prefs: SharedPreferences): String {
         return prefs.getString(context.getString(R.string.pref_key_preferred_speed_units_v2), METERS_PER_SECOND) ?: METERS_PER_SECOND
     }

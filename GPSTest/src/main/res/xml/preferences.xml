@@ -51,6 +51,11 @@
             android:entries="@array/preferred_track_distance_units_entries"
             android:entryValues="@array/preferred_track_distance_units_values"
             android:defaultValue="0" />
+        <CheckBoxPreference
+            android:key="@string/pref_key_track_show_pace"
+            android:title="@string/preferences_track_show_pace_title"
+            android:summary="@string/preferences_track_show_pace_summary"
+            android:defaultValue="false" />
         <ListPreference
             android:key="@string/pref_key_preferred_speed_units_v2"
             android:title="@string/preferences_preferred_speed_units_title"

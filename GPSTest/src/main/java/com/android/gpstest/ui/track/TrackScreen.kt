@@ -118,6 +118,12 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                 StatRow(R.string.track_direction, s.currentBearing?.let { TrackUnits.direction(it) } ?: DASH)
             }
             StatRow(R.string.track_avg_speed, s.averageMovingSpeed?.let { units.speed(it) } ?: DASH)
+            if (PreferenceUtil.trackShowPace(app, prefs)) {
+                if (state.isRecording) {
+                    StatRow(R.string.track_pace_current, s.currentSpeed?.let { units.pace(it.toDouble()) } ?: DASH)
+                }
+                StatRow(R.string.track_avg_pace, s.averageMovingSpeed?.let { units.pace(it) } ?: DASH)
+            }
             StatRow(R.string.track_avg_speed_total, s.averageSpeed?.let { units.speed(it) } ?: DASH)
             StatRow(R.string.track_max_speed, s.maxSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
         }
