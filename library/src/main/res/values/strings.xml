@@ -387,8 +387,11 @@
     <string name="track_duration">Duration</string>
     <string name="track_moving_time">Moving time</string>
     <string name="track_distance">Distance</string>
-    <string name="track_avg_speed">Average speed (moving)</string>
-    <string name="track_max_speed">Max speed</string>
+    <string name="track_section_speed">Speed</string>
+    <string name="track_speed_current">Current</string>
+    <string name="track_avg_speed">Average (moving)</string>
+    <string name="track_avg_speed_total">Average (with stops)</string>
+    <string name="track_max_speed">Max</string>
     <string name="track_section_elevation">Elevation</string>
     <string name="track_elevation_current">Current</string>
     <string name="track_elevation_min">Lowest</string>

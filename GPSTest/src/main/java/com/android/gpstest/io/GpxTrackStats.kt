@@ -35,6 +35,8 @@ data class GpxTrackStats(
     val distanceMeters: Double,
     val movingTimeMillis: Long,
     val maxSpeed: Float?,
+    /** Speed of the latest fix, or null if it had none */
+    val currentSpeed: Float? = null,
     val currentElevation: Double?,
     val minElevation: Double?,
     val maxElevation: Double?,
@@ -63,6 +65,10 @@ data class GpxTrackStats(
     val averageMovingSpeed: Double?
         get() = if (movingTimeMillis > 0) distanceMeters / (movingTimeMillis / 1000.0) else null
 
+    /** Distance over the whole duration, stops included */
+    val averageSpeed: Double?
+        get() = if (durationMillis > 0) distanceMeters / (durationMillis / 1000.0) else null
+
     fun toJson(): JSONObject {
         val o = JSONObject()
         o.put("v", 1)
@@ -76,6 +82,7 @@ data class GpxTrackStats(
         o.put("distance", distanceMeters)
         o.put("moving", movingTimeMillis)
         o.putOpt("maxSpeed", maxSpeed?.toDouble())
+        o.putOpt("speed", currentSpeed?.toDouble())
         o.putOpt("ele", currentElevation)
         o.putOpt("minEle", minElevation)
         o.putOpt("maxEle", maxElevation)
@@ -127,6 +134,7 @@ data class GpxTrackStats(
                 distanceMeters = o.getDouble("distance"),
                 movingTimeMillis = o.getLong("moving"),
                 maxSpeed = optD("maxSpeed")?.toFloat(),
+                currentSpeed = optD("speed")?.toFloat(),
                 currentElevation = optD("ele"),
                 minElevation = optD("minEle"),
                 maxElevation = optD("maxEle"),
@@ -165,6 +173,7 @@ class GpxTrackStatsAccumulator(
     private var distance = 0.0
     private var movingMillis = 0L
     private var maxSpeed: Float? = null
+    private var currentSpeed: Float? = null
     private var currentEle: Double? = null
     private var minEle: Double? = null
     private var maxEle: Double? = null
@@ -215,6 +224,7 @@ class GpxTrackStatsAccumulator(
         if (l.hasSpeed()) {
             maxSpeed = max(maxSpeed ?: 0f, l.speed)
         }
+        currentSpeed = if (l.hasSpeed()) l.speed else null
 
         // Elevation with hysteresis for ascent/descent
         val ele = GpxTrackWriter.elevationOf(l, fix)
@@ -283,6 +293,7 @@ class GpxTrackStatsAccumulator(
         distanceMeters = distance,
         movingTimeMillis = movingMillis,
         maxSpeed = maxSpeed,
+        currentSpeed = currentSpeed,
         currentElevation = currentEle,
         minElevation = minEle,
         maxElevation = maxEle,
