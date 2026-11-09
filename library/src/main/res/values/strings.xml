@@ -403,6 +403,17 @@
     <string name="track_section_file">File</string>
     <string name="track_points">Points</string>
     <string name="track_segments">Segments</string>
+    <string name="track_logging">Logging</string>
+    <string name="track_logging_every">Every %1$s s</string>
+    <string name="track_logging_every_after">Every %1$s s, after %2$s</string>
+    <string name="track_write_interval">Written to file</string>
+    <string name="track_write_every_min">Every %1$d min</string>
+    <string name="track_write_every_point">Every point</string>
+    <string name="track_segment_gap">New segment after</string>
+    <string name="track_segment_gap_value">%1$d s without a fix</string>
+    <string name="track_satellite_details">Satellite details</string>
+    <string name="track_on">On</string>
+    <string name="track_off">Off</string>
     <string name="track_last_write">Last written to file</string>
     <string name="track_not_yet">not yet</string>
     <string name="track_pending">Points waiting in memory</string>
