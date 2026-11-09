@@ -57,6 +57,7 @@ import java.text.DateFormat
 import java.text.DecimalFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
@@ -105,6 +106,8 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             StatRow(R.string.track_started, DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(s.startTime)))
             StatRow(R.string.track_duration, DateUtils.formatElapsedTime(duration / 1000))
             StatRow(R.string.track_moving_time, DateUtils.formatElapsedTime(s.movingTimeMillis / 1000))
+            // The rest of the duration: stops, and gaps without a fix
+            StatRow(R.string.track_stopped_time, DateUtils.formatElapsedTime(max(0L, duration - s.movingTimeMillis) / 1000))
             StatRow(R.string.track_distance, units.distance(s.distanceMeters))
         }
 

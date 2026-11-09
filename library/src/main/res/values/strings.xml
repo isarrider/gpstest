@@ -396,6 +396,7 @@
     <string name="track_started">Started</string>
     <string name="track_duration">Duration</string>
     <string name="track_moving_time">Moving time</string>
+    <string name="track_stopped_time">Stopped time</string>
     <string name="track_distance">Distance</string>
     <string name="track_section_speed">Speed</string>
     <string name="track_speed_current">Current</string>
