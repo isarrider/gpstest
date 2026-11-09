@@ -54,6 +54,8 @@ import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 @Composable
 fun TrackScreen() {
@@ -134,17 +136,22 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
         }
 
         if (s.samples.size >= 2) {
+            val satellitesUsed = stringResource(R.string.track_marker_satellites)
             ChartCard(
                 stringResource(R.string.track_chart_distance, units.distanceAxisUnit),
                 stringResource(R.string.track_chart_axis_minutes),
-                s.samples.map { Entry(it.seconds / 60f, units.distanceAxis(it.distanceMeters)) }
+                s.samples.map { Entry(it.seconds / 60f, units.distanceAxis(it.distanceMeters)) },
+                xText = ::elapsed,
+                yText = { units.distanceAxisValue(it) }
             )
             val elevation = s.samples.mapNotNull { p -> p.elevation?.let { Entry(units.distanceAxis(p.distanceMeters), units.heightValue(it)) } }
             if (elevation.size >= 2) {
                 ChartCard(
                     stringResource(R.string.track_chart_elevation, units.heightUnit),
                     stringResource(R.string.track_chart_axis_distance, units.distanceAxisUnit),
-                    elevation
+                    elevation,
+                    xText = { units.distanceAxisValue(it) },
+                    yText = { units.heightValueText(it) }
                 )
             }
             val speed = s.samples.mapNotNull { p -> p.speed?.let { Entry(p.seconds / 60f, units.speedValue(it)) } }
@@ -152,7 +159,9 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                 ChartCard(
                     stringResource(R.string.track_chart_speed, units.speedUnit),
                     stringResource(R.string.track_chart_axis_minutes),
-                    speed
+                    speed,
+                    xText = ::elapsed,
+                    yText = { units.speedValueText(it) }
                 )
             }
             val sats = s.samples.filter { it.satellites > 0 }.map { Entry(it.seconds / 60f, it.satellites.toFloat()) }
@@ -160,7 +169,9 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                 ChartCard(
                     stringResource(R.string.track_chart_satellites),
                     stringResource(R.string.track_chart_axis_minutes),
-                    sats
+                    sats,
+                    xText = ::elapsed,
+                    yText = { String.format(satellitesUsed, it.roundToInt()) }
                 )
             }
         }
@@ -200,10 +211,22 @@ private fun StatRow(@StringRes label: Int, value: String) {
     }
 }
 
+/**
+ * A line chart of [entries]. Touching it selects the nearest point and shows its values
+ * ([xText], [yText]) in a window above it; dragging moves the selection while the chart isn't
+ * zoomed in (zoomed in, dragging pans), and a tap elsewhere or on the same point clears it.
+ */
 @Composable
-private fun ChartCard(title: String, xLabel: String, entries: List<Entry>) {
+private fun ChartCard(
+    title: String,
+    xLabel: String,
+    entries: List<Entry>,
+    xText: (Float) -> String,
+    yText: (Float) -> String
+) {
     val lineColor = MaterialTheme.colors.primary.toArgb()
     val textColor = MaterialTheme.colors.onSurface.toArgb()
+    val surfaceColor = MaterialTheme.colors.surface.toArgb()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,9 +256,13 @@ private fun ChartCard(title: String, xLabel: String, entries: List<Entry>) {
                         xAxis.textColor = textColor
                         axisLeft.textColor = textColor
                         setNoDataTextColor(textColor)
+                        isHighlightPerTapEnabled = true
+                        isHighlightPerDragEnabled = true
                     }
                 },
                 update = { chart ->
+                    // Keep the selected point while the recording adds new ones
+                    val selectedX = chart.highlighted?.firstOrNull()?.x
                     val set = LineDataSet(entries, title).apply {
                         color = lineColor
                         lineWidth = 2f
@@ -244,9 +271,15 @@ private fun ChartCard(title: String, xLabel: String, entries: List<Entry>) {
                         setDrawFilled(true)
                         fillColor = lineColor
                         fillAlpha = 40
-                        isHighlightEnabled = false
+                        isHighlightEnabled = true
+                        highLightColor = textColor
+                        highlightLineWidth = 1f
+                        setDrawHorizontalHighlightIndicator(false)
                     }
+                    chart.marker =
+                        TrackChartMarker(chart.context, xText, yText, textColor, surfaceColor)
                     chart.data = LineData(set)
+                    if (selectedX != null) chart.highlightValue(selectedX, 0, false)
                     chart.invalidate()
                 }
             )
@@ -261,5 +294,8 @@ private fun ChartCard(title: String, xLabel: String, entries: List<Entry>) {
 }
 
 private const val DASH = "–"
+
+/** Time since the start of the track, from minutes on the x axis */
+private fun elapsed(minutes: Float) = DateUtils.formatElapsedTime((minutes * 60).roundToLong())
 
 private fun percent(share: Double) = String.format(Locale.getDefault(), "%.0f %%", share * 100)
