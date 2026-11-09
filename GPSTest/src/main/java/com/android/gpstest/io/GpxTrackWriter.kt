@@ -276,6 +276,9 @@ class GpxTrackWriter(
         fix.heading?.let {
             sb.append("          <gpstest:heading>").append(fmt(it, 1)).append("</gpstest:heading>\n")
         }
+        fix.pressureHpa?.let {
+            sb.append("          <gpstest:pressure>").append(fmt(it.toDouble(), 2)).append("</gpstest:pressure>\n")
+        }
 
         if (fix.satellites.isEmpty()) return
 

@@ -39,7 +39,9 @@ data class GpxFixContext(
     /** Altitude above mean sea level from NMEA GGA, or null */
     val mslAltitude: Double? = null,
     /** Geoid separation (geoid above WGS84 ellipsoid) from NMEA GGA, or null */
-    val geoidSeparation: Double? = null
+    val geoidSeparation: Double? = null,
+    /** Air pressure in hPa, averaged since the previous fix, or null without a barometer */
+    val pressureHpa: Float? = null
 ) {
     /** Signals used in the fix (one satellite can contribute several signals on different bands) */
     val usedSignals: List<SatelliteStatus> by lazy { satellites.filter { it.usedInFix } }
@@ -121,6 +123,28 @@ class GpxFixContextCollector {
         headingTime = SystemClock.elapsedRealtime()
     }
 
+    private var pressureSum = 0.0
+    private var pressureCount = 0
+    private var pressure: Float? = null
+    private var pressureTime = 0L
+
+    /** A barometer reading in hPa; the readings between two fixes are averaged */
+    fun onPressure(hPa: Float) {
+        pressureSum += hPa
+        pressureCount++
+    }
+
+    /** The average pressure since the last fix, or the last one if it's recent */
+    private fun takePressure(now: Long): Float? {
+        if (pressureCount > 0) {
+            pressure = (pressureSum / pressureCount).toFloat()
+            pressureTime = now
+            pressureSum = 0.0
+            pressureCount = 0
+        }
+        return if (now - pressureTime <= MAX_NMEA_AGE_MS) pressure else null
+    }
+
     fun snapshot(): GpxFixContext {
         val now = SystemClock.elapsedRealtime()
         val g = if (now - ggaTime <= MAX_NMEA_AGE_MS) gga else null
@@ -132,7 +156,8 @@ class GpxFixContextCollector {
             dgpsId = g?.stationId,
             heading = if (now - headingTime <= MAX_NMEA_AGE_MS) heading else null,
             mslAltitude = g?.msl,
-            geoidSeparation = g?.geoidSep
+            geoidSeparation = g?.geoidSep,
+            pressureHpa = takePressure(now)
         )
     }
 

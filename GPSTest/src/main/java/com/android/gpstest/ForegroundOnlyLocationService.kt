@@ -29,6 +29,10 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.location.Location
 import android.location.LocationManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -138,6 +142,15 @@ class ForegroundOnlyLocationService : LifecycleService() {
     lateinit var jsonFileLogger: JsonFileLogger
     lateinit var gpxTrackRecorder: GpxTrackRecorder
     private val gpxFixContext = GpxFixContextCollector()
+
+    /** Air pressure for the track's elevation, only while a track records */
+    private val pressureListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            gpxFixContext.onPressure(event.values[0])
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
     private var gpxTickJob: Job? = null
 
     // Preference listener that will init the loggers if the user changes Settings while Service is running
@@ -276,6 +289,7 @@ class ForegroundOnlyLocationService : LifecycleService() {
         if (!gpxTrackRecorder.start()) {
             return false
         }
+        startPressureUpdates()
         gpxTickJob?.cancel()
         gpxTickJob = lifecycleScope.launch {
             // Writes buffered points on schedule even when no fixes arrive
@@ -294,10 +308,23 @@ class ForegroundOnlyLocationService : LifecycleService() {
     fun stopGpxRecording() {
         gpxTickJob?.cancel()
         gpxTickJob = null
+        stopPressureUpdates()
         if (gpxTrackRecorder.isRecording) {
             gpxTrackRecorder.stop()
             refreshNotification()
         }
+    }
+
+    /** Reads the barometer, if the device has one, for the track's elevation */
+    private fun startPressureUpdates() {
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val barometer = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) ?: return
+        sensorManager.registerListener(pressureListener, barometer, PRESSURE_PERIOD_US)
+    }
+
+    private fun stopPressureUpdates() {
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        sensorManager.unregisterListener(pressureListener)
     }
 
     private fun refreshNotification() {
@@ -786,6 +813,9 @@ class ForegroundOnlyLocationService : LifecycleService() {
         private const val REQUEST_CODE_STOP_GPX_RECORDING = 4711
 
         private const val GPX_TICK_MILLIS = 15_000L
+
+        /** Barometer readings every 200 ms; they're averaged per fix */
+        private const val PRESSURE_PERIOD_US = 200_000
 
         private const val NOTIFICATION_ID = 12345678
 
