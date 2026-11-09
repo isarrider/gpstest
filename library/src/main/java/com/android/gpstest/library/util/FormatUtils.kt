@@ -449,6 +449,9 @@ object FormatUtils {
      */
     @JvmStatic
     fun Float.toLog(): String {
+        if (this.isNaN() || this.isInfinite()) {
+            return ""
+        }
         return this.toBigDecimal().toPlainString()
     }
 
@@ -459,6 +462,9 @@ object FormatUtils {
      */
     @JvmStatic
     fun Double.toLog(): String {
+        if (this.isNaN() || this.isInfinite()) {
+            return ""
+        }
         return this.toBigDecimal().toPlainString()
     }
 
