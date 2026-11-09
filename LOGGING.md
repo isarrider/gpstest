@@ -308,14 +308,14 @@ Example track point:
 
 The "Track" screen shows the track being recorded, or the last recorded track when nothing is recording (also after an app restart):
 * Start time, duration, moving time, distance, average speed while moving and maximum speed
-* Elevation: current, lowest, highest, total ascent and descent, and its source
+* Elevation: current, lowest, highest, total ascent and descent, gradient (current while recording, steepest climb and descent), and its source
 * GNSS: average satellites used and HDOP, share of the track with dual-frequency and with SBAS corrections
 * File: points, segments, file location, and while recording, the time of the last write and the points still waiting in memory
 * Charts of distance over time, elevation over distance, and speed and satellites used over time
 
 Distance only counts movement larger than the fix accuracy (at least 3 m), so standing still doesn't add distance, and ascent/descent ignore changes smaller than 3 m.
 
-On devices with a barometer, the elevation comes from it: the pressure altitude, calibrated with the GNSS altitude (the offset is the average difference over the first minute, then follows it slowly, which filters the GNSS noise and still follows weather changes). Ascent and descent then come from pressure changes alone, with a 1 m threshold. `<ele>` in the GPX file stays the GNSS altitude; the pressure is in `gpstest:pressure`. Units follow the distance and speed unit settings.
+On devices with a barometer, the elevation comes from it: the pressure altitude, calibrated with the GNSS altitude (the offset is the average difference over the first minute, then follows it slowly, which filters the GNSS noise and still follows weather changes). Ascent and descent then come from pressure changes alone, with a 1 m threshold. The gradient is measured over the last 50 m travelled with the barometer, or 200 m with GNSS elevation only, so elevation noise doesn't turn into wild slopes. `<ele>` in the GPX file stays the GNSS altitude; the pressure is in `gpstest:pressure`. Units follow the distance and speed unit settings.
 
 ## Accessing the real-time output via Android Studio
 

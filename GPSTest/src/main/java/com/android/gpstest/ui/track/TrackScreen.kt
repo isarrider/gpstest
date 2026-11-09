@@ -119,6 +119,20 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             StatRow(R.string.track_elevation_max, s.maxElevation?.let { units.height(it) } ?: DASH)
             StatRow(R.string.track_ascent, units.height(s.ascentMeters))
             StatRow(R.string.track_descent, units.height(s.descentMeters))
+            if (state.isRecording) {
+                StatRow(
+                    R.string.track_gradient_current,
+                    s.currentGradient?.let { String.format(Locale.getDefault(), "%+.1f %%", it) } ?: DASH
+                )
+            }
+            StatRow(
+                R.string.track_gradient_climb,
+                s.steepestClimb?.let { String.format(Locale.getDefault(), "%.1f %%", it) } ?: DASH
+            )
+            StatRow(
+                R.string.track_gradient_descent,
+                s.steepestDescent?.let { String.format(Locale.getDefault(), "%.1f %%", -it) } ?: DASH
+            )
             StatRow(
                 R.string.track_elevation_source,
                 stringResource(
