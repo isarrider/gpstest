@@ -389,6 +389,7 @@
     <string name="track_distance">Distance</string>
     <string name="track_section_speed">Speed</string>
     <string name="track_speed_current">Current</string>
+    <string name="track_direction">Direction</string>
     <string name="track_avg_speed">Average (moving)</string>
     <string name="track_avg_speed_total">Average (with stops)</string>
     <string name="track_max_speed">Max</string>
@@ -399,7 +400,10 @@
     <string name="track_ascent">Total ascent</string>
     <string name="track_descent">Total descent</string>
     <string name="track_section_gnss">GNSS</string>
+    <string name="track_sats_current">Satellites used</string>
     <string name="track_avg_sats">Average satellites used</string>
+    <string name="track_accuracy_current">Accuracy</string>
+    <string name="track_avg_accuracy">Average accuracy</string>
     <string name="track_avg_hdop">Average HDOP</string>
     <string name="track_dual_freq">Dual-frequency</string>
     <string name="track_sbas">SBAS corrections (e.g. EGNOS)</string>

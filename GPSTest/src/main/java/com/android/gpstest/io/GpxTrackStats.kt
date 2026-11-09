@@ -37,13 +37,21 @@ data class GpxTrackStats(
     val maxSpeed: Float?,
     /** Speed of the latest fix, or null if it had none */
     val currentSpeed: Float? = null,
+    /** Direction of travel of the latest fix in degrees, or null if it had none or stood still */
+    val currentBearing: Float? = null,
     val currentElevation: Double?,
     val minElevation: Double?,
     val maxElevation: Double?,
     val ascentMeters: Double,
     val descentMeters: Double,
     val avgSatellites: Double?,
+    /** Satellites used in the latest fix, or null if not known */
+    val currentSatellites: Int? = null,
     val avgHdop: Double?,
+    /** Horizontal accuracy of the latest fix in meters, or null if it had none */
+    val currentAccuracy: Float? = null,
+    /** Average horizontal accuracy in meters, or null if no fix had one */
+    val avgAccuracy: Double? = null,
     /** Share of points (0..1) with signals on more than one band */
     val dualFrequencyShare: Double?,
     /** Share of points (0..1) with SBAS corrections (e.g. EGNOS) */
@@ -90,6 +98,10 @@ data class GpxTrackStats(
         o.put("descent", descentMeters)
         o.putOpt("sats", avgSatellites)
         o.putOpt("hdop", avgHdop)
+        o.putOpt("bearing", currentBearing?.toDouble())
+        o.putOpt("satsNow", currentSatellites)
+        o.putOpt("acc", currentAccuracy?.toDouble())
+        o.putOpt("avgAcc", avgAccuracy)
         o.putOpt("dual", dualFrequencyShare)
         o.putOpt("sbas", sbasShare)
         val a = JSONArray()
@@ -142,6 +154,10 @@ data class GpxTrackStats(
                 descentMeters = o.getDouble("descent"),
                 avgSatellites = optD("sats"),
                 avgHdop = optD("hdop"),
+                currentBearing = optD("bearing")?.toFloat(),
+                currentSatellites = if (o.isNull("satsNow") || !o.has("satsNow")) null else o.getInt("satsNow"),
+                currentAccuracy = optD("acc")?.toFloat(),
+                avgAccuracy = optD("avgAcc"),
                 dualFrequencyShare = optD("dual"),
                 sbasShare = optD("sbas"),
                 samples = samples
@@ -184,6 +200,11 @@ class GpxTrackStatsAccumulator(
     private var satCount = 0
     private var hdopSum = 0.0
     private var hdopCount = 0
+    private var currentBearing: Float? = null
+    private var currentSatellites: Int? = null
+    private var currentAccuracy: Float? = null
+    private var accuracySum = 0.0
+    private var accuracyCount = 0
     private var dualCount = 0
     private var bandInfoCount = 0
     private var sbasCount = 0
@@ -225,6 +246,13 @@ class GpxTrackStatsAccumulator(
             maxSpeed = max(maxSpeed ?: 0f, l.speed)
         }
         currentSpeed = if (l.hasSpeed()) l.speed else null
+        // The bearing is noise while standing still
+        currentBearing = if (l.hasBearing() && l.hasSpeed() && l.speed >= MOVING_SPEED) l.bearing else null
+        currentAccuracy = if (l.hasAccuracy()) l.accuracy else null
+        if (l.hasAccuracy()) {
+            accuracySum += l.accuracy
+            accuracyCount++
+        }
 
         // Elevation with hysteresis for ascent/descent
         val ele = GpxTrackWriter.elevationOf(l, fix)
@@ -245,6 +273,7 @@ class GpxTrackStatsAccumulator(
         }
 
         // GNSS quality
+        currentSatellites = fix.satellitesUsed.takeIf { it > 0 }
         if (fix.satellitesUsed > 0) {
             satSum += fix.satellitesUsed
             satCount++
@@ -301,6 +330,10 @@ class GpxTrackStatsAccumulator(
         descentMeters = descent,
         avgSatellites = if (satCount > 0) satSum.toDouble() / satCount else null,
         avgHdop = if (hdopCount > 0) hdopSum / hdopCount else null,
+        currentBearing = currentBearing,
+        currentSatellites = currentSatellites,
+        currentAccuracy = currentAccuracy,
+        avgAccuracy = if (accuracyCount > 0) accuracySum / accuracyCount else null,
         dualFrequencyShare = if (bandInfoCount > 0) dualCount.toDouble() / bandInfoCount else null,
         sbasShare = if (points > 0) sbasCount.toDouble() / points else null,
         samples = ArrayList(samples)

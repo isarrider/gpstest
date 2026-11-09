@@ -106,6 +106,7 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
             // The current speed only means something while recording
             if (state.isRecording) {
                 StatRow(R.string.track_speed_current, s.currentSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
+                StatRow(R.string.track_direction, s.currentBearing?.let { TrackUnits.direction(it) } ?: DASH)
             }
             StatRow(R.string.track_avg_speed, s.averageMovingSpeed?.let { units.speed(it) } ?: DASH)
             StatRow(R.string.track_avg_speed_total, s.averageSpeed?.let { units.speed(it) } ?: DASH)
@@ -121,7 +122,15 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
         }
 
         TrackCard(R.string.track_section_gnss) {
+            // Current values only while recording, like the current speed
+            if (state.isRecording) {
+                StatRow(R.string.track_sats_current, s.currentSatellites?.toString() ?: DASH)
+            }
             StatRow(R.string.track_avg_sats, s.avgSatellites?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
+            if (state.isRecording) {
+                StatRow(R.string.track_accuracy_current, s.currentAccuracy?.let { units.accuracy(it.toDouble()) } ?: DASH)
+            }
+            StatRow(R.string.track_avg_accuracy, s.avgAccuracy?.let { units.accuracy(it) } ?: DASH)
             StatRow(R.string.track_avg_hdop, s.avgHdop?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
             StatRow(R.string.track_dual_freq, s.dualFrequencyShare?.let { percent(it) } ?: DASH)
             StatRow(R.string.track_sbas, s.sbasShare?.let { percent(it) } ?: DASH)
