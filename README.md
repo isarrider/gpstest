@@ -6,7 +6,7 @@
 
 ## About this fork
 
-This is [isarrider/gpstest](https://github.com/isarrider/gpstest), a fork of [barbeau/gpstest](https://github.com/barbeau/gpstest). It follows upstream `master` and adds the changes below, which are not in upstream yet. The branch [`all-features`](https://github.com/isarrider/gpstest/tree/all-features) contains all of them and upstream `master`; the fork's `master` stays equal to upstream. Each change also lives on its own branch, from which it is (or could be) proposed upstream. Once upstream merges a change, its row is removed here.
+This is [isarrider/gpstest](https://github.com/isarrider/gpstest), a fork of [barbeau/gpstest](https://github.com/barbeau/gpstest). It follows upstream `master` and adds the changes below, which are not in upstream yet. The branch [`all-features`](https://github.com/isarrider/gpstest/tree/all-features) contains all of them and upstream `master`; the fork's `master` follows upstream, with only a short version of this section in its README. Each change also lives on its own branch, from which it is (or could be) proposed upstream. Once upstream merges a change, its row is removed here.
 
 **Getting the app:** every push to `all-features` is built by the [Android CI Build](https://github.com/isarrider/gpstest/actions/workflows/android.yml?query=branch%3Aall-features) workflow; download the APKs (`google` and `osmdroid` flavors) from the artifacts of the latest successful run. They need Android 15 or newer, and use the same app ID as GPSTest from Google Play or F-Droid but a different signing key, so uninstall that one first (its settings and data are lost).
 
