@@ -476,8 +476,8 @@
     <string name="track_chart_splits">Splits (time per %1$s)</string>
     <string name="track_chart_speed_distribution">Speed distribution (%1$s)</string>
     <string name="track_chart_axis_speed_distribution">Speed (%1$s), share of the moving time</string>
-    <string name="track_speed_distribution_dominant">Most of the time: %1$s (%2$d %%)</string>
-    <string name="track_speed_distribution_share">%1$d %% · %2$s</string>
+    <string name="track_speed_distribution_dominant">Most of the time: %1$s (%2$s %%)</string>
+    <string name="track_speed_distribution_share">%1$s %% · %2$s</string>
     <string name="track_chart_axis_splits">Split (%1$s)</string>
     <string name="track_split_part">%1$s %2$d (%3$.1f)</string>
     <string name="gpx_recording_indicator">● REC %1$s</string>

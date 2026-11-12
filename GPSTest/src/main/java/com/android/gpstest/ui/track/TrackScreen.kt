@@ -607,7 +607,7 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
                     text = stringResource(
                         R.string.track_speed_distribution_dominant,
                         range(it),
-                        (d.share(it) * 100).roundToInt()
+                        sharePercent(d.share(it) * 100)
                     ),
                     fontSize = 14.sp
                 )
@@ -629,12 +629,12 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
                         axisLeft.textColor = textColor
                         axisLeft.valueFormatter = object : ValueFormatter() {
                             override fun getFormattedValue(value: Float) =
-                                String.format(Locale.getDefault(), "%.0f %%", value)
+                                String.format(Locale.getDefault(), "%.1f %%", value)
                         }
                         xAxis.position = XAxis.XAxisPosition.BOTTOM
                         xAxis.setDrawGridLines(false)
                         xAxis.granularity = 1f
-                        // About 30 bars: only every few gets a label
+                        // About 100 bars: only every few gets a label
                         xAxis.setLabelCount(7, false)
                         xAxis.textColor = textColor
                         setNoDataTextColor(textColor)
@@ -663,13 +663,13 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
                         yText = { y ->
                             // The share of the moving time, and the time it stands for
                             val seconds = d.totalSeconds * y / 100.0
-                            String.format(shareFormat, y.roundToInt(), TrackSplits.format(seconds))
+                            String.format(shareFormat, sharePercent(y.toDouble()), TrackSplits.format(seconds))
                         },
                         textColor = textColor,
                         backgroundColor = surfaceColor
                     )
-                    // Thin bars with a gap, so many ranges stay readable
-                    chart.data = BarData(set).apply { barWidth = 0.7f }
+                    // Many narrow ranges with almost no gap, so they read as a curve
+                    chart.data = BarData(set).apply { barWidth = 0.9f }
                     if (selectedX != null) chart.highlightValue(selectedX, 0, false)
                     chart.invalidate()
                 }
@@ -685,6 +685,11 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
 }
 
 private const val DASH = "–"
+
+/** A share in percent: one decimal below 10 %, as single ranges are small with 100 bars */
+private fun sharePercent(percent: Double): String =
+    if (percent < 9.95) String.format(Locale.getDefault(), "%.1f", percent)
+    else String.format(Locale.getDefault(), "%.0f", percent)
 
 private fun percentPoints(value: Int) = String.format(Locale.getDefault(), "%d %%", value)
 

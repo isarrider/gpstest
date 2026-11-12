@@ -40,8 +40,11 @@ object TrackSpeedDistribution {
     /** Intervals longer than this are gaps without a fix, not travel at one speed */
     const val MAX_GAP_SECONDS = 300.0
 
-    /** About this many ranges; the width is rounded to 1, 2 or 5 × 10ⁿ */
-    const val TARGET_BINS = 30
+    /** About this many ranges, so the bars read as a curve; the width is rounded to [STEPS] */
+    const val TARGET_BINS = 100
+
+    /** Widths × 10ⁿ the range width is rounded up to, fine enough to stay close to [TARGET_BINS] */
+    private val STEPS = listOf(1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
 
     /**
      * @param seconds time since the start of each sample, ascending
@@ -75,10 +78,10 @@ object TrackSpeedDistribution {
         return Distribution(width, bins, time.sum())
     }
 
-    /** The smallest of 1, 2 or 5 × 10ⁿ at least [raw] */
+    /** The smallest of [STEPS] × 10ⁿ at least [raw] */
     fun niceWidth(raw: Double): Double {
         if (raw <= 0) return 1.0
         val magnitude = 10.0.pow(floor(log10(raw)))
-        return listOf(1.0, 2.0, 5.0, 10.0).map { it * magnitude }.first { it >= raw - 1e-12 }
+        return STEPS.map { it * magnitude }.first { it >= raw - 1e-12 }
     }
 }
