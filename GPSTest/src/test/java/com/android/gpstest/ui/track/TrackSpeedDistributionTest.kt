@@ -23,10 +23,11 @@ class TrackSpeedDistributionTest {
 
     @Test
     fun niceWidth() {
-        assertEquals(1.0, TrackSpeedDistribution.niceWidth(0.8), 1e-9)
-        assertEquals(2.0, TrackSpeedDistribution.niceWidth(1.5), 1e-9)
+        assertEquals(1.0, TrackSpeedDistribution.niceWidth(0.85), 1e-9)
+        assertEquals(1.5, TrackSpeedDistribution.niceWidth(1.2), 1e-9)
+        assertEquals(2.5, TrackSpeedDistribution.niceWidth(2.1), 1e-9)
         assertEquals(5.0, TrackSpeedDistribution.niceWidth(4.2), 1e-9)
-        assertEquals(10.0, TrackSpeedDistribution.niceWidth(7.0), 1e-9)
+        assertEquals(8.0, TrackSpeedDistribution.niceWidth(7.0), 1e-9)
         assertEquals(0.5, TrackSpeedDistribution.niceWidth(0.45), 1e-9)
     }
 
@@ -36,16 +37,16 @@ class TrackSpeedDistributionTest {
         val speeds = List(11) { 50.0 } + List(30) { 100.0 } + List(5) { 120.0 }
         val seconds = speeds.indices.map { it * 60.0 }
         val d = TrackSpeedDistribution.compute(seconds, speeds, 1.8)!!
-        // 120 km/h / 30 ranges = 4, rounded up to 5 km/h steps
-        assertEquals(5.0, d.binWidth, 1e-9)
+        // 120 km/h / 100 ranges = 1.2, rounded up to 1.5 km/h steps
+        assertEquals(1.5, d.binWidth, 1e-9)
         val dominant = d.dominant!!
-        assertEquals(100.0, dominant.from, 1e-9)
-        assertEquals(105.0, dominant.to, 1e-9)
+        assertEquals(99.0, dominant.from, 1e-9)
+        assertEquals(100.5, dominant.to, 1e-9)
         // The interval from 50 to 100 km/h counts at 75 km/h
         assertEquals(29 * 60.0, dominant.seconds, 1e-9)
         assertEquals(45 * 60.0, d.totalSeconds, 1e-9)
         // Empty ranges below the slowest speed are left out
-        assertEquals(50.0, d.bins.first().from, 1e-9)
+        assertEquals(49.5, d.bins.first().from, 1e-9)
     }
 
     @Test
