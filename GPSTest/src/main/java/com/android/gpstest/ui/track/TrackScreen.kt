@@ -48,6 +48,7 @@ import com.android.gpstest.Application.Companion.prefs
 import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
+import com.android.gpstest.io.GpxTrackStatsAccumulator
 import com.android.gpstest.library.util.PreferenceUtil
 import com.android.gpstest.ui.status.preferenceState
 import com.github.mikephil.charting.charts.BarChart
@@ -284,6 +285,18 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                                     xText = ::elapsed,
                                     yText = { units.speedValueText(it) }
                                 )
+                            }
+                        }
+                    }
+                    TrackSection.CHART_SPEED_DISTRIBUTION -> {
+                        if (charted) {
+                            val distribution = TrackSpeedDistribution.compute(
+                                s.samples.map { it.seconds.toDouble() },
+                                s.samples.map { p -> p.speed?.let { units.speedValue(it).toDouble() } },
+                                units.speedValue(GpxTrackStatsAccumulator.MOVING_SPEED).toDouble()
+                            )
+                            if (distribution != null) {
+                                SpeedDistributionCard(distribution, units.speedUnit)
                             }
                         }
                     }
@@ -555,6 +568,114 @@ private fun SplitsCard(splits: List<TrackSplits.Split>, unit: String) {
             )
             Text(
                 text = stringResource(R.string.track_chart_axis_splits, unit),
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Speed distribution: one bar per speed range with its share of the moving time, so the tallest
+ * bar is the dominant speed. Touching a bar shows the range, share and time.
+ */
+@Composable
+private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: String) {
+    val barColor = MaterialTheme.colors.primary.toArgb()
+    val textColor = MaterialTheme.colors.onSurface.toArgb()
+    val surfaceColor = MaterialTheme.colors.surface.toArgb()
+    val decimals = if (d.binWidth < 1) 1 else 0
+    fun speed(v: Double) = String.format(Locale.getDefault(), "%.${decimals}f", v)
+    fun range(bin: TrackSpeedDistribution.Bin) = "${speed(bin.from)}–${speed(bin.to)} $unit"
+    val title = stringResource(R.string.track_chart_speed_distribution, unit)
+    val shareFormat = stringResource(R.string.track_speed_distribution_share)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(5.dp),
+        elevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.subtitle1,
+                fontWeight = FontWeight.Bold
+            )
+            d.dominant?.let {
+                Text(
+                    text = stringResource(
+                        R.string.track_speed_distribution_dominant,
+                        range(it),
+                        (d.share(it) * 100).roundToInt()
+                    ),
+                    fontSize = 14.sp
+                )
+            }
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                factory = { context ->
+                    BarChart(context).apply {
+                        description.isEnabled = false
+                        legend.isEnabled = false
+                        setTouchEnabled(true)
+                        setPinchZoom(false)
+                        isDoubleTapToZoomEnabled = false
+                        setScaleEnabled(true)
+                        axisRight.isEnabled = false
+                        axisLeft.axisMinimum = 0f
+                        axisLeft.textColor = textColor
+                        axisLeft.valueFormatter = object : ValueFormatter() {
+                            override fun getFormattedValue(value: Float) =
+                                String.format(Locale.getDefault(), "%.0f %%", value)
+                        }
+                        xAxis.position = XAxis.XAxisPosition.BOTTOM
+                        xAxis.setDrawGridLines(false)
+                        xAxis.granularity = 1f
+                        // About 30 bars: only every few gets a label
+                        xAxis.setLabelCount(7, false)
+                        xAxis.textColor = textColor
+                        setNoDataTextColor(textColor)
+                    }
+                },
+                update = { chart ->
+                    val selectedX = chart.highlighted?.firstOrNull()?.x
+                    fun binAt(x: Float) = d.bins.getOrNull(x.roundToInt())
+                    // Each bar is labelled with the lower end of its range
+                    chart.xAxis.valueFormatter = object : ValueFormatter() {
+                        override fun getFormattedValue(value: Float) =
+                            binAt(value)?.let { speed(it.from) } ?: ""
+                    }
+                    val entries = d.bins.map {
+                        BarEntry(it.index.toFloat(), (d.share(it) * 100).toFloat())
+                    }
+                    val set = BarDataSet(entries, title).apply {
+                        color = barColor
+                        setDrawValues(false)
+                        highLightColor = textColor
+                        highLightAlpha = 60
+                    }
+                    chart.marker = TrackChartMarker(
+                        chart.context,
+                        xText = { x -> binAt(x)?.let { range(it) } ?: "" },
+                        yText = { y ->
+                            // The share of the moving time, and the time it stands for
+                            val seconds = d.totalSeconds * y / 100.0
+                            String.format(shareFormat, y.roundToInt(), TrackSplits.format(seconds))
+                        },
+                        textColor = textColor,
+                        backgroundColor = surfaceColor
+                    )
+                    // Thin bars with a gap, so many ranges stay readable
+                    chart.data = BarData(set).apply { barWidth = 0.7f }
+                    if (selectedX != null) chart.highlightValue(selectedX, 0, false)
+                    chart.invalidate()
+                }
+            )
+            Text(
+                text = stringResource(R.string.track_chart_axis_speed_distribution, unit),
                 fontSize = 12.sp,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center

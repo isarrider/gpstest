@@ -196,6 +196,7 @@ class TrackCardsDialog : DialogFragment() {
             TrackSection.SPLITS -> R.string.track_card_splits
             TrackSection.CHART_ELEVATION -> R.string.track_card_chart_elevation
             TrackSection.CHART_SPEED -> R.string.track_card_chart_speed
+            TrackSection.CHART_SPEED_DISTRIBUTION -> R.string.track_card_speed_distribution
             TrackSection.CHART_SATELLITES -> R.string.track_card_chart_satellites
             TrackSection.CHART_BATTERY -> R.string.track_card_chart_battery
         }

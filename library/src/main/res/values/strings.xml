@@ -414,6 +414,7 @@
     <string name="track_card_splits">Splits chart</string>
     <string name="track_card_chart_elevation">Elevation chart</string>
     <string name="track_card_chart_speed">Speed chart</string>
+    <string name="track_card_speed_distribution">Speed distribution</string>
     <string name="track_card_chart_satellites">Satellites chart</string>
     <string name="track_card_chart_battery">Battery chart</string>
     <string name="track_speed_current">Current</string>
@@ -473,6 +474,10 @@
     <string name="track_chart_axis_minutes">Time (minutes)</string>
     <string name="track_marker_satellites">%1$d used</string>
     <string name="track_chart_splits">Splits (time per %1$s)</string>
+    <string name="track_chart_speed_distribution">Speed distribution (%1$s)</string>
+    <string name="track_chart_axis_speed_distribution">Speed (%1$s), share of the moving time</string>
+    <string name="track_speed_distribution_dominant">Most of the time: %1$s (%2$d %%)</string>
+    <string name="track_speed_distribution_share">%1$d %% · %2$s</string>
     <string name="track_chart_axis_splits">Split (%1$s)</string>
     <string name="track_split_part">%1$s %2$d (%3$.1f)</string>
     <string name="gpx_recording_indicator">● REC %1$s</string>
