@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +49,7 @@ import com.android.gpstest.R
 import com.android.gpstest.io.GpxTrackRecorder
 import com.android.gpstest.io.GpxTrackStats
 import com.android.gpstest.library.util.PreferenceUtil
+import com.android.gpstest.ui.status.preferenceState
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
@@ -105,172 +107,215 @@ fun TrackScreen() {
 @Composable
 private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, duration: Long) {
     val units = TrackUnits.fromPrefs()
+    val satellitesUsed = stringResource(R.string.track_marker_satellites)
+    // Order and visibility from the "Arrange cards" dialog (the toolbar's filter button)
+    val savedCards: String? by preferenceState(R.string.pref_key_track_cards) { p, key ->
+        p.getString(key, null)
+    }
+    val sections = remember(savedCards) {
+        parseTrackSections(savedCards).filter { it.shown }.map { it.section }
+    }
+    // Charts need at least two points
+    val charted = s.samples.size >= 2
     Column {
-
-        TrackCard(if (state.isRecording) R.string.track_title_recording else R.string.track_title_last) {
-            StatRow(R.string.track_started, DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(s.startTime)))
-            StatRow(R.string.track_duration, DateUtils.formatElapsedTime(duration / 1000))
-            StatRow(R.string.track_moving_time, DateUtils.formatElapsedTime(s.movingTimeMillis / 1000))
-            // The rest of the duration: stops, and gaps without a fix
-            StatRow(R.string.track_stopped_time, DateUtils.formatElapsedTime(max(0L, duration - s.movingTimeMillis) / 1000))
-            StatRow(R.string.track_distance, units.distance(s.distanceMeters))
-        }
-
-        TrackCard(R.string.track_section_speed) {
-            // The current speed only means something while recording
-            if (state.isRecording) {
-                StatRow(R.string.track_speed_current, s.currentSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
-                StatRow(R.string.track_direction, s.currentBearing?.let { TrackUnits.direction(it) } ?: DASH)
-            }
-            StatRow(R.string.track_avg_speed, s.averageMovingSpeed?.let { units.speed(it) } ?: DASH)
-            if (PreferenceUtil.trackShowPace(app, prefs)) {
-                if (state.isRecording) {
-                    StatRow(R.string.track_pace_current, s.currentSpeed?.let { units.pace(it.toDouble()) } ?: DASH)
+        sections.forEach { section ->
+            // Keyed, so a chart keeps its state (zoom, selected point) when the order changes
+            key(section) {
+                when (section) {
+                    TrackSection.SUMMARY -> {
+                        TrackCard(if (state.isRecording) R.string.track_title_recording else R.string.track_title_last) {
+                            StatRow(R.string.track_started, DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(s.startTime)))
+                            StatRow(R.string.track_duration, DateUtils.formatElapsedTime(duration / 1000))
+                            StatRow(R.string.track_moving_time, DateUtils.formatElapsedTime(s.movingTimeMillis / 1000))
+                            // The rest of the duration: stops, and gaps without a fix
+                            StatRow(R.string.track_stopped_time, DateUtils.formatElapsedTime(max(0L, duration - s.movingTimeMillis) / 1000))
+                            StatRow(R.string.track_distance, units.distance(s.distanceMeters))
+                        }
+                    }
+                    TrackSection.SPEED -> {
+                        TrackCard(R.string.track_section_speed) {
+                            // The current speed only means something while recording
+                            if (state.isRecording) {
+                                StatRow(R.string.track_speed_current, s.currentSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
+                                StatRow(R.string.track_direction, s.currentBearing?.let { TrackUnits.direction(it) } ?: DASH)
+                            }
+                            StatRow(R.string.track_avg_speed, s.averageMovingSpeed?.let { units.speed(it) } ?: DASH)
+                            if (PreferenceUtil.trackShowPace(app, prefs)) {
+                                if (state.isRecording) {
+                                    StatRow(R.string.track_pace_current, s.currentSpeed?.let { units.pace(it.toDouble()) } ?: DASH)
+                                }
+                                StatRow(R.string.track_avg_pace, s.averageMovingSpeed?.let { units.pace(it) } ?: DASH)
+                            }
+                            StatRow(R.string.track_avg_speed_total, s.averageSpeed?.let { units.speed(it) } ?: DASH)
+                            StatRow(R.string.track_max_speed, s.maxSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
+                        }
+                    }
+                    TrackSection.ELEVATION -> {
+                        TrackCard(R.string.track_section_elevation) {
+                            StatRow(R.string.track_elevation_current, s.currentElevation?.let { units.height(it) } ?: DASH)
+                            StatRow(R.string.track_elevation_min, s.minElevation?.let { units.height(it) } ?: DASH)
+                            StatRow(R.string.track_elevation_max, s.maxElevation?.let { units.height(it) } ?: DASH)
+                            StatRow(R.string.track_ascent, units.height(s.ascentMeters))
+                            StatRow(R.string.track_descent, units.height(s.descentMeters))
+                            if (state.isRecording) {
+                                StatRow(
+                                    R.string.track_gradient_current,
+                                    s.currentGradient?.let { String.format(Locale.getDefault(), "%+.1f %%", it) } ?: DASH
+                                )
+                            }
+                            StatRow(
+                                R.string.track_gradient_climb,
+                                s.steepestClimb?.let { String.format(Locale.getDefault(), "%.1f %%", it) } ?: DASH
+                            )
+                            StatRow(
+                                R.string.track_gradient_descent,
+                                s.steepestDescent?.let { String.format(Locale.getDefault(), "%.1f %%", -it) } ?: DASH
+                            )
+                            StatRow(
+                                R.string.track_elevation_source,
+                                stringResource(
+                                    if (s.elevationFromBarometer) R.string.track_elevation_source_barometer
+                                    else R.string.track_elevation_source_gnss
+                                )
+                            )
+                        }
+                    }
+                    TrackSection.GNSS -> {
+                        TrackCard(R.string.track_section_gnss) {
+                            // Current values only while recording, like the current speed
+                            if (state.isRecording) {
+                                StatRow(R.string.track_sats_current, s.currentSatellites?.toString() ?: DASH)
+                            }
+                            StatRow(R.string.track_avg_sats, s.avgSatellites?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
+                            if (state.isRecording) {
+                                StatRow(R.string.track_accuracy_current, s.currentAccuracy?.let { units.accuracy(it.toDouble()) } ?: DASH)
+                            }
+                            StatRow(R.string.track_avg_accuracy, s.avgAccuracy?.let { units.accuracy(it) } ?: DASH)
+                            StatRow(R.string.track_avg_hdop, s.avgHdop?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
+                            StatRow(R.string.track_dual_freq, s.dualFrequencyShare?.let { percent(it) } ?: DASH)
+                            StatRow(R.string.track_sbas, s.sbasShare?.let { percent(it) } ?: DASH)
+                            if (s.osnmaPoints > 0) {
+                                StatRow(R.string.track_osnma_all, percent(s.osnmaAllAuthenticated.toDouble() / s.osnmaPoints))
+                                StatRow(R.string.track_osnma_failed, s.osnmaFailedPoints.toString())
+                            }
+                        }
+                    }
+                    TrackSection.BATTERY -> {
+                        if (s.batteryStart != null) {
+                            TrackCard(R.string.track_section_battery) {
+                                StatRow(R.string.track_battery_start, percentPoints(s.batteryStart))
+                                StatRow(
+                                    if (state.isRecording) R.string.track_battery_now else R.string.track_battery_end,
+                                    s.batteryLast?.let { percentPoints(it) } ?: DASH
+                                )
+                                if (s.batteryCharged) {
+                                    StatRow(R.string.track_battery_used, stringResource(R.string.track_battery_charged))
+                                } else {
+                                    StatRow(R.string.track_battery_used, s.batteryUsed?.let { percentPoints(it) } ?: DASH)
+                                    StatRow(
+                                        R.string.track_battery_rate,
+                                        s.batteryPerHour?.let { String.format(Locale.getDefault(), "%.1f %%", it) } ?: DASH
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    TrackSection.FILE -> {
+                        TrackCard(R.string.track_section_file) {
+                            StatRow(R.string.track_points, s.points.toString())
+                            StatRow(R.string.track_segments, s.segments.toString())
+                            LogSettingsRows(units)
+                            if (state.isRecording) {
+                                StatRow(
+                                    R.string.track_last_write,
+                                    if (state.lastWriteTime > 0) DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(state.lastWriteTime))
+                                    else stringResource(R.string.track_not_yet)
+                                )
+                                StatRow(R.string.track_pending, state.pendingPoints.toString())
+                            }
+                            StatRow(R.string.track_file, s.fileLocation)
+                        }
+                    }
+                    TrackSection.CHART_DISTANCE -> {
+                        if (charted) {
+                            ChartCard(
+                                stringResource(R.string.track_chart_distance, units.distanceAxisUnit),
+                                stringResource(R.string.track_chart_axis_minutes),
+                                s.samples.map { Entry(it.seconds / 60f, units.distanceAxis(it.distanceMeters)) },
+                                xText = ::elapsed,
+                                yText = { units.distanceAxisValue(it) }
+                            )
+                        }
+                    }
+                    TrackSection.SPLITS -> {
+                        if (charted) {
+                            val splits = TrackSplits.compute(
+                                s.samples.map { it.seconds.toDouble() },
+                                s.samples.map { it.distanceMeters.toDouble() },
+                                units.metersPerDistanceUnit.toDouble()
+                            )
+                            if (splits.isNotEmpty()) {
+                                SplitsCard(splits, units.distanceAxisUnit)
+                            }
+                        }
+                    }
+                    TrackSection.CHART_ELEVATION -> {
+                        if (charted) {
+                            val elevation = s.samples.mapNotNull { p -> p.elevation?.let { Entry(units.distanceAxis(p.distanceMeters), units.heightValue(it)) } }
+                            if (elevation.size >= 2) {
+                                ChartCard(
+                                    stringResource(R.string.track_chart_elevation, units.heightUnit),
+                                    stringResource(R.string.track_chart_axis_distance, units.distanceAxisUnit),
+                                    elevation,
+                                    xText = { units.distanceAxisValue(it) },
+                                    yText = { units.heightValueText(it) }
+                                )
+                            }
+                        }
+                    }
+                    TrackSection.CHART_SPEED -> {
+                        if (charted) {
+                            val speed = s.samples.mapNotNull { p -> p.speed?.let { Entry(p.seconds / 60f, units.speedValue(it)) } }
+                            if (speed.size >= 2) {
+                                ChartCard(
+                                    stringResource(R.string.track_chart_speed, units.speedUnit),
+                                    stringResource(R.string.track_chart_axis_minutes),
+                                    speed,
+                                    xText = ::elapsed,
+                                    yText = { units.speedValueText(it) }
+                                )
+                            }
+                        }
+                    }
+                    TrackSection.CHART_SATELLITES -> {
+                        if (charted) {
+                            val sats = s.samples.filter { it.satellites > 0 }.map { Entry(it.seconds / 60f, it.satellites.toFloat()) }
+                            if (sats.size >= 2) {
+                                ChartCard(
+                                    stringResource(R.string.track_chart_satellites),
+                                    stringResource(R.string.track_chart_axis_minutes),
+                                    sats,
+                                    xText = ::elapsed,
+                                    yText = { String.format(satellitesUsed, it.roundToInt()) }
+                                )
+                            }
+                        }
+                    }
+                    TrackSection.CHART_BATTERY -> {
+                        if (charted) {
+                            val battery = s.samples.mapNotNull { p -> p.battery?.let { Entry(p.seconds / 60f, it.toFloat()) } }
+                            if (battery.size >= 2) {
+                                ChartCard(
+                                    stringResource(R.string.track_chart_battery),
+                                    stringResource(R.string.track_chart_axis_minutes),
+                                    battery,
+                                    xText = ::elapsed,
+                                    yText = { percentPoints(it.roundToInt()) }
+                                )
+                            }
+                        }
+                    }
                 }
-                StatRow(R.string.track_avg_pace, s.averageMovingSpeed?.let { units.pace(it) } ?: DASH)
-            }
-            StatRow(R.string.track_avg_speed_total, s.averageSpeed?.let { units.speed(it) } ?: DASH)
-            StatRow(R.string.track_max_speed, s.maxSpeed?.let { units.speed(it.toDouble()) } ?: DASH)
-        }
-
-        TrackCard(R.string.track_section_elevation) {
-            StatRow(R.string.track_elevation_current, s.currentElevation?.let { units.height(it) } ?: DASH)
-            StatRow(R.string.track_elevation_min, s.minElevation?.let { units.height(it) } ?: DASH)
-            StatRow(R.string.track_elevation_max, s.maxElevation?.let { units.height(it) } ?: DASH)
-            StatRow(R.string.track_ascent, units.height(s.ascentMeters))
-            StatRow(R.string.track_descent, units.height(s.descentMeters))
-            if (state.isRecording) {
-                StatRow(
-                    R.string.track_gradient_current,
-                    s.currentGradient?.let { String.format(Locale.getDefault(), "%+.1f %%", it) } ?: DASH
-                )
-            }
-            StatRow(
-                R.string.track_gradient_climb,
-                s.steepestClimb?.let { String.format(Locale.getDefault(), "%.1f %%", it) } ?: DASH
-            )
-            StatRow(
-                R.string.track_gradient_descent,
-                s.steepestDescent?.let { String.format(Locale.getDefault(), "%.1f %%", -it) } ?: DASH
-            )
-            StatRow(
-                R.string.track_elevation_source,
-                stringResource(
-                    if (s.elevationFromBarometer) R.string.track_elevation_source_barometer
-                    else R.string.track_elevation_source_gnss
-                )
-            )
-        }
-
-        TrackCard(R.string.track_section_gnss) {
-            // Current values only while recording, like the current speed
-            if (state.isRecording) {
-                StatRow(R.string.track_sats_current, s.currentSatellites?.toString() ?: DASH)
-            }
-            StatRow(R.string.track_avg_sats, s.avgSatellites?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
-            if (state.isRecording) {
-                StatRow(R.string.track_accuracy_current, s.currentAccuracy?.let { units.accuracy(it.toDouble()) } ?: DASH)
-            }
-            StatRow(R.string.track_avg_accuracy, s.avgAccuracy?.let { units.accuracy(it) } ?: DASH)
-            StatRow(R.string.track_avg_hdop, s.avgHdop?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: DASH)
-            StatRow(R.string.track_dual_freq, s.dualFrequencyShare?.let { percent(it) } ?: DASH)
-            StatRow(R.string.track_sbas, s.sbasShare?.let { percent(it) } ?: DASH)
-            if (s.osnmaPoints > 0) {
-                StatRow(R.string.track_osnma_all, percent(s.osnmaAllAuthenticated.toDouble() / s.osnmaPoints))
-                StatRow(R.string.track_osnma_failed, s.osnmaFailedPoints.toString())
-            }
-        }
-
-        if (s.batteryStart != null) {
-            TrackCard(R.string.track_section_battery) {
-                StatRow(R.string.track_battery_start, percentPoints(s.batteryStart))
-                StatRow(
-                    if (state.isRecording) R.string.track_battery_now else R.string.track_battery_end,
-                    s.batteryLast?.let { percentPoints(it) } ?: DASH
-                )
-                if (s.batteryCharged) {
-                    StatRow(R.string.track_battery_used, stringResource(R.string.track_battery_charged))
-                } else {
-                    StatRow(R.string.track_battery_used, s.batteryUsed?.let { percentPoints(it) } ?: DASH)
-                    StatRow(
-                        R.string.track_battery_rate,
-                        s.batteryPerHour?.let { String.format(Locale.getDefault(), "%.1f %%", it) } ?: DASH
-                    )
-                }
-            }
-        }
-
-        TrackCard(R.string.track_section_file) {
-            StatRow(R.string.track_points, s.points.toString())
-            StatRow(R.string.track_segments, s.segments.toString())
-            LogSettingsRows(units)
-            if (state.isRecording) {
-                StatRow(
-                    R.string.track_last_write,
-                    if (state.lastWriteTime > 0) DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(state.lastWriteTime))
-                    else stringResource(R.string.track_not_yet)
-                )
-                StatRow(R.string.track_pending, state.pendingPoints.toString())
-            }
-            StatRow(R.string.track_file, s.fileLocation)
-        }
-
-        if (s.samples.size >= 2) {
-            val satellitesUsed = stringResource(R.string.track_marker_satellites)
-            ChartCard(
-                stringResource(R.string.track_chart_distance, units.distanceAxisUnit),
-                stringResource(R.string.track_chart_axis_minutes),
-                s.samples.map { Entry(it.seconds / 60f, units.distanceAxis(it.distanceMeters)) },
-                xText = ::elapsed,
-                yText = { units.distanceAxisValue(it) }
-            )
-            val splits = TrackSplits.compute(
-                s.samples.map { it.seconds.toDouble() },
-                s.samples.map { it.distanceMeters.toDouble() },
-                units.metersPerDistanceUnit.toDouble()
-            )
-            if (splits.isNotEmpty()) {
-                SplitsCard(splits, units.distanceAxisUnit)
-            }
-            val elevation = s.samples.mapNotNull { p -> p.elevation?.let { Entry(units.distanceAxis(p.distanceMeters), units.heightValue(it)) } }
-            if (elevation.size >= 2) {
-                ChartCard(
-                    stringResource(R.string.track_chart_elevation, units.heightUnit),
-                    stringResource(R.string.track_chart_axis_distance, units.distanceAxisUnit),
-                    elevation,
-                    xText = { units.distanceAxisValue(it) },
-                    yText = { units.heightValueText(it) }
-                )
-            }
-            val speed = s.samples.mapNotNull { p -> p.speed?.let { Entry(p.seconds / 60f, units.speedValue(it)) } }
-            if (speed.size >= 2) {
-                ChartCard(
-                    stringResource(R.string.track_chart_speed, units.speedUnit),
-                    stringResource(R.string.track_chart_axis_minutes),
-                    speed,
-                    xText = ::elapsed,
-                    yText = { units.speedValueText(it) }
-                )
-            }
-            val sats = s.samples.filter { it.satellites > 0 }.map { Entry(it.seconds / 60f, it.satellites.toFloat()) }
-            if (sats.size >= 2) {
-                ChartCard(
-                    stringResource(R.string.track_chart_satellites),
-                    stringResource(R.string.track_chart_axis_minutes),
-                    sats,
-                    xText = ::elapsed,
-                    yText = { String.format(satellitesUsed, it.roundToInt()) }
-                )
-            }
-            val battery = s.samples.mapNotNull { p -> p.battery?.let { Entry(p.seconds / 60f, it.toFloat()) } }
-            if (battery.size >= 2) {
-                ChartCard(
-                    stringResource(R.string.track_chart_battery),
-                    stringResource(R.string.track_chart_axis_minutes),
-                    battery,
-                    xText = ::elapsed,
-                    yText = { percentPoints(it.roundToInt()) }
-                )
             }
         }
     }

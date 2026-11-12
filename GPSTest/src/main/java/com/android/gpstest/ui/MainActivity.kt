@@ -78,6 +78,7 @@ import com.android.gpstest.ui.NavigationDrawerFragment.NavigationDrawerCallbacks
 import com.android.gpstest.ui.signals.SignalsFragment
 import com.android.gpstest.ui.sky.SkyFragment
 import com.android.gpstest.ui.status.StatusFragment
+import com.android.gpstest.ui.track.TrackCardsDialog
 import com.android.gpstest.ui.track.TrackFragment
 import com.android.gpstest.util.BuildUtils
 import com.android.gpstest.util.UIUtils
@@ -1008,6 +1009,13 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
             item.isVisible = lastLocation != null || isFileLoggingEnabled(app, prefs) == true ||
                     GpxTrackRecorder.stats.value?.fileUri != null
         }
+        menu.findItem(R.id.filter_sats)?.title = getString(
+            if (currentNavDrawerPosition == NavigationDrawerFragment.NAVDRAWER_ITEM_TRACK) {
+                R.string.track_cards_menu
+            } else {
+                R.string.menu_option_filter
+            }
+        )
         val record = menu.findItem(R.id.record_track)
         if (record != null) {
             val recording = GpxTrackRecorder.state.value.isRecording
@@ -1032,7 +1040,14 @@ class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks {
                 return true
             }
             R.id.filter_sats -> {
-                UIUtils.showFilterDialog(this)
+                // On the Track screen the button arranges its cards; the GNSS filter means
+                // nothing there
+                if (currentNavDrawerPosition == NavigationDrawerFragment.NAVDRAWER_ITEM_TRACK) {
+                    TrackCardsDialog().show(supportFragmentManager, ".TrackCardsDialog")
+                } else {
+                    UIUtils.showFilterDialog(this)
+                }
+                return true
             }
         }
         return super.onOptionsItemSelected(item)

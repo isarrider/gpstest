@@ -405,6 +405,17 @@
     <string name="track_elevation_source_gnss">GNSS</string>
     <string name="track_distance">Distance</string>
     <string name="track_section_speed">Speed</string>
+    <string name="track_cards_dialog_title">Arrange cards</string>
+    <string name="track_cards_dialog_hint">Drag the handles to change the order of the cards on the Track screen; uncheck the ones you don\'t need</string>
+    <string name="track_cards_dialog_reset">Default</string>
+    <string name="track_cards_menu">Arrange cards</string>
+    <string name="track_card_summary">Summary</string>
+    <string name="track_card_chart_distance">Distance chart</string>
+    <string name="track_card_splits">Splits chart</string>
+    <string name="track_card_chart_elevation">Elevation chart</string>
+    <string name="track_card_chart_speed">Speed chart</string>
+    <string name="track_card_chart_satellites">Satellites chart</string>
+    <string name="track_card_chart_battery">Battery chart</string>
     <string name="track_speed_current">Current</string>
     <string name="track_direction">Direction</string>
     <string name="track_avg_speed">Average (moving)</string>
