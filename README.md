@@ -4,6 +4,21 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/sjbarbeau.svg?style=social&label=Follow)](https://twitter.com/sjbarbeau)
 [![GitHub](https://img.shields.io/github/license/barbeau/gpstest)](/LICENSE)
 
+## About this fork
+
+This is [isarrider/gpstest](https://github.com/isarrider/gpstest), a fork of [barbeau/gpstest](https://github.com/barbeau/gpstest). The app with all of the fork's changes is built from the branch [`all-features`](https://github.com/isarrider/gpstest/tree/all-features); this `master` follows upstream, plus this note. What the fork adds:
+
+* **Galileo OSNMA**: checks on the phone that the Galileo navigation data is genuine, with a Status card and seals for authenticated satellites. Proposed upstream in [#864](https://github.com/barbeau/gpstest/pull/864).
+* **Status screen redesign**: satellites grouped by constellation, one row per satellite, details and C/N0 history on tap, "8 of 12 possible in view of 31 total" per constellation, constellations in your own order.
+* **EGNOS**: EGNOS satellites, an EGNOS card and corrections from an internet source.
+* **Signals screen**: the C/N0 of every received signal, as a chart or a table, and their history in one chart.
+* **GPX track recording** with GNSS details, battery, OSNMA state and air pressure per point, and a **Track screen** with speed, elevation (from the barometer where there is one), gradient, splits, speed distribution and more, in cards you can arrange.
+* **Smaller things**: time since first fix, GNSS that keeps running in the background only if you want, a black top bar in the dark theme, units for track distance separate from elevation.
+
+Already merged upstream: [#871](https://github.com/barbeau/gpstest/pull/871) (GPS times far in the future are invalid).
+
+**[Full list of changes, branches and upstream status](https://github.com/isarrider/gpstest/blob/all-features/README.md#about-this-fork)** · **Download:** the APKs of every `all-features` build are in the artifacts of the [Android CI Build](https://github.com/isarrider/gpstest/actions/workflows/android.yml?query=branch%3Aall-features) runs (Android 15 or newer; uninstall the Play Store or F-Droid version first, as the signing key differs).
+
 The #1 open-source global navigation satellite system (GNSS) testing app.
 
 ## Install
