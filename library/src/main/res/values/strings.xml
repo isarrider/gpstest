@@ -684,7 +684,8 @@
     <string name="signals_history_ago">\u2212%1$d min</string>
     <string name="signals_history_now">now</string>
     <string name="signals_history_empty">No history yet. It fills up while GNSS is running.</string>
-    <string name="signals_history_caption">Thin: each signal \u00B7 thick: average of each satellite\'s strongest signal \u00B7 tap a constellation to hide it</string>
+    <string name="signals_history_caption">Thin: each signal \u00B7 thick: average of each satellite\'s strongest signal \u00B7 dashed: that average over the whole window \u00B7 tap a constellation to hide it</string>
+    <string name="signals_history_legend_average">%1$s \u2300 %2$.0f \u00B7 avg %3$.0f</string>
     <string name="signals_a11y_history">C/N0 of all signals over the last %1$d minutes, from 10 to 50 dB-Hz</string>
     <string name="signals_a11y_shown">shown, tap to hide</string>
     <string name="signals_a11y_hidden">hidden, tap to show</string>
