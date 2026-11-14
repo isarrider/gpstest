@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -97,6 +98,9 @@ private class GroupLines(
 ) {
     /** Latest value of the average line, for the legend */
     val latestAverage: Float? get() = average.lastOrNull { !it.isNaN() }
+
+    /** Mean of the average line over the whole window, drawn as a dashed horizontal line */
+    val windowAverage: Float? get() = average.filter { !it.isNaN() }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
 }
 
 /**
@@ -215,6 +219,19 @@ fun SignalHistoryCard(
                     visible.forEach { lines ->
                         drawRuns(lines.average, maxGap, groupColor(lines.group), thick)
                     }
+                    // The average over the window per constellation: dashed, in its colour
+                    val dash = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx()))
+                    visible.forEach { lines ->
+                        val average = lines.windowAverage ?: return@forEach
+                        val y = size.height * yFraction(average)
+                        drawLine(
+                            groupColor(lines.group),
+                            Offset(0f, y),
+                            Offset(size.width, y),
+                            strokeWidth = 1.5.dp.toPx(),
+                            pathEffect = dash
+                        )
+                    }
                 }
             }
 
@@ -329,10 +346,12 @@ private fun WindowChip(minutes: Int, selected: Boolean, onClick: () -> Unit) {
 private fun LegendChip(lines: GroupLines, hidden: Boolean, onClick: () -> Unit) {
     val name = groupName(SatelliteGroup("", lines.group.gnssType, lines.group.sbasType, emptyList()))
     val average = lines.latestAverage
-    val label = if (average != null) {
-        stringResource(R.string.signals_band_average, name, average)
-    } else {
-        name
+    val windowAverage = lines.windowAverage
+    val label = when {
+        average != null && windowAverage != null ->
+            stringResource(R.string.signals_history_legend_average, name, average, windowAverage)
+        average != null -> stringResource(R.string.signals_band_average, name, average)
+        else -> name
     }
     val description = label + ", " + stringResource(
         if (hidden) R.string.signals_a11y_hidden else R.string.signals_a11y_shown
