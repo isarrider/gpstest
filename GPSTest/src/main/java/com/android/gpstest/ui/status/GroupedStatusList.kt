@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -553,15 +554,23 @@ private fun SatelliteDetails(
             val used = stringResource(
                 if (status.usedInFix) R.string.status_details_used else R.string.status_details_not_used
             )
+            val samples = history[satellite.signals.indexOf(status)]
+            val average = if (cn0History != null && newest != null) {
+                windowAverage(samples, newest, cn0History.windowMillis)
+            } else {
+                null
+            }
+            val averageText = average?.let { stringResource(R.string.status_details_cn0_average, it) } ?: ""
             Text(
-                text = "$label: $frequency, $cn0$baseband$used",
+                text = "$label: $frequency, $cn0$averageText$baseband$used",
                 fontSize = 12.sp
             )
             if (cn0History != null && newest != null) {
                 Cn0Chart(
-                    samples = history[satellite.signals.indexOf(status)],
+                    samples = samples,
                     newestMillis = newest,
                     windowMillis = cn0History.windowMillis,
+                    average = average,
                     modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
                 )
             }
@@ -682,6 +691,20 @@ private fun satelliteDescription(
     return parts.joinToString(", ")
 }
 
+/** Average C/N0 of the [samples] at most [windowMillis] older than [newestMillis], or null if none */
+internal fun windowAverage(samples: List<Cn0History.Sample>, newestMillis: Long, windowMillis: Long): Float? {
+    var sum = 0.0
+    var count = 0
+    samples.forEach {
+        val age = newestMillis - it.timeMillis
+        if (age in 0..windowMillis) {
+            sum += it.cn0DbHz
+            count++
+        }
+    }
+    return if (count > 0) (sum / count).toFloat() else null
+}
+
 private const val CHART_MIN_CN0 = 10f
 private const val CHART_MAX_CN0 = 50f
 
@@ -694,13 +717,15 @@ private const val CHART_GAP_MILLIS = 3_000L
  * the latest C/N0.
  *
  * With an hour of history there are more samples than pixels, so the samples are averaged per pixel
- * column and the line connects the columns.
+ * column and the line connects the columns. A dashed line in the same colour marks the [average]
+ * over the window.
  */
 @Composable
 private fun Cn0Chart(
     samples: List<Cn0History.Sample>,
     newestMillis: Long,
     windowMillis: Long,
+    average: Float?,
     modifier: Modifier = Modifier,
 ) {
     val lineColor = cn0Color(samples.lastOrNull()?.cn0DbHz ?: CHART_MIN_CN0)
@@ -717,6 +742,16 @@ private fun Cn0Chart(
 
         listOf(20f, 30f, 40f).forEach {
             drawLine(gridColor, Offset(0f, y(it)), Offset(size.width, y(it)), strokeWidth = 1f)
+        }
+
+        if (average != null) {
+            drawLine(
+                lineColor.copy(alpha = 0.75f),
+                Offset(0f, y(average)),
+                Offset(size.width, y(average)),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))
+            )
         }
 
         val columns = size.width.toInt().coerceAtLeast(1)
