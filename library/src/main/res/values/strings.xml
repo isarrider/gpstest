@@ -470,6 +470,8 @@
     <string name="track_chart_elevation">Elevation (%1$s)</string>
     <string name="track_chart_speed">Speed (%1$s)</string>
     <string name="track_chart_satellites">Satellites used</string>
+    <string name="track_chart_average">avg %1$s</string>
+    <string name="track_chart_average_moving">avg moving %1$s</string>
     <string name="track_chart_axis_distance">Distance (%1$s)</string>
     <string name="track_chart_axis_minutes">Time (minutes)</string>
     <string name="track_marker_satellites">%1$d used</string>

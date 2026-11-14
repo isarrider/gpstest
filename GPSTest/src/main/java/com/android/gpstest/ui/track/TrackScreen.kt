@@ -15,6 +15,7 @@ package com.android.gpstest.ui.track
 
 import android.text.format.DateUtils
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Card
@@ -35,7 +37,11 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +59,8 @@ import com.android.gpstest.library.util.PreferenceUtil
 import com.android.gpstest.ui.status.preferenceState
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.AxisBase
+import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
@@ -269,7 +277,9 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                                     stringResource(R.string.track_chart_axis_distance, units.distanceAxisUnit),
                                     elevation,
                                     xText = { units.distanceAxisValue(it) },
-                                    yText = { units.heightValueText(it) }
+                                    yText = { units.heightValueText(it) },
+                                    average = elevation.map { it.y.toDouble() }.average().toFloat(),
+                                    averageText = { units.heightValueText(it) }
                                 )
                             }
                         }
@@ -283,7 +293,11 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                                     stringResource(R.string.track_chart_axis_minutes),
                                     speed,
                                     xText = ::elapsed,
-                                    yText = { units.speedValueText(it) }
+                                    yText = { units.speedValueText(it) },
+                                    // Moving time only, the same as the average speed in the overview
+                                    average = s.averageMovingSpeed?.let { units.speedValue(it.toFloat()) },
+                                    averageText = { units.speedValueText(it) },
+                                    averageLabel = R.string.track_chart_average_moving
                                 )
                             }
                         }
@@ -296,7 +310,12 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                                 units.speedValue(GpxTrackStatsAccumulator.MOVING_SPEED).toDouble()
                             )
                             if (distribution != null) {
-                                SpeedDistributionCard(distribution, units.speedUnit)
+                                SpeedDistributionCard(
+                                    distribution,
+                                    units.speedUnit,
+                                    average = s.averageMovingSpeed?.let { units.speedValue(it.toFloat()) },
+                                    averageText = { units.speedValueText(it) }
+                                )
                             }
                         }
                     }
@@ -309,7 +328,9 @@ private fun TrackContent(s: GpxTrackStats, state: GpxTrackRecorder.State, durati
                                     stringResource(R.string.track_chart_axis_minutes),
                                     sats,
                                     xText = ::elapsed,
-                                    yText = { String.format(satellitesUsed, it.roundToInt()) }
+                                    yText = { String.format(satellitesUsed, it.roundToInt()) },
+                                    average = s.avgSatellites?.toFloat(),
+                                    averageText = { String.format(Locale.getDefault(), "%.1f", it) }
                                 )
                             }
                         }
@@ -408,6 +429,9 @@ private fun StatRow(@StringRes label: Int, value: String) {
  * A line chart of [entries]. Touching it selects the nearest point and shows its values
  * ([xText], [yText]) in a window above it; dragging moves the selection while the chart isn't
  * zoomed in (zoomed in, dragging pans), and a tap elsewhere or on the same point clears it.
+ *
+ * With an [average], a dashed horizontal line marks it, and the title row shows its value
+ * ([averageText], with the [averageLabel] wording).
  */
 @Composable
 private fun ChartCard(
@@ -415,7 +439,10 @@ private fun ChartCard(
     xLabel: String,
     entries: List<Entry>,
     xText: (Float) -> String,
-    yText: (Float) -> String
+    yText: (Float) -> String,
+    average: Float? = null,
+    averageText: (Float) -> String = { "" },
+    @StringRes averageLabel: Int = R.string.track_chart_average
 ) {
     val lineColor = MaterialTheme.colors.primary.toArgb()
     val textColor = MaterialTheme.colors.onSurface.toArgb()
@@ -427,11 +454,7 @@ private fun ChartCard(
         elevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.subtitle1,
-                fontWeight = FontWeight.Bold
-            )
+            ChartTitle(title, average?.let { stringResource(averageLabel, averageText(it)) })
             AndroidView(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -472,6 +495,7 @@ private fun ChartCard(
                     chart.marker =
                         TrackChartMarker(chart.context, xText, yText, textColor, surfaceColor)
                     chart.data = LineData(set)
+                    chart.axisLeft.setAverageLine(average)
                     if (selectedX != null) chart.highlightValue(selectedX, 0, false)
                     chart.invalidate()
                 }
@@ -497,6 +521,9 @@ private fun SplitsCard(splits: List<TrackSplits.Split>, unit: String) {
     val surfaceColor = MaterialTheme.colors.surface.toArgb()
     val partFormat = stringResource(R.string.track_split_part)
     val title = stringResource(R.string.track_chart_splits, unit)
+    // Average time per unit over all splits, stops included: total time over total distance
+    val averageMinutes = splits.sumOf { it.fraction }.takeIf { it > 0 }
+        ?.let { (splits.sumOf { it.seconds } / it / 60.0).toFloat() }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -504,10 +531,11 @@ private fun SplitsCard(splits: List<TrackSplits.Split>, unit: String) {
         elevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.subtitle1,
-                fontWeight = FontWeight.Bold
+            ChartTitle(
+                title,
+                averageMinutes?.let {
+                    stringResource(R.string.track_chart_average, TrackSplits.format(it * 60.0))
+                }
             )
             AndroidView(
                 modifier = Modifier
@@ -562,6 +590,7 @@ private fun SplitsCard(splits: List<TrackSplits.Split>, unit: String) {
                         backgroundColor = surfaceColor
                     )
                     chart.data = BarData(set).apply { barWidth = 0.8f }
+                    chart.axisLeft.setAverageLine(averageMinutes)
                     if (selectedX != null) chart.highlightValue(selectedX, 0, false)
                     chart.invalidate()
                 }
@@ -581,7 +610,12 @@ private fun SplitsCard(splits: List<TrackSplits.Split>, unit: String) {
  * bar is the dominant speed. Touching a bar shows the range, share and time.
  */
 @Composable
-private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: String) {
+private fun SpeedDistributionCard(
+    d: TrackSpeedDistribution.Distribution,
+    unit: String,
+    average: Float? = null,
+    averageText: (Float) -> String = { "" }
+) {
     val barColor = MaterialTheme.colors.primary.toArgb()
     val textColor = MaterialTheme.colors.onSurface.toArgb()
     val surfaceColor = MaterialTheme.colors.surface.toArgb()
@@ -597,11 +631,7 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
         elevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.subtitle1,
-                fontWeight = FontWeight.Bold
-            )
+            ChartTitle(title, average?.let { stringResource(R.string.track_chart_average_moving, averageText(it)) })
             d.dominant?.let {
                 Text(
                     text = stringResource(
@@ -670,6 +700,13 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
                     )
                     // Many narrow ranges with almost no gap, so they read as a curve
                     chart.data = BarData(set).apply { barWidth = 0.9f }
+                    // Speed is on the x axis here, so the average is a vertical line. Bar i covers
+                    // bins[i].from..to and is centred on x = i.
+                    chart.xAxis.setAverageLine(
+                        average?.let { v ->
+                            d.bins.firstOrNull()?.let { ((v - it.from) / d.binWidth - 0.5).toFloat() }
+                        }
+                    )
                     if (selectedX != null) chart.highlightValue(selectedX, 0, false)
                     chart.invalidate()
                 }
@@ -679,6 +716,52 @@ private fun SpeedDistributionCard(d: TrackSpeedDistribution.Distribution, unit: 
                 fontSize = 12.sp,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/** Colour of the dashed average lines, a contrast to the charts' primary colour in both themes */
+private val AVERAGE_COLOR = Color(0xFFEB6834)
+
+/** Replaces the dashed average line of this axis, or removes it if [value] is null */
+private fun AxisBase.setAverageLine(value: Float?) {
+    removeAllLimitLines()
+    if (value == null || value.isNaN()) return
+    addLimitLine(LimitLine(value).apply {
+        lineColor = AVERAGE_COLOR.toArgb()
+        lineWidth = 1.5f
+        enableDashedLine(18f, 12f, 0f)
+    })
+    // Over the data, so it stays visible on filled areas and bars
+    setDrawLimitLinesBehindData(false)
+}
+
+/** A chart card's title, with the average (dashed sample and value) at the right if there is one */
+@Composable
+private fun ChartTitle(title: String, average: String?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.subtitle1,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        if (average != null) {
+            Canvas(modifier = Modifier.size(width = 16.dp, height = 2.dp)) {
+                drawLine(
+                    AVERAGE_COLOR,
+                    Offset(0f, size.height / 2),
+                    Offset(size.width, size.height / 2),
+                    strokeWidth = size.height,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 3.dp.toPx()))
+                )
+            }
+            Text(
+                text = average,
+                fontSize = 12.sp,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(start = 5.dp)
             )
         }
     }
