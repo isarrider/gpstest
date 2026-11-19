@@ -85,7 +85,10 @@ class OsnmaProgressViewTest {
         assertTrue(sawBeforeTracking)
     }
 
-    /** Pixel 10 Pro XL: every authenticated satellite says whose tags authenticated it */
+    /**
+     * Pixel 10 Pro XL: every authenticated satellite says whose tags authenticated it. E32 sends
+     * no OSNMA data the phone delivered and is only authenticated by E03's tags.
+     */
     @Test
     fun authenticatedBy() {
         val r = NavLogReplay.replay("/osnma/pixel10proxl_gal_inav.txt", offsetBits = 0)
@@ -95,6 +98,39 @@ class OsnmaProgressViewTest {
             assertTrue("E${it.svn} has no sender", it.cedAuthenticatedBy.isNotEmpty())
             assertEquals(it.cedAuthenticatedBy.sorted(), it.cedAuthenticatedBy)
         }
+        assertEquals(
+            mapOf(
+                3 to listOf(3), 25 to listOf(25), 30 to listOf(30), 32 to listOf(3),
+                36 to listOf(36)
+            ),
+            authenticated.associate { it.svn to it.cedAuthenticatedBy.toList() }
+        )
+    }
+
+    /** A reserved number of DSM-KROOT blocks counts as unknown, and the parts stay in range */
+    @Test
+    fun reservedBlockCount_isUnknown() {
+        val dsm = DsmAssembler()
+        // Block 0, first byte: NB = 15 (reserved)
+        dsm.write(0, 0, 0, 0xF0.toByte())
+        assertEquals(0 to 0, dsm.progress(0))
+        val (fill, known) = dsm.blockFill(0, 8)!!
+        assertFalse(known)
+        assertEquals(8, fill.size)
+        // A valid count is used
+        dsm.write(1, 0, 0, 0x20.toByte())
+        assertEquals(0 to 8, dsm.progress(1))
+    }
+
+    /** Unusable pages are only kept for the subframes the page store keeps */
+    @Test
+    fun unusablePages_pruned() {
+        val store = PageStore()
+        val start = Gst(1420, 3600)
+        store.markUnusable(5, start)
+        assertTrue(store.view(start).satellites.any { it.svn == 5 })
+        store.markUnusable(6, start.addSubframes(20))
+        assertTrue(store.view(start).satellites.none { it.svn == 5 })
     }
 
     /** A page reported as unusable shows as such, unless the same page was also received */
